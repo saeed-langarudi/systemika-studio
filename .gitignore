@@ -1,0 +1,10 @@
+OpenSystemDynamics/build/
+OpenSystemDynamics/node_modules/
+node_modules/
+distribute/node_modules/
+distribute/output/
+release/
+build/
+dist/
+.DS_Store
+.env

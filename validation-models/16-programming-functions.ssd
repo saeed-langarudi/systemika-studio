@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<InsightMakerModel>
+<root>
+<mxCell id="0"/>
+<mxCell id="1" parent="0"/>
+<Setting id="setting" Version="36" TimeStart="0" TimeLength="4" TimeStep="0.05" SolutionAlgorithm="RK4" TimeUnits="" BackgroundColor="white"><mxCell parent="1" visible="0"><mxGeometry x="0" y="0" width="0" height="0" as="geometry"/></mxCell></Setting>
+<Variable id="input" name="Input" Equation="T()" isConstant="false" Units="Unitless"><mxCell parent="1" vertex="1" style="variable"><mxGeometry x="40" y="60" width="100" height="40" as="geometry"/></mxCell></Variable>
+<Variable id="lag" name="Lagged" Equation="Lag([Input], 2, -1)" isConstant="false" Units="Unitless"><mxCell parent="1" vertex="1" style="variable"><mxGeometry x="100" y="60" width="100" height="40" as="geometry"/></mxCell></Variable>
+<Variable id="smooth" name="Smoothed" Equation="Smooth(10, 4, 2, 0)" isConstant="false" Units="Unitless"><mxCell parent="1" vertex="1" style="variable"><mxGeometry x="260" y="60" width="100" height="40" as="geometry"/></mxCell></Variable>
+<Variable id="delay" name="Delayed" Equation="Delay(10, 4, 2, 0)" isConstant="false" Units="Unitless"><mxCell parent="1" vertex="1" style="variable"><mxGeometry x="420" y="60" width="100" height="40" as="geometry"/></mxCell></Variable>
+</root>
+</InsightMakerModel>

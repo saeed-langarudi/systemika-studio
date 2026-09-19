@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<InsightMakerModel>
+<root>
+<mxCell id="0"/>
+<mxCell id="1" parent="0"/>
+<Setting id="setting" Version="36" TimeStart="0" TimeLength="3" TimeStep="1" SolutionAlgorithm="RK1" TimeUnits="" BackgroundColor="white"><mxCell parent="1" visible="0"><mxGeometry x="0" y="0" width="0" height="0" as="geometry"/></mxCell></Setting>
+<Stock id="a" name="A" InitialValue="0" NonNegative="false" Units="Unitless"><mxCell parent="1" vertex="1" style="stock"><mxGeometry x="120" y="60" width="100" height="40" as="geometry"/></mxCell></Stock>
+<Stock id="b" name="B" InitialValue="10" NonNegative="false" Units="Unitless"><mxCell parent="1" vertex="1" style="stock"><mxGeometry x="420" y="60" width="100" height="40" as="geometry"/></mxCell></Stock>
+<Flow id="f" name="Transfer" FlowRate="-2" OnlyPositive="true" Units="Unitless"><mxCell parent="1" edge="1" style="flow" source="a" target="b"><mxGeometry x="0" y="0" width="0" height="0" as="geometry"><mxPoint as="sourcePoint" x="220" y="80"/><mxPoint as="targetPoint" x="420" y="80"/></mxGeometry></mxCell></Flow>
+</root>
+</InsightMakerModel>

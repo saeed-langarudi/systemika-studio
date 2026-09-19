@@ -1,0 +1,22 @@
+{
+  "appId": "org.systemika.studio",
+  "productName": "Systemika Studio",
+  "directories": {
+    "app": "output/app",
+    "output": "output/dist-electron"
+  },
+  "win": {
+    "target": [
+      {
+        "target": "portable",
+        "arch": [
+          "x64"
+        ]
+      }
+    ],
+    "icon": "../app-icons/systemika.ico",
+    "artifactName": "Systemika-Studio-Portable-${version}-${arch}.${ext}"
+  },
+  "npmRebuild": false,
+  "electronVersion": "44.3.0"
+}

@@ -1,0 +1,408 @@
+<!--
+/*
+
+This file may distributed and/or modified under the
+terms of the Affero General Public License (http://www.gnu.org/licenses/agpl-3.0.html).
+
+*/
+-->
+
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+	<title>Systemika</title>
+
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+	<!-- Prevent rightclick contextmenu -->
+	<script type="text/javascript">
+		document.addEventListener('contextmenu', event => event.preventDefault());
+	</script>
+	<!-- build:js opensystemdynamics.min.js  -->
+	<script type="text/javascript" src="libs/idbkeyval.js"></script>
+	<script type="text/javascript" src="version.js"></script>
+	<script type="text/javascript" src="preferences.js"></script>
+	<script type="text/javascript" src="settings.js"></script>
+	<script type="text/javascript" src="debug.js"></script>
+	<script type="text/javascript" src="model-storage.js"></script>
+	<!-- environment.js determines whether to use web or Electron. Must be executed early to work -->
+	<script type="text/javascript" src="environment.js"></script>
+	<script type="text/javascript" src="systemika-localization.js"></script>
+	<script type="text/javascript" src="systemika-entities.js"></script>
+	<script type="text/javascript" src="systemika-model-utils.js"></script>
+	<script type="text/javascript" src="systemika-model-api.js"></script>
+	<script type="text/javascript" src="systemika-model-graph.js"></script>
+	<!-- Systemika uses its native simulation engine. Legacy Insight Maker simulation scripts removed. -->
+	<script type="text/javascript" src="definition-error.js"></script>
+	<script type="text/javascript" src="newAPI.js"></script>
+	<script src="makexml.js"></script>
+	<script type="text/javascript" src="imc.js"></script>
+	<script src="transform.js"></script>
+	<script src="SVG.js"></script>
+	<script type="text/javascript" src="./codemirror/lib/codemirror.js"></script>
+	<script type="text/javascript" src="./codemirror/addon/hint/show-hint.js"></script>
+	<script type="text/javascript" src="./codemirror/addon/mode/simple.js"></script>
+	<script type="text/javascript" src="./codemirror/mode/stochsd/stochsd-dynimic-mode.js"></script>
+	<script type="text/javascript" src="./codemirror/mode/stochsd/convertermode.js"></script>
+	<script type="text/javascript" src="./codemirror/addon/edit/matchbrackets.js"></script>
+	<script src="jquery/jquery-1.8.3.min.js"></script>
+	<script type="text/javascript" src="jquery/jqplot-1.0.8/jquery.jqplot.min.js"></script>
+	<script type="text/javascript" src="jquery/jqplot-1.0.8/plugins/jqplot.barRenderer.min.js"></script>
+	<script type="text/javascript" src="jquery/jqplot-1.0.8/plugins/jqplot.categoryAxisRenderer.min.js"></script>
+	<script type="text/javascript" src="jquery/jqplot-1.0.8/plugins/jqplot.pointLabels.min.js"></script>
+	<script type="text/javascript" src="jquery/jqplot-1.0.8/plugins/jqplot.logAxisRenderer.min.js"></script>
+	<script type="text/javascript" src="jquery/jqplot-1.0.8/plugins/jqplot.canvasAxisTickRenderer.min.js"></script>
+	<script type="text/javascript" src="jquery/jqplot-1.0.8/plugins/jqplot.highlighter.min.js"></script>
+	<script type="text/javascript" src="jquery/jqplot-1.0.8/plugins/jqplot.canvasTextRenderer.min.js"></script>
+	<script type="text/javascript" src="jquery/jqplot-1.0.8/plugins/jqplot.canvasAxisLabelRenderer.min.js"></script>
+	<script src="jquery/jquery-ui-1.12.1/jquery-ui.min.js"></script>
+	<script type="text/javascript" src="emenu.js"></script>
+	<script type="text/javascript" src="functionCategories.js"></script>
+	<script type="text/javascript" src="format_number.js"></script>
+	<script type="text/javascript" src="DragAndDrop.js"></script>
+	<script type="text/javascript" src="primitive-svg-preview.js"></script>
+	<script type="text/javascript" src="systemika-run-browser-store.js"></script>
+	<script type="text/javascript" src="systemika-run-data-manager.js"></script>
+	<script type="text/javascript" src="systemika-run-manager.js"></script>
+	<!-- Native Systemika simulation engine (default backend). -->
+	<script type="text/javascript" src="systemika-engine.js"></script>
+	<script type="text/javascript" src="systemika-units.js"></script>
+	<script type="text/javascript" src="systemika-plot-pages.js"></script>
+	<script type="text/javascript" src="systemika-documentation.js"></script>
+	<script type="text/javascript" src="editor.js?v=1.0.6"></script>
+	<!-- endbuild -->
+
+	<!-- build:css opensystemdynamics.css  -->
+	<link rel="stylesheet" href="./codemirror/lib/codemirror.css" />
+	<link rel="stylesheet" href="./codemirror/theme/stochsdtheme.css" />
+	<link rel="stylesheet" href="./codemirror/theme/oneline.css" />
+	<link rel="stylesheet" href="./codemirror/theme/resize.css" />
+	<link rel="stylesheet" type="text/css" href="style/editor.css?v=1.0.6">
+	<link rel="stylesheet" type="text/css" href="style/systemika-runs.css" />
+	<link class="include" rel="stylesheet" type="text/css" href="jquery/jqplot-1.0.8/jquery.jqplot.min.css" />
+	<link rel="stylesheet" href="jquery/jquery-ui-1.12.1/jquery-ui.css" />
+	<link rel="stylesheet" href="style/emenu.css" />
+	<link rel="stylesheet" href="./codemirror/addon/hint/show-hint.css" />
+	<!-- endbuild -->
+
+
+	<link rel="shortcut icon" type="image/png" href="../../app-icons/systemika.png" />
+	<link rel="icon" type="image/png" href="../../app-icons/systemika.png" />
+</head>
+
+<body>
+	<div id="overlay" class="hidden">Drop .ssd file to load.</div>
+	<div id="coverEverythingDiv">
+		<div id="topPanel"> <!-- This panel is hidden when printing-->
+			<div class="fileToolBox">
+				<div class="eMenu">
+					<button class="menuButton" id="btn_file">File</button>
+					<div class="menuContent">
+						<span>
+							<button id="btn_new">New</button>
+						</span>
+						<span>
+							<button id="btn_load"><u>O</u>pen<span class="shortcut">Ctrl O</span></button>
+						</span>
+						<span>
+							<button id="btn_save"><u>S</u>ave<span class="shortcut">Ctrl S</span></button>
+						</span>
+						<span>
+							<button id="btn_save_as" data-title="Save As (Ctrl+Shift+S)" style="display: none;">Save As...<span class="shortcut">Ctrl Shift S</span></button>
+						</span>
+						<span class="menuSeparator">
+							<button id="btn_import" style="display: none;">Import from file...</button>
+						</span>
+						<span>
+							<button id="btn_export" style="display: none;">Export to file...</button>
+						</span>
+						<span>
+							<button id="btn_browser_models" style="display: none;">Models in Browser...</button>
+						</span>
+						<span id="recent_title" style="display: none">
+							<p>Recently Opened</p>
+						</span>
+						<span>
+							<button id="btn_recent_0" style="display: none;">Recent 0</button>
+						</span>
+						<span>
+							<button id="btn_recent_1" style="display: none;">Recent 1</button>
+						</span>
+						<span>
+							<button id="btn_recent_2" style="display: none;">Recent 2</button>
+						</span>
+						<span>
+							<button id="btn_recent_3" style="display: none;">Recent 3</button>
+						</span>
+						<span>
+							<button id="btn_recent_4" style="display: none;">Recent 4</button>
+						</span>
+						<span>
+							<button id="btn_recent_5" style="display: none;">Recent 5</button>
+						</span>
+						<span>
+							<button id="btn_recent_6" style="display: none;">Recent 6</button>
+						</span>
+						<span>
+							<button id="btn_recent_7" style="display: none;">Recent 7</button>
+						</span>
+						<span>
+							<button id="btn_recent_8" style="display: none;">Recent 8</button>
+						</span>
+						<span>
+							<button id="btn_recent_9" style="display: none;">Recent 9</button>
+						</span>
+						<span>
+							<button id="btn_recent_clear" style="display: none;">Clear Recent List</button>
+						</span>
+					</div>
+				</div>
+				<div class="eMenu">
+					<button class="menuButton">View</button>
+					<div class="menuContent">
+						<span>
+							<button id="btn_zoom_in">Zoom In <span class="shortcut">Ctrl +</span></button>
+						</span>
+						<span>
+							<button id="btn_zoom_out">Zoom Out <span class="shortcut">Ctrl -</span></button>
+						</span>
+						<span>
+							<button id="btn_zoom_reset">Reset Zoom</button>
+						</span>
+					</div>
+				</div>
+				<!-- Simulation Settings are intentionally hidden from the menu bar for the current release. -->
+
+
+
+				<div class="eMenu">
+					<button class="menuButton">Help</button>
+					<div class="menuContent">
+						<span><button id="btn_getting_started">Getting Started</button></span>
+						<span><button id="btn_shortcuts">Keyboard Shortcuts</button></span>
+						<span><button id="btn_functions_help">Functions &amp; Equations</button></span>
+						<span><button id="btn_units_help">Unit Checking</button></span>
+						<span class="menuSeparator"><button id="btn_preferences">Preferences</button></span>
+						<span class="menuSeparator"><button id="btn_about">About Systemika</button></span>
+						<span><button id="btn_license">Systemika License</button></span>
+						<span><button id="btn_thirdparty">Third-party Notices</button></span>
+					</div>
+				</div>
+
+			</div>
+
+		</div> <!-- End of topPanel -->
+
+		<div class="tool-panel run-tool-panel" aria-label="Editor and simulation controls">
+			<div class="tool-grouping editor-actions" aria-label="Selection and history tools">
+				<button id="btn_mouse" data-title="Mouse" class="tool-button" data-tool="mouse">
+					<img src="graphics/mouse.svg" />
+				</button>
+				<button id="btn_delete" data-title="Delete" class="tool-button" data-tool="delete">
+					<img src="graphics/delete.svg" />
+				</button>
+				<button id="btn_undo" data-title="Undo" class="tool-button" data-tool="undo" disabled>
+					<img src="graphics/undo.svg" />
+				</button>
+				<button id="btn_redo" data-title="Redo" class="tool-button" data-tool="redo" disabled>
+					<img src="graphics/redo.svg" />
+				</button>
+			</div>
+			<div class="tool-grouping editing-actions" aria-label="Clipboard and colour tools">
+				<button id="btn_cut" type="button" data-title="Cut (Ctrl+X)" class="toolbar-action-button" aria-label="Cut selected model structure">
+					<img class="toolbar-inline-icon" src="graphics/cut.svg" alt="" aria-hidden="true" />
+				</button>
+				<button id="btn_copy" type="button" data-title="Copy (Ctrl+C)" class="toolbar-action-button" aria-label="Copy selected model structure">
+					<svg class="toolbar-inline-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 8V5.5A1.5 1.5 0 0 0 14.5 4h-10A1.5 1.5 0 0 0 3 5.5v10A1.5 1.5 0 0 0 4.5 17H8" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+				</button>
+				<button id="btn_paste" type="button" data-title="Paste (Ctrl+V)" class="toolbar-action-button" aria-label="Paste copied model structure" disabled>
+					<svg class="toolbar-inline-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5h6M9 3h6v4H9V3Z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M7 5H5.5A1.5 1.5 0 0 0 4 6.5v13A1.5 1.5 0 0 0 5.5 21h13a1.5 1.5 0 0 0 1.5-1.5v-13A1.5 1.5 0 0 0 18.5 5H17" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+				</button>
+				<div class="toolbar-colour-control">
+					<button id="btn_colour" type="button" data-title="Colour" class="toolbar-action-button" aria-label="Change colour of selection" aria-expanded="false">
+						<img class="toolbar-inline-icon" src="graphics/colour-pallet.svg" alt="" aria-hidden="true" />
+					</button>
+					<div id="toolbar-colour-picker" class="toolbar-colour-picker" hidden role="menu" aria-label="Selection colour">
+						<button id="btn_black" type="button" class="toolbar-colour-swatch" style="--swatch:black" data-title="Black" aria-label="Black"></button>
+						<button id="btn_grey" type="button" class="toolbar-colour-swatch" style="--swatch:silver" data-title="Grey" aria-label="Grey"></button>
+						<button id="btn_red" type="button" class="toolbar-colour-swatch" style="--swatch:red" data-title="Red" aria-label="Red"></button>
+						<button id="btn_deeppink" type="button" class="toolbar-colour-swatch" style="--swatch:deeppink" data-title="Pink" aria-label="Pink"></button>
+						<button id="btn_brown" type="button" class="toolbar-colour-swatch" style="--swatch:brown" data-title="Brown" aria-label="Brown"></button>
+						<button id="btn_orange" type="button" class="toolbar-colour-swatch" style="--swatch:orange" data-title="Orange" aria-label="Orange"></button>
+						<button id="btn_gold" type="button" class="toolbar-colour-swatch" style="--swatch:gold" data-title="Gold" aria-label="Gold"></button>
+						<button id="btn_olive" type="button" class="toolbar-colour-swatch" style="--swatch:olive" data-title="Olive" aria-label="Olive"></button>
+						<button id="btn_green" type="button" class="toolbar-colour-swatch" style="--swatch:green" data-title="Green" aria-label="Green"></button>
+						<button id="btn_teal" type="button" class="toolbar-colour-swatch" style="--swatch:teal" data-title="Teal" aria-label="Teal"></button>
+						<button id="btn_blue" type="button" class="toolbar-colour-swatch" style="--swatch:blue" data-title="Blue" aria-label="Blue"></button>
+						<button id="btn_magenta" type="button" class="toolbar-colour-swatch" style="--swatch:magenta" data-title="Magenta" aria-label="Magenta"></button>
+					</div>
+				</div>
+			</div>
+			<div class="tool-grouping output-actions" aria-label="Output displays">
+				<button id="btn_equations" data-title="Equations (E)" class="tool-button" data-tool="equations" aria-label="Equations">
+					<img src="graphics/equations.svg" alt="" aria-hidden="true" />
+				</button>
+				<button id="btn_table" data-title="Table (T)" class="tool-button" data-tool="table">
+					<img src="graphics/table.svg" />
+				</button>
+				<button id="btn_compareplot" data-title="Time Plot (P)" class="tool-button" data-tool="compareplot">
+					<img src="graphics/timeplot.svg" />
+				</button>
+				<button id="btn_xyplot" data-title="XY Plot (X)" class="tool-button" data-tool="xyplot">
+					<img src="graphics/xyplot.svg" />
+				</button>
+				<button id="btn_histoplot" data-title="Histogram (H)" class="tool-button" data-tool="histoplot">
+					<img src="graphics/histoplot.svg" />
+				</button>
+			</div>
+			<div class="tool-grouping" id="runControllerArea">
+				<div id="systemika-run-controls">
+					<label for="systemika-run-name">Run Name</label>
+					<input id="systemika-run-name" type="text" value="Base" autocomplete="off" spellcheck="false" aria-label="Simulation run name" />
+					<button id="btn_open_runs_folder" type="button" data-title="Manage Runs" aria-label="Manage Runs">
+						<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 5a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5Zm2 2v10h14V7H5Z"/></svg>
+					</button>
+				</div>
+				<button id="btn_clear" data-title="Clear Outputs (Ctrl+0)" class="tool-button" data-tool="clear" aria-label="Clear Outputs">
+					<img src="graphics/eraser.svg" alt="" aria-hidden="true" />
+				</button>
+				<button id="btn_run" data-title="Run/Pause (Ctrl+1)" class="tool-button" data-tool="run">
+					<img id="imgRunPauseTool" src="graphics/run.svg" />
+				</button>
+				<button id="btn_step" data-title="Advance (Ctrl+2)" class="tool-button" data-tool="step">
+					<img src="graphics/step.svg" />
+				</button>
+				<button id="btn_finish" data-title="Advance to End (Ctrl+3)" class="tool-button" disabled data-tool="finish" aria-label="Advance to End">
+					<svg class="toolbar-inline-icon" viewBox="0 0 24 24" aria-hidden="true">
+						<path d="M3 6l6 6-6 6V6Zm7 0 6 6-6 6V6Zm9-1v14" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+					</svg>
+				</button>
+				<div id="progress-bar">
+					<div id="progress-bar-text" data-title="Start / Current / End &#10; Method(Step)">
+					</div>
+				</div>
+				<button id="btn_timeunit">
+					<div id="timeunit-label">Time Unit</div>
+					<div id="timeunit-value">None</div>
+				</button>
+				<button id="btn_check_units">
+					<div id="check_units-label">Check Units</div>
+					<div id="check_units-value">Report</div>
+				</button>
+				<button id="unsaved_changes" type="button" class="hidden" data-title="Save unsaved changes">
+					<div id="unsaved_changes-value">Unsaved<br/>Changes</div>
+				</button>
+			</div> <!-- End of runControllArea -->
+
+
+		</div> <!-- End of top tool-panel-->
+		<div class="info-bar">
+				<div class="info-bar__definition info-box__element" data-title="Selection"></div>
+				<!--<div style="border-left:1px solid #ccc; margin: 6px  0px;"></div>--> <!--Divider here-->
+				<div class="info-bar__definition-error info-box__element"
+					data-title="Definition Error">
+				</div>
+				<div id="systemika-browser-compatibility-status" class="systemika-browser-compatibility-status" role="status" aria-label="Browser compatibility notice" title="Firefox and Safari do not provide the local project-folder access used for full file and simulation-run management.">Firefox and Safari are not fully supported: use Chrome or Edge for full file and run management.</div>
+		</div>
+
+		<!-- Working area -->
+		<div class="workspace-row">
+			<div class="model-tool-panel" aria-label="Model creation tools">
+			<div class="tool-grouping">
+				<button id="btn_stock" data-title="Stock (S)" class="tool-button" data-tool="stock">
+					<img src="graphics/stock.svg" />
+				</button>
+				<button id="btn_flow" data-title="Flow (F)" class="tool-button" data-tool="flow">
+					<img src="graphics/flow.svg" />
+				</button>
+				<button id="btn_link" data-title="Link (L)" class="tool-button" data-tool="link">
+					<img src="graphics/link.svg" />
+				</button>
+				<button id="btn_variable" data-title="Auxiliary (A)" class="tool-button" data-tool="variable">
+					<img src="graphics/variable.svg" />
+				</button>
+				<button id="btn_constant" data-title="Constant (C)" class="tool-button" data-tool="constant">
+					<img src="graphics/constant.svg" />
+				</button>
+				<button id="btn_converter" data-title="Lookup (K)" class="tool-button" data-tool="converter">
+					<img src="graphics/converter.svg" />
+				</button>
+				<button id="btn_ghost" data-title="Ghost (G)" class="tool-button" data-tool="ghost">
+					<img src="graphics/ghost.svg" />
+				</button>
+			</div>
+			<div class="tool-grouping" aria-label="Model display tools">
+				<button id="btn_question_marks" type="button" data-title="Hide/Unhide Question Marks (Q)" class="tool-button" data-action="toggle-question-marks" aria-label="Hide/Unhide Question Marks (Q)" aria-pressed="false">
+					<img src="graphics/hidden.svg" alt="" aria-hidden="true" />
+				</button>
+			</div>
+			<div class="tool-grouping">
+				<button id="btn_rotatename" data-title="Rotate Name (R)" class="tool-button" data-tool="rotatename">
+					<img src="graphics/rotate_name.svg" />
+				</button>
+				<button id="btn_movevalve" data-title="Move Valve" class="tool-button" data-tool="movevalve">
+					<img src="graphics/move_valve.svg">
+				</button>
+				<button id="btn_straighten_link" data-title="Straighten Link" class="tool-button" data-tool="straightenlink">
+					<img src="graphics/straighten_link.svg">
+				</button>
+				<button id="btn_text" data-title="Text" class="tool-button" data-tool="text">
+					<img src="graphics/text.svg" />
+				</button>
+				<button id="btn_rectangle" data-title="Rectangle (shift gives square)" class="tool-button"
+					data-tool="rectangle">
+					<img src="graphics/rectangle.svg" />
+				</button>
+				<button id="btn_ellipse" data-title="Ellipse (shift gives circle)" class="tool-button" data-tool="ellipse">
+					<img src="graphics/ellipse.svg" />
+				</button>
+				<button id="btn_line" data-title="Arrow/Line" class="tool-button" data-tool="line">
+					<img src="graphics/arrow.svg" />
+				</button>
+			</div>
+			</div>
+			<div id="svgplanebackground"
+			style="overflow: scroll; flex-grow: 1; border: 2px solid var(--color-border); z-index: 3; width: calc(100% - 0.5rem); position: relative; display: inline-block; font-family: Arial, Helvetica, sans-serif">
+			<div id="svgBlockOverlay"
+				style="position: absolute; left: 0px; top: 0px; display: none; z-index: 110; width: 100%; height: 100%; background-color: red; opacity: 0;">
+			</div>
+			<svg draggable="false" id="svgplane" width="6000" height="2000" style="background-color: white;">
+				<g class="layer stock"></g>
+				<g class="layer variable"></g>
+				<g class="layer constant"></g>
+				<g class="layer converter"></g>
+				<g class="layer flow"></g>
+				<g class="layer link"></g>
+				<g class="layer plot"></g>
+				<g class="layer anchor"></g>
+			</svg>
+		</div>
+		<div id="systemika-output-splitter" class="systemika-output-splitter systemika-output-hidden" role="separator" aria-orientation="vertical" aria-label="Resize modeling and output panels"></div>
+		<aside id="systemika-output-panel" class="systemika-output-panel systemika-output-hidden" aria-label="Outputs" aria-hidden="true">
+			<div class="systemika-output-header">
+				<strong id="systemika-output-title">Equations</strong>
+				<div id="systemika-output-actions" class="systemika-output-actions" aria-label="Output export actions"></div>
+				<button id="systemika-output-detach" class="systemika-output-detach-button" type="button" title="Detach output panel" aria-label="Detach output panel">
+					<img src="graphics/unlink.svg" alt="" aria-hidden="true" />
+				</button>
+				<button id="systemika-output-close" class="systemika-output-close-button" type="button" title="Close output panel" aria-label="Close output panel">×</button>
+			</div>
+			<div id="systemika-output-body" class="systemika-output-body">
+				<div id="systemika-output-view" class="systemika-output-view"></div>
+				<div id="systemika-output-horizontal-splitter" class="systemika-output-horizontal-splitter" role="separator" aria-orientation="horizontal" aria-label="Resize output and settings panels"></div>
+				<div id="systemika-output-settings" class="systemika-output-settings"></div>
+			</div>
+			<div id="systemika-output-holding" class="systemika-output-holding" aria-hidden="true"></div>
+		</aside>
+		</div> <!-- End of workspace-row -->
+		<div class="editor-footer" style="display: none;">
+			<div class="editor-footer-filepath">FilePath/FileName</div>
+			<div style="padding: 0px 16px;">|</div>
+			<div class="editor-footer-date">YYYY-MM-DD</div>
+		</div>
+	</div>
+</body>
+
+</html>

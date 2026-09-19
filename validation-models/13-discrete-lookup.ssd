@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<InsightMakerModel>
+<root>
+<mxCell id="0"/>
+<mxCell id="1" parent="0"/>
+<Setting id="setting" Version="36" TimeStart="0" TimeLength="2.5" TimeStep="0.5" SolutionAlgorithm="RK1" TimeUnits="" BackgroundColor="white"><mxCell parent="1" visible="0"><mxGeometry x="0" y="0" width="0" height="0" as="geometry"/></mxCell></Setting>
+<Converter id="l" name="Lookup" Data="0,5;1,10;2,20;3,40" Source="Time" Interpolation="Discrete" Units="Unitless"><mxCell parent="1" vertex="1" style="converter"><mxGeometry x="120" y="60" width="100" height="40" as="geometry"/></mxCell></Converter>
+</root>
+</InsightMakerModel>

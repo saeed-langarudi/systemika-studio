@@ -1,0 +1,84 @@
+/* Persistent Systemika simulation-run controls */
+#systemika-run-controls {
+    height: 100%;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding-inline: 0.45rem;
+    box-sizing: border-box;
+    border: 1px solid var(--color-border);
+    border-radius: 0.25rem;
+    background: var(--color-highlight-neutral);
+    vertical-align: top;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+#systemika-run-controls label {
+    font-weight: 600;
+}
+
+#systemika-run-name {
+    width: 8.5rem;
+    min-width: 5rem;
+    height: 1.6rem;
+    padding: 0 0.35rem;
+    box-sizing: border-box;
+    border: 1px solid var(--color-border);
+    border-radius: 0.2rem;
+    background: var(--color-background-primary, white);
+    color: var(--color-text-primary);
+    font: inherit;
+}
+
+#btn_open_runs_folder {
+    width: 1.8rem;
+    min-width: 1.8rem;
+    height: 1.7rem;
+    padding: 0.15rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--color-border);
+    border-radius: 0.2rem;
+    background: transparent;
+}
+
+#btn_open_runs_folder:hover:enabled {
+    border-color: black;
+}
+
+#btn_open_runs_folder svg {
+    width: 1rem;
+    height: 1rem;
+}
+
+/* A browser launch cannot create a project-local Runs directory. Make that
+   state visible instead of leaving the folder button looking broken. */
+#systemika-run-controls[data-persistence="unavailable"]::after {
+    content: "Runs not saved";
+    font-size: 10px;
+    font-weight: 600;
+    opacity: 0.8;
+}
+
+
+/* Browser compatibility guidance lives in the normal info/status bar so it
+   remains visible without competing with dialogs or obscuring the workspace. */
+.systemika-browser-compatibility-status {
+    display: none;
+    margin-left: auto;
+    padding: 0 0.75rem;
+    align-items: center;
+    white-space: nowrap;
+    max-width: 52vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex-shrink: 1;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-warning-foreground);
+    background: var(--color-warning-background);
+    border-left: 1px solid var(--table-border-color);
+}

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<InsightMakerModel>
+<root>
+<mxCell id="0"/>
+<mxCell id="1" parent="0"/>
+<Setting id="setting" Version="36" TimeStart="0" TimeLength="10" TimeStep="0.25" SolutionAlgorithm="RK4" TimeUnits="" BackgroundColor="white"><mxCell parent="1" visible="0"><mxGeometry x="0" y="0" width="0" height="0" as="geometry"/></mxCell></Setting>
+<Stock id="s" name="State" InitialValue="0" NonNegative="false" Units="Unitless"><mxCell parent="1" vertex="1" style="stock"><mxGeometry x="120" y="60" width="100" height="40" as="geometry"/></mxCell></Stock>
+<Variable id="g" name="Goal" Equation="100" isConstant="true" Units="Unitless"><mxCell parent="1" vertex="1" style="variable"><mxGeometry x="120" y="140" width="100" height="40" as="geometry"/></mxCell></Variable>
+<Variable id="t" name="Adjustment Time" Equation="2" isConstant="true" Units="Unitless"><mxCell parent="1" vertex="1" style="variable"><mxGeometry x="120" y="220" width="100" height="40" as="geometry"/></mxCell></Variable>
+<Flow id="f" name="Adjustment" FlowRate="([Goal] - [State]) / [Adjustment Time]" OnlyPositive="false" Units="Unitless"><mxCell parent="1" edge="1" style="flow" target="s"><mxGeometry x="0" y="0" width="0" height="0" as="geometry"><mxPoint as="sourcePoint" x="300" y="300"/><mxPoint as="targetPoint" x="420" y="300"/></mxGeometry></mxCell></Flow>
+</root>
+</InsightMakerModel>

@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Systemika Studio 1.0.6 - macOS Installer Build Guide</title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      background-color: #1a1a1a;
+      border: none;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+    /* CSS for syntax highlighting */
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {   }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { color: #008000; } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { color: #008000; font-weight: bold; } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">Systemika Studio 1.0.6 - macOS Installer Build
+Guide</h1>
+</header>
+<h1 id="systemika-studio-1.0.6-macos-installer-build-guide">Systemika
+Studio 1.0.6 — macOS Installer Build Guide</h1>
+<p>This guide is for a person who can use ordinary Mac applications but
+is <strong>not a programmer</strong>. You do not need to understand the
+Systemika source code. The source package contains an automated builder
+named <code>BUILD_MACOS_INSTALLER.command</code> that performs the
+technical build steps for you.</p>
+<p>These instructions correspond specifically to the <strong>Systemika
+Studio 1.0.6 release</strong>. The builder reads the
+version directly from <code>package.json</code>, so the generated
+installer filenames and macOS application metadata will also be
+<code>1.0.6</code>.</p>
+<h2 id="what-this-procedure-creates">What this procedure creates</h2>
+<p>The builder creates:</p>
+<ul>
+<li><code>Systemika Studio.app</code> — the Mac application;</li>
+<li><code>Systemika-Studio-1.0.6-macOS-Universal.dmg</code> — the normal
+installer disk image to give to students;</li>
+<li><code>Systemika-Studio-1.0.6-macOS-Universal.zip</code> — a
+compressed copy of the app, useful as a backup distribution format;</li>
+<li><code>SHA256SUMS.txt</code> — checksums that can be used to verify
+that the distributed files were not changed or corrupted.</li>
+</ul>
+<p>The application is <strong>Universal</strong>: the same build
+supports both modern Apple Silicon Macs (M1/M2/M3/M4 and later) and
+older Intel Macs.</p>
+<p>The finished application does <strong>not</strong> require Node.js,
+Go, Xcode, or programming tools on students’ Macs. Those tools are
+needed only on the one Mac used to create the installer.</p>
+<h2 id="important-browser-requirement-for-students">Important browser
+requirement for students</h2>
+<p>The macOS launcher starts Systemika Studio locally and opens it in an
+application-style browser window. For full project-folder and saved-run
+functionality, students should have <strong>Google Chrome, Microsoft
+Edge, or Chromium</strong> installed.</p>
+<p>If none of those browsers is installed, the launcher can fall back to
+the Mac’s default browser for a newly started session. Safari can run
+the application, but Systemika’s project-folder and persistent
+run-management features are more limited there. For student
+distribution, installing Chrome, Edge, or Chromium is therefore
+recommended.</p>
+<h2 id="part-1-prepare-the-build-mac">Part 1 — Prepare the build
+Mac</h2>
+<p>You need:</p>
+<ol type="1">
+<li>A Mac running macOS 11 or newer.</li>
+<li>An internet connection while installing the build tools.</li>
+<li>The complete <strong>Systemika Studio 1.0.6 source package</strong>,
+extracted to a folder such as
+<code>Systemika-Studio-1.0.6-Source</code>.</li>
+<li>Apple Command Line Tools.</li>
+<li>The Go programming language.</li>
+</ol>
+<p>You do <strong>not</strong> need the full Xcode application unless
+you want it for other reasons.</p>
+<h3 id="step-1-put-the-systemika-source-folder-somewhere-simple">Step 1:
+Put the Systemika source folder somewhere simple</h3>
+<p>Download or copy the Systemika Studio source ZIP to the Mac.
+Double-click the ZIP to extract it.</p>
+<p>Move the extracted folder somewhere easy to find, for example:</p>
+<p><code>Downloads/Systemika-Studio-1.0.6-Source</code></p>
+<p>Do not try to run the builder while the source is still inside the
+ZIP file.</p>
+<h3 id="step-2-install-apple-command-line-tools">Step 2: Install Apple
+Command Line Tools</h3>
+<p>Open <strong>Terminal</strong>. You can find it with Spotlight by
+pressing <code>Command + Space</code>, typing <code>Terminal</code>, and
+pressing Return.</p>
+<p>In Terminal, type:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">xcode-select</span> <span class="at">--install</span></span></code></pre></div>
+<p>Press Return.</p>
+<p>macOS should display an Apple installation window. Choose
+<strong>Install</strong> and wait until it finishes.</p>
+<p>If macOS says the command line tools are already installed, that is
+fine; continue to the next step.</p>
+<h3 id="step-3-install-go">Step 3: Install Go</h3>
+<p>Open the official Go download page in a browser:</p>
+<p>https://go.dev/dl/</p>
+<p>Download the current stable <strong>macOS installer package
+(<code>.pkg</code>)</strong> appropriate for the build Mac:</p>
+<ul>
+<li>Apple Silicon Mac: choose the <strong>ARM64</strong> macOS
+package.</li>
+<li>Intel Mac: choose the <strong>x86-64 / AMD64</strong> macOS
+package.</li>
+</ul>
+<p>Double-click the downloaded <code>.pkg</code> file and follow the
+normal installer steps.</p>
+<p>When installation finishes, close Terminal and open a new Terminal
+window. Type:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">go</span> version</span></code></pre></div>
+<p>Press Return. You should see a line beginning with
+<code>go version</code>.</p>
+<p>If you see <code>command not found</code>, restart the Mac once and
+try <code>go version</code> again.</p>
+<h2 id="part-2-build-the-installer">Part 2 — Build the installer</h2>
+<h3 id="step-4-find-the-build-file">Step 4: Find the build file</h3>
+<p>Open the extracted Systemika Studio source folder in Finder.</p>
+<p>Find:</p>
+<p><code>BUILD_MACOS_INSTALLER.command</code></p>
+<h3 id="step-5-run-the-builder">Step 5: Run the builder</h3>
+<p>Double-click <code>BUILD_MACOS_INSTALLER.command</code>.</p>
+<p>A Terminal window will open. The builder will automatically:</p>
+<ol type="1">
+<li>check that it is running on macOS;</li>
+<li>check Apple Command Line Tools;</li>
+<li>check Go;</li>
+<li>compile an Intel Mac launcher;</li>
+<li>compile an Apple Silicon launcher;</li>
+<li>combine them into one Universal Mac application;</li>
+<li>copy the Systemika Studio application files into the
+<code>.app</code> bundle;</li>
+<li>apply a local ad-hoc signature unless you supplied an Apple
+Developer ID certificate;</li>
+<li>create a ZIP archive;</li>
+<li>create the DMG installer image;</li>
+<li>verify the application and DMG;</li>
+<li>generate SHA-256 checksums.</li>
+</ol>
+<p>The first build can take a little longer because Go performs its
+first compilation setup. No source-code editing is required.</p>
+<p>If macOS refuses to open the <code>.command</code> file because it
+came from the internet, use this method:</p>
+<ol type="1">
+<li>Control-click or right-click
+<code>BUILD_MACOS_INSTALLER.command</code>.</li>
+<li>Choose <strong>Open</strong>.</li>
+<li>Confirm <strong>Open</strong> in the security dialog.</li>
+</ol>
+<h3 id="step-6-locate-the-finished-files">Step 6: Locate the finished
+files</h3>
+<p>After a successful build, open this folder inside the Systemika
+source folder:</p>
+<p><code>release/macos/</code></p>
+<p>You should see:</p>
+<pre class="text"><code>Systemika Studio.app
+Systemika-Studio-1.0.6-macOS-Universal.dmg
+Systemika-Studio-1.0.6-macOS-Universal.zip
+SHA256SUMS.txt</code></pre>
+<p>The <code>.dmg</code> file is the normal file to distribute to
+students and public Mac users. If the Terminal window reports
+<strong>“Systemika Studio macOS build finished successfully.”</strong>,
+the automated build completed without an error.</p>
+<h2 id="part-3-test-the-dmg-before-distributing-it">Part 3 — Test the
+DMG before distributing it</h2>
+<p>Do not distribute a newly built installer without testing it at least
+once.</p>
+<h3 id="step-7-install-from-the-dmg-exactly-as-a-student-would">Step 7:
+Install from the DMG exactly as a student would</h3>
+<ol type="1">
+<li>Double-click
+<code>Systemika-Studio-1.0.6-macOS-Universal.dmg</code>.</li>
+<li>A Finder window opens showing <strong>Systemika Studio.app</strong>
+and an <strong>Applications</strong> shortcut.</li>
+<li>Drag <strong>Systemika Studio.app</strong> onto
+<strong>Applications</strong>.</li>
+<li>Eject the Systemika Studio disk image.</li>
+<li>Open the <strong>Applications</strong> folder.</li>
+<li>Launch <strong>Systemika Studio</strong>.</li>
+</ol>
+<p>For the unsigned/ad-hoc build, macOS Gatekeeper may prevent an
+ordinary double-click the first time. In that case:</p>
+<ol type="1">
+<li>Control-click or right-click <strong>Systemika Studio</strong> in
+Applications.</li>
+<li>Choose <strong>Open</strong>.</li>
+<li>Choose <strong>Open</strong> again in the security dialog.</li>
+</ol>
+<p>This exception normally needs to be approved only once for that copy
+of the application.</p>
+<h3 id="step-8-perform-a-short-functional-test">Step 8: Perform a short
+functional test</h3>
+<p>Before distribution, verify at least these actions:</p>
+<ul>
+<li>Systemika Studio opens.</li>
+<li>A new model can be created.</li>
+<li>A Stock and Flow can be placed.</li>
+<li>A model can be saved as an <code>.ssd</code> file.</li>
+<li>The model can be simulated.</li>
+<li>A Time Plot can be created.</li>
+<li>A Histogram can be created for one run.</li>
+<li>A second run can be created and compared.</li>
+<li>The application closes normally.</li>
+</ul>
+<p>For full saved-run testing, use Chrome, Edge, or Chromium.</p>
+<h2 id="part-4-unsigned-versus-signednotarized-distribution">Part 4 —
+Unsigned versus signed/notarized distribution</h2>
+<h3 id="the-simple-classroom-build">The simple classroom build</h3>
+<p>If you simply double-click
+<code>BUILD_MACOS_INSTALLER.command</code>, the builder creates an
+<strong>ad-hoc signed</strong> application. This is sufficient for local
+testing and can be used in a controlled classroom if students are given
+the right-click <strong>Open</strong> instructions above.</p>
+<p>However, macOS may display security warnings because the app has not
+been signed with an Apple Developer ID and notarized by Apple.</p>
+<h3 id="recommended-for-broad-public-distribution">Recommended for broad
+public distribution</h3>
+<p>For public distribution, the best user experience is to
+<strong>Developer ID sign and notarize</strong> the application. This
+normally requires a paid Apple Developer Program membership.</p>
+<p>If you do not have an Apple Developer account, you can still build
+the DMG. The difference is only the Gatekeeper experience for the end
+user.</p>
+<h2 id="part-5-optional-developer-id-signing-and-notarization">Part 5 —
+Optional: Developer ID signing and notarization</h2>
+<p>This section is only needed if the person building Systemika has
+access to an Apple Developer Program account.</p>
+<h3 id="step-9-install-a-developer-id-application-certificate">Step 9:
+Install a Developer ID Application certificate</h3>
+<p>The Apple Developer account holder should create/install a
+<strong>Developer ID Application</strong> certificate in the Mac’s
+Keychain. Xcode or Apple’s Developer website can be used to manage
+certificates.</p>
+<p>To see available signing identities, run:</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="ex">security</span> find-identity <span class="at">-v</span> <span class="at">-p</span> codesigning</span></code></pre></div>
+<p>Look for a line similar to:</p>
+<pre class="text"><code>Developer ID Application: Your Name or Organization (TEAMID)</code></pre>
+<p>Copy that identity exactly.</p>
+<h3 id="step-10-save-notarization-credentials-once">Step 10: Save
+notarization credentials once</h3>
+<p>Apple’s current command-line notarization tool is
+<code>notarytool</code>. Store credentials in the Keychain once
+with:</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="ex">xcrun</span> notarytool store-credentials <span class="st">&quot;SystemikaNotary&quot;</span> <span class="dt">\</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">--apple-id</span> <span class="st">&quot;YOUR-APPLE-ID&quot;</span> <span class="dt">\</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">--team-id</span> <span class="st">&quot;YOUR-TEAM-ID&quot;</span> <span class="dt">\</span></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">--password</span> <span class="st">&quot;YOUR-APP-SPECIFIC-PASSWORD&quot;</span></span></code></pre></div>
+<p>Use an Apple app-specific password, not the normal Apple account
+password.</p>
+<h3 id="step-11-build-sign-and-notarize-in-one-command">Step 11: Build,
+sign, and notarize in one command</h3>
+<p>Open Terminal in the Systemika source folder and run:</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="va">SYSTEMIKA_SIGN_IDENTITY</span><span class="op">=</span><span class="st">&quot;Developer ID Application: Your Name or Organization (TEAMID)&quot;</span> <span class="dt">\</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="va">SYSTEMIKA_NOTARY_PROFILE</span><span class="op">=</span><span class="st">&quot;SystemikaNotary&quot;</span> <span class="dt">\</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="ex">./BUILD_MACOS_INSTALLER.command</span></span></code></pre></div>
+<p>Replace the signing identity with the exact identity shown on the
+build Mac.</p>
+<p>With both variables supplied, the builder will:</p>
+<ul>
+<li>sign the <code>.app</code> with the Developer ID certificate;</li>
+<li>enable Apple’s hardened runtime;</li>
+<li>sign the DMG;</li>
+<li>submit the DMG to Apple for notarization;</li>
+<li>wait for Apple’s result;</li>
+<li>staple the notarization ticket to the DMG;</li>
+<li>validate the stapled ticket.</li>
+</ul>
+<p>If notarization succeeds, the resulting DMG is the preferred file for
+public distribution.</p>
+<h2 id="part-6-verify-that-the-application-is-universal">Part 6 — Verify
+that the application is Universal</h2>
+<p>The builder verifies this automatically, but you can check
+manually.</p>
+<p>In Terminal, from the Systemika source folder, run:</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="ex">lipo</span> <span class="at">-archs</span> <span class="st">&quot;release/macos/Systemika Studio.app/Contents/MacOS/Systemika Studio&quot;</span></span></code></pre></div>
+<p>The result should contain both:</p>
+<pre class="text"><code>x86_64 arm64</code></pre>
+<p>The order does not matter.</p>
+<h2 id="part-7-what-to-send-to-students">Part 7 — What to send to
+students</h2>
+<p>For normal Mac installation, send students only:</p>
+<p><code>Systemika-Studio-1.0.6-macOS-Universal.dmg</code></p>
+<p>They do <strong>not</strong> need the source folder, Go, Xcode,
+Node.js, or npm.</p>
+<p>If the DMG is not Developer ID signed/notarized, also give students
+the first-launch instruction:</p>
+<blockquote>
+<p>After copying Systemika Studio to Applications, Control-click
+Systemika Studio, choose Open, then confirm Open.</p>
+</blockquote>
+<p>Also recommend Chrome, Edge, or Chromium for full Systemika
+project/run functionality.</p>
+<p>The <code>.zip</code> file is an optional backup distribution format.
+<code>SHA256SUMS.txt</code> can be published alongside the download so
+users can verify integrity.</p>
+<h2 id="part-8-troubleshooting">Part 8 — Troubleshooting</h2>
+<h3 id="the-builder-says-this-builder-must-be-run-on-macos">The builder
+says: <code>This builder must be run on macOS</code></h3>
+<p>A macOS <code>.app</code> and <code>.dmg</code> should be finalized
+on a Mac. Copy the complete source folder to a Mac and run the builder
+there.</p>
+<h3
+id="xcode-select-error-or-command-line-tools-are-missing"><code>xcode-select: error</code>
+or command line tools are missing</h3>
+<p>Run:</p>
+<div class="sourceCode" id="cb10"><pre
+class="sourceCode sh"><code class="sourceCode bash"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="ex">xcode-select</span> <span class="at">--install</span></span></code></pre></div>
+<p>Complete the Apple installer, then run the Systemika builder
+again.</p>
+<h3
+id="go-is-not-installed-or-go-command-not-found"><code>Go is not installed</code>
+or <code>go: command not found</code></h3>
+<p>Install Go from https://go.dev/dl/, close and reopen Terminal, then
+check:</p>
+<div class="sourceCode" id="cb11"><pre
+class="sourceCode sh"><code class="sourceCode bash"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="ex">go</span> version</span></code></pre></div>
+<h3
+id="double-clicking-the-.command-file-does-nothing-or-macos-blocks-it">Double-clicking
+the <code>.command</code> file does nothing or macOS blocks it</h3>
+<p>Control-click the file, choose <strong>Open</strong>, then confirm
+<strong>Open</strong>.</p>
+<p>If necessary, open Terminal, drag the <code>.command</code> file from
+Finder into the Terminal window, and press Return.</p>
+<h3 id="the-build-stops-during-lipo-codesign-or-hdiutil">The build stops
+during <code>lipo</code>, <code>codesign</code>, or
+<code>hdiutil</code></h3>
+<p>Those commands are supplied by macOS/Apple developer tools. Run:</p>
+<div class="sourceCode" id="cb12"><pre
+class="sourceCode sh"><code class="sourceCode bash"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="ex">xcode-select</span> <span class="at">-p</span></span></code></pre></div>
+<p>If it reports an error, install/reinstall Apple Command Line Tools
+with <code>xcode-select --install</code>.</p>
+<h3
+id="the-finished-app-opens-safari-instead-of-an-application-style-window">The
+finished app opens Safari instead of an application-style window</h3>
+<p>Install Google Chrome, Microsoft Edge, or Chromium. The Systemika
+launcher looks for those browsers and uses their application-window mode
+when available.</p>
+<h3
+id="a-student-sees-a-message-that-apple-cannot-verify-the-developer">A
+student sees a message that Apple cannot verify the developer</h3>
+<p>For an unsigned/ad-hoc classroom build, Control-click the app in
+Applications and choose <strong>Open</strong>. For broad public
+distribution without that extra step, use Developer ID signing and Apple
+notarization as described above.</p>
+<h3 id="notarization-fails">Notarization fails</h3>
+<p>Read the error printed by <code>notarytool</code>. Common causes are
+an incorrect Team ID, an app-specific password that has expired, or a
+Developer ID certificate that is not valid on the build Mac.</p>
+<p>You can list stored signing identities with:</p>
+<div class="sourceCode" id="cb13"><pre
+class="sourceCode sh"><code class="sourceCode bash"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="ex">security</span> find-identity <span class="at">-v</span> <span class="at">-p</span> codesigning</span></code></pre></div>
+<h2 id="build-result-summary">Build result summary</h2>
+<p>For a lay user, the entire normal process is:</p>
+<ol type="1">
+<li>Extract the Systemika source ZIP on a Mac.</li>
+<li>Install Apple Command Line Tools once.</li>
+<li>Install Go once.</li>
+<li>Double-click <code>BUILD_MACOS_INSTALLER.command</code>.</li>
+<li>Take the finished DMG from <code>release/macos/</code>.</li>
+<li>Test it on a Mac.</li>
+<li>Distribute the DMG to students.</li>
+</ol>
+<p>No programming or source-code modification is required.</p>
+</body>
+</html>

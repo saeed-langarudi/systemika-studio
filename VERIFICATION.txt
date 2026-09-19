@@ -1,0 +1,71 @@
+Systemika Studio 1.0.6 - Release verification
+Date: 2026-09-17
+
+Automated regression verification:
+- 333/333 tests passing with: npm test
+- 19 permanent validation models under validation-models/
+
+Verified output workspace:
+- Systemika opens with the Output workspace closed so the modeling canvas uses the full window; the startup Set Time Unit prompt is centered against that full modeling canvas. Output toolbar commands/shortcuts reopen the requested view in the right pane.
+- Table, Time Plot, XY Plot, and Histogram toolbar/keyboard actions activate the corresponding output in the upper right pane, with output and settings each using 50% of the available right-panel body height; Equations uses the full output height with no lower pane.
+- Vertical and horizontal splitters resize the workspace; × hides the Output workspace without deleting outputs; the active output keyboard shortcut E/T/P/X/H also toggles that view closed/open. The detach/attach control is icon-only, uses the same button footprint as Close, and relies on its tooltip/accessible label; it opens a true external output window and returns the live panel to the main workspace. Closing a detached window hides the workspace and the next output command reopens it docked.
+- Runs-to-compare uses a fixed scrollable three-row list. Plot variable selection uses one compact Selected Variable(s) box of matching width with an on-demand + Add Variable finder.
+- Time Plot/comparison Time Plot selected-variable rows integrate Dash and Width; XY Plot exposes the same curve Dash/Width controls inside Selected Variable(s); the separate Line Style panel is absent.
+- Table uses the same compact Selected Variable(s) + Add Variable finder as plots, retaining per-variable Decimal controls.
+- All plot/table setting wrappers use an exact shared 360 px width. Legacy table-based controls collapse their default cell spacing so their visible outer borders fill that full width and align exactly with Selected Variable(s) and Runs to compare. The default dock width is 378 px (105% of the setting-box width) and is synchronized from the mounted settings unless the user manually resizes the dock.
+- Equations/Table/plot export controls occupy a dedicated second row of the Output header, aligned to the left below the title/control row; Table is CSV-only and plots provide SVG plus plotted-data CSV export. Plot PNG export is intentionally omitted because clipboard image copying already provides raster output.
+- Plot legends are below the chart. Single-variable time comparisons label runs only; multi-variable comparisons use Variable [Run] labels in variable-first order.
+- Manage Runs text entry is isolated from editor single-key shortcuts; Enter/Ctrl/Cmd+1/Ctrl/Cmd+R run from the Run Name field.
+- Number Box creation UI and N shortcut are removed; legacy Number Box models remain loadable.
+
+Verified classroom interface:
+- Help menu is Systemika-specific: Getting Started, Keyboard Shortcuts, Functions & Equations, Unit Checking, Preferences, About, License, Third-party Notices.
+- Obsolete StochSD manuals/support links, Full Potential CSS material, restart items, and hidden legacy plugin-menu access are absent.
+- Histogram output is available on the toolbar with shortcut H and supports multi-run comparison with shared bins and translucent overlays.
+- Single-run Histogram uses light gray fill with black bin borders and no point markers.
+- Hide/Unhide Question Marks toolbar control and Q shortcut are present; hiding markers does not disable definition validation.
+- Preferences, About, license text, and third-party notices use current Systemika terminology/provenance.
+- Keyboard Shortcuts help matches the current interface; obsolete Ctrl/Cmd+Enter equation guidance/binding is removed. Enter inserts equation line breaks and Apply saves definitions.
+- The menu bar no longer contains top-right provenance hyperlinks; About Systemika contains links to Systemika (https://systemika.no), StochSD, and Insight Maker.
+
+Simulation and validation:
+- Flow rates are signed and unrestricted; negative values are not clamped, and legacy OnlyPositive metadata is normalized/ignored.
+- Native Systemika engine retained.
+- Strict unit checker retained.
+- Permanent validation set retained.
+
+Verified live output settings and Advance editing:
+- Selected Variable(s) is the first control in Time/Compare/XY/Histogram/Table settings; variable/run/output controls apply live with no docked Apply footer.
+- Plot-page navigation flushes any pending live settings before changing pages and rebuilds the lower settings pane from the selected page, so page-specific controls track the visible graph.
+- Table headings remain visible while scrolling long single-run and multi-run Tables; Table rows scroll inside a dedicated docked-table viewport.
+- Output settings use a contained scroll area with no exposed content underneath a sticky footer.
+- Paused Advance runs hot-recompile state-dependent formulation changes while preserving current stock state and compatible stateful-function memory.
+- New model entities/Flows can be added during Advance and become part of subsequent steps.
+- Deleting model entities during Advance asks first; confirmation genuinely runs Advance to the configured end before deletion is applied.
+
+Desktop packaging:
+- Electron is pinned to 44.3.0 for Electron-based source and Electron-based packaging.
+- Release packaging uses electron-builder 26.16.1 as its only npm packaging dependency; Gulp/useref packaging dependencies are removed.
+- Linux AppImage packaging pins the static AppImage toolset 1.0.3 to avoid the legacy FUSE2/libfuse.so.2 runtime requirement.
+- Installer staging is handled by dependency-free distribute/build.js; electron-builder native-module rebuilding is disabled because Systemika has no native npm modules.
+- Public packaging metadata consistently uses Systemika Studio 1.0.6.
+- macOS Universal app builder is included as BUILD_MACOS_INSTALLER.command.
+
+WebApp packaging:
+- distribute/build.js rebuilds the WebApp from current source rather than using a stale prebuilt editor bundle.
+- Generated MSA and OpenSystemDynamics JS/CSS references carry ?v=1.0.6 cache keys.
+- The upload-ready WebApp includes .htaccess no-cache rules and WEB_BUILD_INFO.txt.
+
+- Paged Figures: Time/Compare/XY/Histogram page persistence and legacy compatibility covered by regression tests; page navigation/add/delete controls live on the Figure, with the last page protected from deletion.
+- Print Equations: integral/differential/difference forms, type/name/computation sorting, explicit stock Initial Condition fields, persistent model-entity comments, and TXT/CSV/LaTeX export covered by regression tests.
+- Graph export: the Output header exposes transparent SVG plus plotted-data CSV for Time/Compare/XY/Histogram; exported legends are below the graph and reproduce dash/width styles. XY Show Number repeats run numbers along curves according to rendered curve length; Figure page navigation is bottom-right and omitted from exports. Plot Period is automatic and no longer exposed in plot properties.
+- Figure clipboard: Electron 44 uses clipboard.write() + ClipboardItem for PNG images; toolbar/keyboard Copy and Cut of a single Figure also place a high-resolution transparent PNG on the system clipboard for direct paste into document/presentation software.
+
+Equation/editor refinements:
+- Canonical Systemika references use bare entity names; legacy bracketed references remain accepted for older `.ssd` files.
+- Multiline nested equations require no continuation/escape character.
+- Double-click focuses Name first; Tab moves through property fields rather than inserting a tab character.
+- Time/Compare Plot line dash and width are stored per plotted entity and per Figure page, with a uniform solid/2px default.
+
+Run management refinement:
+- Manage Runs includes Delete All with confirmation; deleting runs removes them from display selections and refreshes output devices.

@@ -1,0 +1,18 @@
+{
+    "name": "Systemika Studio",
+    "short_name": "Systemika Studio",
+    "start_url": "./standalone.html",
+    "display": "standalone",
+    "background_color": "#ffffff",
+    "theme_color": "#24527e",
+    "description": "Systemika Studio system dynamics modeling and simulation",
+    "orientation": "portrait-primary",
+    "prefer_related_applications": false,
+    "icons": [
+        {
+            "src": "systemika-256.png",
+            "sizes": "256x256",
+            "type": "image/png"
+        }
+    ]
+}

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<InsightMakerModel>
+<root>
+<mxCell id="0"/>
+<mxCell id="1" parent="0"/>
+<Setting id="setting" Version="36" TimeStart="0" TimeLength="10" TimeStep="0.25" SolutionAlgorithm="RK4" TimeUnits="" BackgroundColor="white"><mxCell parent="1" visible="0"><mxGeometry x="0" y="0" width="0" height="0" as="geometry"/></mxCell></Setting>
+<Stock id="p" name="Population" InitialValue="100" NonNegative="false" Units="Unitless"><mxCell parent="1" vertex="1" style="stock"><mxGeometry x="120" y="60" width="100" height="40" as="geometry"/></mxCell></Stock>
+<Flow id="g" name="Growth" FlowRate="0.1 * [Population]" OnlyPositive="false" Units="Unitless"><mxCell parent="1" edge="1" style="flow" target="p"><mxGeometry x="0" y="0" width="0" height="0" as="geometry"><mxPoint as="sourcePoint" x="300" y="140"/><mxPoint as="targetPoint" x="420" y="140"/></mxGeometry></mxCell></Flow>
+</root>
+</InsightMakerModel>

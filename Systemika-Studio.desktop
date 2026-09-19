@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Systemika Studio
+GenericName=System Dynamics Modeling and Simulation
+Comment=Build, simulate, and analyze system dynamics models
+Exec=sh -c 'exec "$HOME/.local/opt/systemika-studio/Systemika-Studio.AppImage"'
+Icon=systemika-studio
+Terminal=false
+Categories=Education;Science;
+StartupNotify=true
+StartupWMClass=Systemika Studio

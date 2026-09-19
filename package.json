@@ -1,0 +1,20 @@
+{
+  "name": "systemika",
+  "version": "1.0.6",
+  "description": "Systemika Studio educational system dynamics modeling and simulation software",
+  "author": "Filipe Medeiros <hello@filipesm.eu>",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "electron .",
+    "electron": "electron .",
+    "web": "node web-server.js",
+    "test": "node --test tests/*.test.js"
+  },
+  "devDependencies": {
+    "electron": "44.3.0"
+  },
+  "productName": "Systemika Studio",
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}

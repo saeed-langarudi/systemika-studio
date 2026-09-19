@@ -1,0 +1,15 @@
+Systemika Studio copyright and provenance notice
+
+Systemika Studio contains original Systemika contributions and code derived from the open-source StochSD project. Copyright in original Systemika contributions remains with the respective contributors. The application source is distributed under the GNU Affero General Public License version 3 (AGPLv3) unless an included third-party component states a different license.
+
+StochSD provenance retained in this distribution:
+- Copyright StochSD-Team and Scott Fortmann-Roe for their respective historical contributions.
+- The StochSD-Team is identified in the inherited project notices as Erik Gustafsson, Magnus Gustafsson, and Leif Gustafsson.
+
+Systemika Studio no longer uses the historical Insight Maker numerical simulation engine in its active runtime. Remaining Insight Maker references are retained only where required for historical attribution, third-party/provenance documentation, comments about removed components, or backward-compatible `.ssd` storage identifiers.
+
+See:
+- LICENSE.txt — AGPLv3 application license
+- third-party-licenses.md — bundled third-party library notices
+- SYSTEMIKA_SOURCE_AUDIT.md — technical source-independence audit
+- SYSTEMIKA_INDEPENDENCE.md — migration/provenance summary

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<InsightMakerModel>
+<root>
+<mxCell id="0"/>
+<mxCell id="1" parent="0"/>
+<Setting id="setting" Version="36" TimeStart="0" TimeLength="4" TimeStep="1" SolutionAlgorithm="RK4" TimeUnits="" BackgroundColor="white"><mxCell parent="1" visible="0"><mxGeometry x="0" y="0" width="0" height="0" as="geometry"/></mxCell></Setting>
+<Variable id="u" name="Uniform" Equation="RandomUniform(0, 1, 101)" isConstant="false" Units="Unitless"><mxCell parent="1" vertex="1" style="variable"><mxGeometry x="80" y="60" width="100" height="40" as="geometry"/></mxCell></Variable>
+<Variable id="n" name="Normal" Equation="RandomNormal(0, 1, 102)" isConstant="false" Units="Unitless"><mxCell parent="1" vertex="1" style="variable"><mxGeometry x="210" y="60" width="100" height="40" as="geometry"/></mxCell></Variable>
+<Variable id="t" name="Triangular" Equation="RandomTriangular(0, 1, 0.5, 103)" isConstant="false" Units="Unitless"><mxCell parent="1" vertex="1" style="variable"><mxGeometry x="340" y="60" width="100" height="40" as="geometry"/></mxCell></Variable>
+<Variable id="g" name="Gamma" Equation="RandomGamma(2, 1, 104)" isConstant="false" Units="Unitless"><mxCell parent="1" vertex="1" style="variable"><mxGeometry x="470" y="60" width="100" height="40" as="geometry"/></mxCell></Variable>
+<Variable id="b" name="Beta" Equation="RandomBeta(2, 5, 105)" isConstant="false" Units="Unitless"><mxCell parent="1" vertex="1" style="variable"><mxGeometry x="600" y="60" width="100" height="40" as="geometry"/></mxCell></Variable>
+</root>
+</InsightMakerModel>
