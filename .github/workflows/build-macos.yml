@@ -1,0 +1,32 @@
+name: Build macOS Installer
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+
+    steps:
+      - name: Check out Systemika Studio
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+
+      - name: Build macOS Universal installer
+        run: |
+          chmod +x BUILD_MACOS_INSTALLER.command
+          ./BUILD_MACOS_INSTALLER.command
+
+      - name: Upload macOS installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: Systemika-Studio-macOS
+          path: |
+            release/macos/*.dmg
+            release/macos/*.zip
+            release/macos/SHA256SUMS.txt
+          if-no-files-found: error
