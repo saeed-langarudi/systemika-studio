@@ -7,7 +7,7 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
 const root = path.resolve(__dirname, '..');
-const version = '1.0.6';
+const version = '1.1.0';
 
 test('web release is rebuilt from current UI source with versioned assets and cache controls', () => {
   const result = spawnSync(process.execPath, ['distribute/build.js'], {
@@ -20,20 +20,20 @@ test('web release is rebuilt from current UI source with versioned assets and ca
   const read = (rel) => fs.readFileSync(path.join(web, rel), 'utf8');
 
   assert.ok(fs.existsSync(path.join(web, '.htaccess')));
-  assert.match(read('WEB_BUILD_INFO.txt'), /Systemika Studio WebApp 1\.0\.6/);
-  assert.match(read('index.html'), /MultiSimulationAnalyser\/index\.html\?v=1\.0\.6/);
+  assert.match(read('WEB_BUILD_INFO.txt'), /Systemika Studio WebApp 1\.1\.0/);
+  assert.match(read('index.html'), /MultiSimulationAnalyser\/index\.html\?v=1\.1\.0/);
 
   const msaIndex = read('MultiSimulationAnalyser/index.html');
-  assert.match(msaIndex, /multisimulationanalyser\.min\.css\?v=1\.0\.6/);
-  assert.match(msaIndex, /multisimulationanalyser\.min\.js\?v=1\.0\.6/);
+  assert.match(msaIndex, /multisimulationanalyser\.min\.css\?v=1\.1\.0/);
+  assert.match(msaIndex, /multisimulationanalyser\.min\.js\?v=1\.1\.0/);
   assert.match(
     read('MultiSimulationAnalyser/multisimulationanalyser.min.js'),
-    /OpenSystemDynamics\/src\/index\.html\?v=1\.0\.6/
+    /OpenSystemDynamics\/src\/index\.html\?v=1\.1\.0/
   );
 
   const editorIndex = read('OpenSystemDynamics/src/index.html');
-  assert.match(editorIndex, /opensystemdynamics\.min\.js\?v=1\.0\.6/);
-  assert.match(editorIndex, /opensystemdynamics\.css\?v=1\.0\.6/);
+  assert.match(editorIndex, /opensystemdynamics\.min\.js\?v=1\.1\.0/);
+  assert.match(editorIndex, /opensystemdynamics\.css\?v=1\.1\.0/);
 
   // The generated WebApp must include the current Output-panel implementation,
   // not a stale prebuilt editor bundle from an older release.

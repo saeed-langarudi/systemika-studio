@@ -32,3 +32,13 @@ Do not selectively merge the new files into an older bundle. On a cPanel/Apache 
 - 333/333 automated regression tests pass.
 - 19/19 permanent validation models are retained.
 - A dedicated WebApp release test executes the builder and verifies current-version launch URLs, versioned generated assets, cache-control deployment, the build-information marker, and the presence of the current Output-panel implementation in the generated editor bundle.
+
+## Post-release development refinements
+
+The current 1.0.6 development baseline also includes the updated dialog keyboard convention: **Enter** applies changes, while **Shift+Enter** inserts a line break in multiline equation/text fields. Keyboard-shortcut help, equation guidance, and technical documentation have been synchronized with this behavior. The unit checker also includes the subsequent fixes for unbracketed model-entity references and multiline stored equations.
+
+Current automated regression baseline: **336/336 tests passing**, with **19/19 permanent validation models** retained.
+
+
+### Keyboard and selection refinement
+Enter now applies the Time Unit dialog and opens the equation/properties editor for one selected model variable when used on the canvas. M selects the Mouse tool. Undo/Redo and Mouse tooltips show their shortcuts. Attached Flow endpoint anchors use staged selection: a first click in a Stock selects the Stock; select the Flow first (for example via its valve) before selecting an attached endpoint for detaching or repositioning.

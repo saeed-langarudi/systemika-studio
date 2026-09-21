@@ -20,7 +20,7 @@ IfThenElse(
 )
 ```
 
-In the Equation Editor, **Enter** inserts a new line. **Ctrl+Enter** applies the equation on Windows/Linux; **Cmd+Enter** applies it on macOS.
+In the Equation Editor, **Enter** applies the equation. **Shift+Enter** inserts a new line.
 
 The function list continues to show short function names. For statistical functions, hover over the function to see the full syntax with the optional seed, for example `RandomUniform(Minimum, Maximum, Seed?)`. The syntax marks the seed as optional with `?`. Clicking a statistical function inserts the required arguments only; add a numeric seed as the final argument when reproducibility is wanted.
 

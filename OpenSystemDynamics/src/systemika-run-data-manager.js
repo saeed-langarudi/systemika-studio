@@ -303,23 +303,44 @@
 
     async saveCurrentRun(overwrite) {
       if (!this.currentRun) throw new Error('There is no current simulation run to save.');
+      // Snapshot the completed run before awaiting filesystem I/O. A new live
+      // simulation may clear/replace currentRun while the save is in flight.
+      const run = this.currentRun;
       const api = getRunsAPI();
       if (!api) throw new Error('Run persistence is unavailable in this environment.');
       const saved = await api.save(this.modelPath(), {
-        runLabel: this.currentRun.runName,
-        csv: this.toCsv(this.currentRun),
+        runLabel: run.runName,
+        csv: this.toCsv(run),
         metadata: {
-          ...this.currentRun.metadata,
+          ...run.metadata,
           data: {
-            ...((this.currentRun.metadata && this.currentRun.metadata.data) || {}),
-            columns: this.currentRun.columns.slice(),
-            columnIds: this.currentRun.ids.slice(),
+            ...((run.metadata && run.metadata.data) || {}),
+            columns: run.columns.slice(),
+            columnIds: run.ids.slice(),
           },
         },
         overwrite: Boolean(overwrite),
       });
-      // Keep the canonical disk label in cache after sanitization/overwrite.
-      this.runCache.set(this.currentRun.runName, this.currentRun);
+      // Keep the exact saved snapshot in cache even if another simulation has
+      // become current while the asynchronous save was completing.
+      this.runCache.set(run.runName, run);
+      return saved;
+    }
+
+    async updateRunMetadata(runName, patch) {
+      const name = String(runName || 'Base');
+      const run = await this.loadRun(name, false);
+      if (!run) throw new Error(`Run '${name}' could not be loaded.`);
+      run.metadata = { ...(run.metadata || {}), ...(patch || {}), runName: name };
+      const api = getRunsAPI();
+      if (!api) throw new Error('Run persistence is unavailable in this environment.');
+      const saved = await api.save(this.modelPath(), {
+        runLabel: name,
+        csv: this.toCsv(run),
+        metadata: { ...run.metadata, data: { ...((run.metadata && run.metadata.data) || {}), columns: run.columns.slice(), columnIds: run.ids.slice() } },
+        overwrite: true,
+      });
+      this.runCache.set(name, run);
       return saved;
     }
 

@@ -1,8 +1,8 @@
-Systemika Studio 1.0.6 - Release verification
-Date: 2026-09-17
+Systemika Studio 1.1 - Release verification
+Date: 2026-09-21
 
 Automated regression verification:
-- 333/333 tests passing with: npm test
+- 348/348 tests passing with: npm test
 - 19 permanent validation models under validation-models/
 
 Verified output workspace:
@@ -48,12 +48,12 @@ Desktop packaging:
 - Release packaging uses electron-builder 26.16.1 as its only npm packaging dependency; Gulp/useref packaging dependencies are removed.
 - Linux AppImage packaging pins the static AppImage toolset 1.0.3 to avoid the legacy FUSE2/libfuse.so.2 runtime requirement.
 - Installer staging is handled by dependency-free distribute/build.js; electron-builder native-module rebuilding is disabled because Systemika has no native npm modules.
-- Public packaging metadata consistently uses Systemika Studio 1.0.6.
+- Public packaging metadata consistently uses Systemika Studio 1.1.
 - macOS Universal app builder is included as BUILD_MACOS_INSTALLER.command.
 
 WebApp packaging:
 - distribute/build.js rebuilds the WebApp from current source rather than using a stale prebuilt editor bundle.
-- Generated MSA and OpenSystemDynamics JS/CSS references carry ?v=1.0.6 cache keys.
+- Generated MSA and OpenSystemDynamics JS/CSS references carry ?v=1.1.0 cache keys.
 - The upload-ready WebApp includes .htaccess no-cache rules and WEB_BUILD_INFO.txt.
 
 - Paged Figures: Time/Compare/XY/Histogram page persistence and legacy compatibility covered by regression tests; page navigation/add/delete controls live on the Figure, with the last page protected from deletion.
@@ -69,3 +69,11 @@ Equation/editor refinements:
 
 Run management refinement:
 - Manage Runs includes Delete All with confirmation; deleting runs removes them from display selections and refreshes output devices.
+
+
+Systemika Studio 1.1 Calibration Sandbox verification:
+- Calibration Sandbox toolbar action, six plot slots, Reference/Simulated selectors, universal line-style legend, resizable parameter panel, constant sliders, reset controls, and Save as Default are covered by regression tests.
+- Slider-driven reruns use the existing Systemika engine and avoid run-file persistence after the initial named run for responsive manual calibration.
+- Reset and Reset All refresh plots and preserve subsequent live interaction.
+- Calibration state persists in associated .sysrun metadata and restores plot/parameter configuration.
+- Copied model entities use underscore-number suffixes.

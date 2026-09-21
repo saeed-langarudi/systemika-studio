@@ -170,3 +170,9 @@ Systemika does not:
 - change simulation equations based on units
 
 This behavior is deliberate and supports Systemika's pedagogical goal of making unit consistency the modeler's responsibility.
+
+## Lookup units
+
+Lookups have an explicit output unit. Their input and output units are intentionally independent: Systemika treats a Lookup as a black-box transformation whose hidden mapping may convert any input unit into any declared output unit. Unit checking therefore does not require the Lookup input unit to match or dimensionally determine the Lookup output unit.
+
+The declared Lookup unit is not ignored downstream. When another model equation uses a Lookup, Systemika treats the Lookup result as having its declared output unit and checks the surrounding equation normally. Existing models remain compatible; a Lookup with no declared unit is reported as having an unspecified unit rather than being assigned a unit from its input.

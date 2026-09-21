@@ -45,7 +45,7 @@ test('copy cut paste are exposed in the toolbar and keyboard shortcuts are activ
   assert.match(editor, /\$\("#btn_cut"\)\.click\(function \(\) \{ void cutSelectionWithFigureImage\(\); \}\);/);
   assert.match(editor, /async function copySelectionWithFigureImage\(\)[\s\S]*Clipboard\.copy\(\)[\s\S]*copyGraphVisualToClipboard/);
   assert.match(editor, /async function cutSelectionWithFigureImage\(\)[\s\S]*copyGraphVisualToClipboard[\s\S]*Clipboard\.cut\(\)/);
-  assert.match(editor, /candidate = `\$\{base\} \$\{counter\}`/);
+  assert.match(editor, /candidate = `\$\{base\}_\$\{counter\}`/);
   assert.match(editor, /remapFormulaAttributes/);
   assert.match(editor, /remapIdAttributes/);
   assert.match(editor, /\["flow", "link"\]\.includes/);
@@ -80,7 +80,7 @@ test('clipboard duplicate naming and formula remapping produce coherent copied s
   const start = editor.indexOf('class Clipboard {');
   const end = editor.indexOf('\nClipboard.init();', start);
   const source = editor.slice(start, end) + '\nthis.Clipboard = Clipboard;';
-  const names = new Set(['capital', 'capital 1']);
+  const names = new Set(['capital', 'capital_1']);
   const context = {
     document: { getElementById() { return null; } },
     findName(name) { return names.has(String(name).toLowerCase()) ? { id: 1 } : null; },
@@ -89,9 +89,9 @@ test('clipboard duplicate naming and formula remapping produce coherent copied s
   vm.createContext(context);
   vm.runInContext(source, context);
   const reserved = new Set();
-  assert.equal(context.Clipboard.freeCopyName('Capital', reserved), 'Capital 2');
-  const mapped = context.Clipboard.replaceFormulaNames('[Capital] * [Rate] + 1', new Map([['Capital', 'Capital 2'], ['Rate', 'Rate 1']]));
-  assert.equal(mapped, '[Capital 2] * [Rate 1] + 1');
+  assert.equal(context.Clipboard.freeCopyName('Capital', reserved), 'Capital_2');
+  const mapped = context.Clipboard.replaceFormulaNames('[Capital] * [Rate] + 1', new Map([['Capital', 'Capital_2'], ['Rate', 'Rate_1']]));
+  assert.equal(mapped, '[Capital_2] * [Rate_1] + 1');
 });
 
 

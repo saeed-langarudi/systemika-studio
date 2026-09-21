@@ -1,10 +1,10 @@
-# Systemika Studio 1.0.6
+# Systemika Studio 1.1
 
 Systemika Studio is educational System Dynamics software designed for learning and teaching stock-and-flow modelling. Its classroom interface uses the canonical model entities **Stock, Flow, Link, Auxiliary, Constant, Lookup, and Ghost**.
 
 ## Release status
 
-Version **1.0.6** is the current Systemika Studio release, based on the 1.0.5 stable baseline. The source package includes the independently written Systemika simulation engine, the desktop/web interfaces, platform build helpers, 19 permanent validation models, and an automated regression suite.
+Version **1.1** (package version **1.1.0**) is the current Systemika Studio release. It introduces the manual Calibration Sandbox while retaining the existing Systemika simulation engine. The source package includes the desktop/web interfaces, platform build helpers, 19 permanent validation models, and an automated regression suite.
 
 The 1.0.0 release includes the finalized comparative Histogram implementation. Histogram output is always count-based (the obsolete PDF/scaling selector has been removed). A single-run Histogram uses light gray bars with black borders and no point markers; multiple selected runs use common bins and translucent overlays with an external run legend. It also includes the **Hide/Unhide Question Marks (Q)** display toggle for missing-definition markers.
 
@@ -16,6 +16,7 @@ The 1.0.0 release includes the finalized comparative Histogram implementation. H
 - Strict, report-only dimensional consistency checking. Systemika reports inconsistencies but does not silently convert, repair, or reinterpret units.
 - Run, Pause, Advance, Advance to End, named runs, and multi-run comparison outputs. Paused Advance runs support hot-recompiled formulation changes and model additions while preserving current stock state; deletion is guarded and, when confirmed, finishes the active Advance trajectory before removing structure.
 - A dedicated, resizable **Output panel** can occupy the right side of the workspace while the modeling canvas stays on the left. The panel is **closed by default** so the modeling canvas opens at full width; choosing any output toolbar tool or shortcut reopens it directly in that view. The Equations, Table, Time Plot, XY Plot, and Histogram toolbar buttons (and their keyboard shortcuts) are the only navigation controls for switching output views. Plot/Table outputs default to an equal **50/50 vertical split** between the output and its settings, while Equations uses the full panel without an empty lower pane. Plot/Table setting boxes are fixed to an exact **360 px** visible width and the dock defaults to **378 px**—5% wider—so the settings determine the panel width with balanced padding. The dock can still be resized wider manually. The icon-only detach/attach button uses its tooltip for explanation and matches the Close button footprint. Export actions occupy a dedicated left-aligned second row beneath the panel title/control row. Closing a detached window hides the workspace; the next output command reopens it docked. Tables provide a per-model-entity **Decimal** field so each displayed variable can use its own decimal-place setting. Plot outputs support multiple pages, a compact one-box **Selected Variable(s)** finder, per-variable dash/width controls directly in the selected-variable rows where applicable, named-run comparison/order controls, page-specific settings that follow the active plot page, transparent SVG export, plot-data CSV export, bottom legends, clipboard image copying, integrated XY dash/width styling, and repeated run numbers on XY curves. Table variable selection uses the same compact finder and Table export is CSV-only.
+- **Calibration Sandbox** for manual calibration: up to six fixed-format Reference/Simulated time plots, live sliders for model constants, per-parameter and global reset controls, Save as Default, resizable parameter controls, and `.sysrun` persistence of sandbox configuration. The sandbox uses the existing simulation engine and adds no automatic fitting/optimisation computation.
 - Link polarity annotations, Ghosts, Lookups, Undo/Redo, copy/paste, and classroom-oriented keyboard shortcuts.
 - Equations panel with integral/differential/difference stock equations, sorting by type/name/computation order, and TXT/CSV/LaTeX export. Stock rows use a dedicated Initial Condition column (for example, `Stock(t0) = 100`); top-level Smooth/Delay/Lag definitions use the same documentation convention for their initial-value argument; model-entity comments appear as the final documentation column.
 - Systemika-specific Help, keyboard-shortcut, functions, units, preferences, licensing, and third-party notices.
@@ -48,7 +49,7 @@ Convenience launchers are included for Windows, macOS, and Linux. See `BUILD_AND
 
 For source-tree WebApp testing, use `npm run web` or the corresponding `RUN_SYSTEMIKA_WEB_*` launcher rather than opening `start.html` directly with `file://`.
 
-For public web deployment, run `node distribute/build.js` and upload the **contents** of `distribute/output/web/1.0.6/`. The web build now versions generated JS/CSS URLs automatically and includes `.htaccess` cache-control rules plus `WEB_BUILD_INFO.txt`, preventing an older browser-cached interface from surviving an in-place upgrade.
+For public web deployment, run `node distribute/build.js` and upload the **contents** of `distribute/output/web/1.1.0/`. The web build now versions generated JS/CSS URLs automatically and includes `.htaccess` cache-control rules plus `WEB_BUILD_INFO.txt`, preventing an older browser-cached interface from surviving an in-place upgrade.
 
 ## Building installers
 
@@ -80,3 +81,7 @@ For full browser-based project-folder and saved-run management, use a current Ch
 Systemika Studio contains original Systemika code and code derived from StochSD. It is distributed under the **GNU Affero General Public License v3 (AGPLv3)**. See `LICENSE.txt`, `COPYRIGHT.txt`, and `third-party-licenses.md`.
 
 Systemika Studio was developed from the open-source StochSD codebase. The current simulation engine and model infrastructure replaced during the Systemika independence work are independently written for Systemika. Historical `.ssd` storage identifiers are retained where needed for file compatibility.
+
+### Windows WebApp build
+
+For a one-click WebApp build on Windows, run `BUILD_WEBAPP_WINDOWS.bat` from the source-package root. It invokes the canonical `distribute\build.js` builder and writes the upload-ready release to `distribute\output\web\1.1.0`. Upload the contents of that version folder together; do not merge them with an older WebApp release. Cache-busting URLs are generated from the central Systemika version automatically.

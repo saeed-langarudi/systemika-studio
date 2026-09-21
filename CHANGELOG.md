@@ -1,4 +1,15 @@
+## 2026-09-21 — Systemika Studio 1.1 — Manual Calibration Sandbox
+- Added the Calibration Sandbox with six fixed-format comparison plots and live sliders for model constants.
+- Added purple dashed Reference and teal solid Simulated trajectories with one universal sandbox legend.
+- Added resizable parameter controls with Minimum, Maximum, Increment, Reset, Reset All, and Save as Default.
+- Made live calibration reruns transient after the initial named run for faster slider feedback; Reset operations now refresh plots without interrupting later slider changes.
+- Persisted Calibration Sandbox configuration and values in associated `.sysrun` metadata.
+- Fixed an asynchronous run-save race by snapshotting the completed run before filesystem I/O.
+- Changed copied-entity suffixes to underscore form (`Variable_1`, `Variable_2`, …).
+- Release verification: 348/348 automated tests passing; 19/19 permanent validation models retained.
+
 ## 2026-09-17 — Systemika Studio 1.0.6 — WebApp deployment/cache correction
+- Dialog keyboard behavior updated: Enter applies changes; Shift+Enter inserts a line break in multiline fields. Help and shortcut documentation were synchronized.
 
 - Corrected the public WebApp staging pipeline so current UI changes cannot be masked by stale browser-cached generated bundles after an in-place server upgrade.
 - Web launch and generated JS/CSS references now use the current Systemika release version as their cache key instead of older hard-coded development identifiers.
@@ -789,3 +800,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 
 [Unreleased]: https://github.com/stochsd/stochsd
+
+
+### Keyboard and selection refinement
+Enter now applies the Time Unit dialog and opens the equation/properties editor for one selected model variable when used on the canvas. M selects the Mouse tool. Undo/Redo and Mouse tooltips show their shortcuts. Attached Flow endpoint anchors use staged selection: a first click in a Stock selects the Stock; select the Flow first (for example via its valve) before selecting an attached endpoint for detaching or repositioning.

@@ -2183,6 +2183,17 @@ class FlowVisual extends BaseConnection {
 		this.group = SVG.append(SVG.flowLayer, SVG.group([this.flowPathGroup, this.valve, this.variable]));
 		this.group.setAttribute("node_id", this.id);
 
+		// New/loaded Flows start inactive.  The first-stage activation target is
+		// the complete valve control: the bow-tie valve plus the circular flow
+		// variable immediately below it.  The pipe/clouds/endpoints remain inert.
+		this.flowPathGroup.setAttribute("pointer-events", "none");
+		this.variable.setAttribute("pointer-events", "none");
+		this.variable.getElementsByClassName("element")[0].setAttribute("pointer-events", "all");
+		this.variable.getElementsByClassName("highlight")[0].setAttribute("pointer-events", "all");
+		this.name_element.setAttribute("pointer-events", "none");
+		this.icons.setAttribute("pointer-events", "none");
+		this.valve.setAttribute("pointer-events", "all");
+
 		$(this.group).dblclick(() => {
 			this.doubleClick(this.id);
 		});
@@ -2280,12 +2291,30 @@ class FlowVisual extends BaseConnection {
 		super.unselect();
 		this.variable.getElementsByClassName("highlight")[0].setAttribute("visibility", "hidden");
 		this.icons.setColor(this.color);
+
+		// An inactive Flow must not compete with Stocks or other primitives for
+		// pointer input.  Only the composite valve control (bow-tie + circular
+		// flow variable) remains hit-testable.  Endpoint editing stays two-stage:
+		// activate the Flow here first, then interact with its endpoint anchors.
+		this.flowPathGroup.setAttribute("pointer-events", "none");
+		this.variable.setAttribute("pointer-events", "none");
+		this.variable.getElementsByClassName("element")[0].setAttribute("pointer-events", "all");
+		this.variable.getElementsByClassName("highlight")[0].setAttribute("pointer-events", "all");
+		this.name_element.setAttribute("pointer-events", "none");
+		this.icons.setAttribute("pointer-events", "none");
+		this.valve.setAttribute("pointer-events", "all");
 	}
 
 	select() {
 		super.select();
 		this.variable.getElementsByClassName("highlight")[0].setAttribute("visibility", "visible");
 		this.icons.setColor("white");
+
+		// Once activated through the valve, restore the Flow's normal hit targets.
+		// Its endpoint anchors are made visible by TwoPointer.select().
+		this.flowPathGroup.setAttribute("pointer-events", "all");
+		this.variable.setAttribute("pointer-events", "all");
+		this.valve.setAttribute("pointer-events", "all");
 	}
 
 	doubleClick() {
@@ -7204,6 +7233,27 @@ function primitive_mousedown(node_id, event, new_primitive) {
 	if (event.which === mouse.left) {
 		if (mouse.lastClickedPrimitive.type == "dummy_anchor") {
 			let elementId = get_parent_id(mouse.lastClickedPrimitive.id);
+			let parentConnection = connection_array[elementId];
+			let attachedStock = null;
+			if (parentConnection && parentConnection.getType && parentConnection.getType() === "flow") {
+				let anchorType = mouse.lastClickedPrimitive.getAnchorType();
+				attachedStock = anchorType === "start" ? parentConnection.getStartAttach() :
+					(anchorType === "end" ? parentConnection.getEndAttach() : null);
+			}
+			// Attached flow endpoints can lie inside a Stock.  Do not let that hidden
+			// endpoint steal the Stock's first click.  The flow must already be selected
+			// (normally by clicking its valve) before an attached endpoint becomes
+			// directly selectable for detaching/repositioning.
+			if (attachedStock && attachedStock.getType && attachedStock.getType() === "stock" &&
+				parentConnection && !parentConnection.isSelected()) {
+				unselect_all();
+				attachedStock.select();
+				mouse.lastClickedPrimitive = attachedStock;
+				mouse.clickedOnObject = true;
+				refreshSelectionStacking();
+				event.stopPropagation();
+				return;
+			}
 			unselect_all_but(elementId);
 		} else if (get_only_selected_anchor_id()) {
 			unselect_all();
@@ -7881,10 +7931,10 @@ class Clipboard {
 	static freeCopyName(originalName, reservedNames) {
 		let base = String(originalName || "Copy").trim() || "Copy";
 		let counter = 1;
-		let candidate = `${base} ${counter}`;
+		let candidate = `${base}_${counter}`;
 		while (findName(candidate) != null || reservedNames.has(candidate.toLowerCase())) {
 			counter++;
-			candidate = `${base} ${counter}`;
+			candidate = `${base}_${counter}`;
 		}
 		reservedNames.add(candidate.toLowerCase());
 		return candidate;
@@ -8166,6 +8216,10 @@ $(window).load(function () {
 				event.preventDefault();
 				FinishTool.enterTool();
 			}
+			if (event.key.toLowerCase() == "n") {
+				event.preventDefault();
+				$("#btn_new").click();
+			}
 			if (event.key.toLowerCase() == "o") {
 				event.preventDefault();
 				$("#btn_load").click();
@@ -8209,6 +8263,23 @@ $(window).load(function () {
 		} else if(!isDrawingFlow) {
 			let key = String(event.key || "").toLowerCase();
 			{
+				if (event.key === "Enter") {
+					let selectedRoots = Object.values(get_selected_root_objects()).filter(Boolean);
+					if (selectedRoots.length === 1) {
+						let selected = selectedRoots[0];
+						let primitive = findID(selected.id);
+						if (primitive && ["Stock", "Flow", "Variable", "Converter"].includes(getType(primitive))) {
+							event.preventDefault();
+							openPrimitiveDialog(selected.id, "value");
+							return;
+						}
+					}
+				}
+				if (key === "m") {
+					event.preventDefault();
+					ToolBox.setTool("mouse");
+					return;
+				}
 				// Single-key creation shortcuts. L is the one contextual exception:
 				// when exactly one Link is selected it opens Link Properties; otherwise
 				// it starts Link creation. Dialogs/text inputs stop propagation.
@@ -9888,6 +9959,19 @@ class jqDialog {
 				event.preventDefault();
 				event.stopPropagation();
 				$(this.dialog).dialog("close");
+				return;
+			}
+			// Enter is the consistent keyboard equivalent of the Apply button.
+			// Shift+Enter is reserved for inserting a line break in multiline editors.
+			// Capture phase makes this work inside CodeMirror and other controls that may
+			// otherwise consume Enter. When CodeMirror autocomplete is open, plain Enter
+			// is left to the completion widget so the highlighted suggestion can be chosen.
+			let autocompleteOpen = document.querySelector(".CodeMirror-hints") !== null;
+			if (event.key === "Enter" && !event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey && !autocompleteOpen && this.visible &&
+				this.dialogParameters && this.dialogParameters.buttons && typeof this.dialogParameters.buttons["Apply"] === "function") {
+				event.preventDefault();
+				event.stopPropagation();
+				this.applyChanges();
 			}
 		}, true);
 
@@ -12938,12 +13022,6 @@ class TimeUnitDialog extends jqDialog {
 		$(this.dialogContent).find(".timeunit-field").keyup((event) => {
 			this.showComplain(this.checkValid());
 		});
-		$(this.dialogContent).find(".enter-apply").keydown(event => {
-			if (event.key === "Enter") {
-				event.preventDefault();
-				this.dialogParameters.buttons["Apply"]();
-			}
-		});
 	}
 	beforeShow() {
 		$(this.dialogContent).find(".timeunit-field").val(getTimeUnits());
@@ -12983,19 +13061,19 @@ class TimeUnitDialog extends jqDialog {
 			complainDiv.html(warningHtml(`Time Unit must contain character A-Z or a-z.`));
 		}
 	}
+	makeApply() {
+		if (!this.checkValid()) {
+			this.showComplain(false);
+			return false;
+		}
+		let timeUnit = $(this.dialogContent).find(".timeunit-field").val();
+		setTimeUnits(timeUnit);
+		$("#timeunit-value").html(timeUnit);
+		return true;
+	}
 	beforeCreateDialog() {
 		this.dialogParameters.buttons = {
-			"Apply": (event) => {
-				if (this.checkValid()) {
-					let timeUnit = $(this.dialogContent).find(".timeunit-field").val();
-					setTimeUnits(timeUnit);
-					$(this.dialog).dialog('close');
-					$("#timeunit-value").html(timeUnit);
-					History.storeUndoState();
-				} else {
-					this.showComplain(this.validName);
-				}
-			}
+			"Apply": () => this.applyChanges()
 		};
 	}
 }
@@ -13180,6 +13258,8 @@ class ConverterDialog extends jqDialog {
 							<b>Definition:</b><span>${this.renderHelpButtonHtml("converter-help")}</span>
 						</div>
 						<textarea class="value-field" style="width: 300px; height: 200px;"></textarea><br/><br/>
+						<b>Unit:</b><br/>
+						<input class="unit-field enter-apply" style="width: 300px; box-sizing: border-box;" type="text" value=""><br/><br/>
 						<b>Comment:</b><br/>
 						<textarea class="comment-field" rows="3" style="width:300px; box-sizing:border-box; resize:vertical;" placeholder="Optional documentation comment"></textarea>
 						<p class="in-link" style="font-weight:bold; margin:5px 0px">Ingoing Link </p>
@@ -13193,6 +13273,7 @@ class ConverterDialog extends jqDialog {
 
 		this.setHelpButtonInfo("converter-help", "Lookup Help", `<div style="max-width: 400px;">
 			<p>The lookup maps input values X<sub>i</sub> from the linked-in model entity to output values Y<sub>i</sub> using a lookup table.</p>
+			<p><b>Unit:</b> declares the unit of the lookup output. A lookup is treated as a black-box transformation, so its input unit does not constrain its output unit. The declared output unit is still used when checking equations that use the lookup.</p>
 			<p>
 				<b>Definition:</b></br>
 				&nbsp &nbsp <span style="font-family: monospace;" >
@@ -13270,6 +13351,7 @@ class ConverterDialog extends jqDialog {
 			}
 		})
 		this.nameField = $(this.dialogContent).find(".name-field").get(0);
+		this.unitField = $(this.dialogContent).find(".unit-field").get(0);
 		this.commentField = $(this.dialogContent).find(".comment-field").get(0);
 		$(this.nameField).keydown((event) => {
 			if (event.key === "Tab" && !event.shiftKey) {
@@ -13322,6 +13404,7 @@ class ConverterDialog extends jqDialog {
 		this.setTitle(`${oldNameBrackets} properties`);
 
 		$(this.nameField).val(oldNameBrackets);
+		$(this.unitField).val(getUnits(this.primitive));
 		$(this.commentField).val(this.primitive.getAttribute("Note") || "");
 		this.cmValueField.setValue(oldValue);
 
@@ -13419,6 +13502,7 @@ class ConverterDialog extends jqDialog {
 			// Handle value
 			let value = this.cmValueField.getValue();
 			setValue2(this.primitive, value);
+			setUnits(this.primitive, this.unitField ? this.unitField.value.trim() : "");
 			this.primitive.setAttribute("Note", this.commentField ? this.commentField.value : "");
 
 			// handle name
@@ -13507,7 +13591,7 @@ class GettingStartedDialog extends CloseDialog {
 				<li><b>Run or explore.</b> <b>Run/Pause</b> performs a normal simulation. <b>Advance</b> steps through the model and allows permitted parameter changes between advances.</li>
 				<li><b>Save the model.</b> Use Save or Save As. The red <b>Unsaved Changes</b> indicator is also clickable.</li>
 			</ol>
-			<p>Equations can span multiple lines. Press <b>Enter</b> to insert a line break; use <b>Apply</b> to save the definition.</p>
+			<p>Press <b>Enter</b> to apply changes. Equations can span multiple lines; press <b>Shift+Enter</b> to insert a line break.</p>
 		</div>`);
 	}
 }
@@ -13520,9 +13604,12 @@ class KeyboardShortcutsDialog extends CloseDialog {
 		<div style="min-width: 540px; max-width: 860px; max-height: 72vh; overflow-y: auto;">
 		<table class="modern-table zebra" style="width:100%">
 		<tr><th>Action</th><th>Shortcut</th></tr>
+		<tr><td>New model</td><td>${modifierKey}+N</td></tr>
 		<tr><td>Open model</td><td>${modifierKey}+O</td></tr>
 		<tr><td>Save / Save As</td><td>${modifierKey}+S / ${modifierKey}+Shift+S</td></tr>
 		<tr><td>Undo / Redo</td><td>${modifierKey}+Z / ${modifierKey}+Y</td></tr>
+		<tr><td>Open equation/properties for selected model variable</td><td>Enter</td></tr>
+		<tr><td>Mouse tool</td><td>M</td></tr>
 		<tr><td>Cut / Copy / Paste</td><td>${modifierKey}+X / ${modifierKey}+C / ${modifierKey}+V<br/><small>Copy/Cut of one selected Figure also copies its image to the system clipboard.</small></td></tr>
 		<tr><td>Select all</td><td>${modifierKey}+A</td></tr>
 		<tr><td>Delete selection</td><td>Delete or Backspace</td></tr>
@@ -13542,6 +13629,8 @@ class KeyboardShortcutsDialog extends CloseDialog {
 		<tr><td>Lookup / Ghost</td><td>K / G</td></tr>
 		<tr><td>Hide / unhide definition question marks</td><td>Q</td></tr>
 		<tr><td>Rotate entity name</td><td>R</td></tr>
+		<tr><td>Apply changes in dialog</td><td>Enter</td></tr>
+		<tr><td>Insert line break in multiline dialog field</td><td>Shift+Enter</td></tr>
 		<tr><td>Close dialog</td><td>Esc</td></tr>
 		</table>
 		<p style="color:#555">Single-letter shortcuts apply when focus is on the model canvas, not while typing in a field or dialog. Output shortcuts (E/T/P/X/H) toggle the corresponding Output panel: pressing the shortcut for the currently open output closes it; pressing it again reopens it.</p>
@@ -13571,7 +13660,7 @@ class FunctionsAndEquationsDialog extends CloseDialog {
 		this.setHtml(`
 		<div style="min-width: 620px; max-width: 980px; max-height: 72vh; overflow-y: auto; line-height:1.4">
 			<p>Model entity references use bare names, for example <code>Population</code>. Legacy square-bracket references such as <code>[Population]</code> remain readable for compatibility. Standard arithmetic operators, comparisons, parentheses, and the functions below are supported.</p>
-			<p>Equations may span multiple lines; press <b>Enter</b> to insert a line break and use <b>Apply</b> to save the definition. In random-function syntax, <code>[Seed]</code> means the seed argument is optional.</p>
+			<p>Press <b>Enter</b> to apply changes. Equations may span multiple lines; press <b>Shift+Enter</b> to insert a line break. In random-function syntax, <code>[Seed]</code> means the seed argument is optional.</p>
 			${categoryHtml}
 		</div>`);
 	}
@@ -14373,7 +14462,8 @@ class DefinitionEditor extends jqDialog {
 			<b>Key bindings:</b>
 			<ul style="margin: 0.5em 0; padding-left: 2em;">
 				<li>${keyHtml("Esc")} &rarr; Cancel changes</li>
-				<li>${keyHtml("Enter")} &rarr; Add new line</li>
+				<li>${keyHtml("Enter")} &rarr; Apply changes</li>
+				<li>${keyHtml(["Shift", "Enter"])} &rarr; Add new line</li>
 				<li>${keyHtml("Tab")} &rarr; Move to the next field</li>
 				<li>
 				${keyHtml(["Ctrl", "Space"])} &rarr; Show autocomplete definition

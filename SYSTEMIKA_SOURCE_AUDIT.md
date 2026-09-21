@@ -1,4 +1,4 @@
-# Systemika Studio 1.0.6 Source Independence Audit
+# Systemika Studio 1.1 Source Independence Audit
 
 Date: 2026-09-15
 
@@ -51,7 +51,7 @@ These references are not runtime calls to Insight Maker code.
 
 ## Compatibility boundary
 
-Systemika Studio 1.0.6 intentionally supports a limited old-file normalization layer rather than the full historical Insight Maker updater. It converts the old forms that are relevant to Systemika's current entity set. Very old files relying on unsupported Insight Maker features (agents, states, transitions, actions, folders, macros, stochastic functions, etc.) are not a compatibility target.
+Systemika Studio 1.1 intentionally supports a limited old-file normalization layer rather than the full historical Insight Maker updater. It converts the old forms that are relevant to Systemika's current entity set. Very old files relying on unsupported Insight Maker features (agents, states, transitions, actions, folders, macros, stochastic functions, etc.) are not a compatibility target.
 
 ## Verification
 

@@ -1,6 +1,6 @@
 # Systemika Independence Roadmap
 
-## Current status — Systemika Studio 1.0.6
+## Current status — Systemika Studio 1.1
 
 Systemika now uses independently written code for the numerical engine and the active model/editor infrastructure that had been identified as Insight Maker-derived in the migration roadmap. The `OpenSystemDynamics/src/insightmaker/` directory has been removed.
 
@@ -31,7 +31,7 @@ Systemika uses exactly these model-entity names:
 
 For backward `.ssd` compatibility, Auxiliaries and Constants are still stored as `Variable` XML nodes and Lookups as `Converter` XML nodes. The historical outer XML tag `InsightMakerModel` is also retained when saving. These are file-format compatibility identifiers, not user-facing Systemika terminology or runtime dependencies.
 
-Systemika Studio 1.0.6 does not add new Insight Maker runtime dependencies. The independent Systemika engine/model layers and permanent validation fixtures remain the release baseline.
+Systemika Studio 1.1 does not add new Insight Maker runtime dependencies. The independent Systemika engine/model layers and permanent validation fixtures remain the release baseline.
 
 ## 0.6.0 replacement
 

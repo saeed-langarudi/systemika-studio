@@ -102,7 +102,17 @@ function bundleHtml(sourceHtml, sourceDir, destHtml, version = null) {
       : `<link rel="stylesheet" href="${targetRef}" />`;
   });
 
-  if (version) rewritten = rewriteLaunchCacheKeys(rewritten, version);
+  if (version) {
+    rewritten = rewriteLaunchCacheKeys(rewritten, version);
+    // Version the WebApp shell resources too. This forces browsers that have
+    // previously opened an older Systemika release to revalidate the shell
+    // rather than retaining stale service-worker/manifest URLs.
+    rewritten = rewritten
+      .replace(/multisimulationanalyser-serviceworker\.js(?:\?v=[^\"'\s<]*)?/g,
+        `multisimulationanalyser-serviceworker.js?v=${version}`)
+      .replace(/multisimulationanalyser-manifest\.json(?:\?v=[^\"'\s<]*)?/g,
+        `multisimulationanalyser-manifest.json?v=${version}`);
+  }
   ensureDir(path.dirname(destHtml));
   fs.writeFileSync(destHtml, rewritten, 'utf8');
 }

@@ -365,7 +365,7 @@ test('native equation editor keeps clean function names while showing optional s
   }
 });
 
-test('equation editor uses Enter for new lines and no obsolete modifier-Enter binding', async () => {
+test('equation editor uses Enter to apply and Shift+Enter for new lines', async () => {
   const fs = require('node:fs/promises');
   const editor = await fs.readFile(path.join(__dirname, '..', 'OpenSystemDynamics', 'src', 'editor.js'), 'utf8');
   const start = editor.indexOf('class DefinitionEditor');
@@ -373,7 +373,8 @@ test('equation editor uses Enter for new lines and no obsolete modifier-Enter bi
   const definitionEditor = editor.slice(start, end);
   assert.doesNotMatch(definitionEditor, /"Enter": \(\) => \{\s*this\.dialogParameters\.buttons\["Apply"\]/);
   assert.doesNotMatch(definitionEditor, /"Ctrl-Enter"|"Cmd-Enter"/);
-  assert.match(definitionEditor, /keyHtml\("Enter"\).*Add new line/);
+  assert.match(definitionEditor, /keyHtml\("Enter"\).*Apply changes/);
+  assert.match(definitionEditor, /keyHtml\(\["Shift", "Enter"\]\).*Add new line/);
   assert.doesNotMatch(definitionEditor, /keyHtml\(\[modifierKey, "Enter"\]\).*Apply changes/);
   assert.match(editor, /cm\.getRange\(\{ line: 0, ch: 0 \}, cursor\)/, 'function argument help should work across equation line breaks');
 });

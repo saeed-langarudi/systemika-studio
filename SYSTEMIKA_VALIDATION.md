@@ -1,15 +1,15 @@
-# Systemika Studio 1.0.6 Validation Baseline
+# Systemika Studio 1.1 Validation Baseline
 
-Date: 2026-09-17
+Date: 2026-09-21
 
 ## Purpose
 
-Systemika Studio 1.0.6 retains the permanent regression baseline established during development and extends it through the final Histogram and release-readiness work. The validation set does not attempt to reproduce every possible system dynamics model; it covers the deliberately focused feature set Systemika currently supports.
+Systemika Studio 1.1 retains the permanent regression baseline established during development and extends it through the final Histogram and release-readiness work. The validation set does not attempt to reproduce every possible system dynamics model; it covers the deliberately focused feature set Systemika currently supports.
 
 
 ## Current release result
 
-Systemika Studio 1.0.6 has **19 permanent validation models** and **333/333 passing automated regression tests**. The milestone notes below are retained as a development history of how that baseline grew.
+Systemika Studio 1.1 has **19 permanent validation models** and **348/348 passing automated regression tests**. The milestone notes below are retained as a development history of how that baseline grew.
 
 ## Permanent validation models
 
@@ -105,7 +105,7 @@ The 1.0.3 suite adds focused checks for the shared compact Table/Plot variable s
 
 ## Version 1.0.6 output-panel polish regression additions
 
-The 1.0.6 suite adds dedicated checks that legacy table-based setting controls collapse their default table spacing so the visible border fills the same 360 px wrapper as Selected Variable(s), and that export actions occupy a dedicated second header row aligned to the left while the title and panel controls remain on the first row. Current baseline: **333/333 automated tests passing** with **19/19 permanent validation models**.
+The 1.0.6 suite added dedicated checks that legacy table-based setting controls collapse their default table spacing so the visible border fills the same 360 px wrapper as Selected Variable(s), and that export actions occupy a dedicated second header row aligned to the left while the title and panel controls remain on the first row. Historical 1.0.6 baseline: **333/333 automated tests passing** with **19/19 permanent validation models**.
 
 ## Version 1.0.4 output-panel geometry regression additions
 
@@ -114,4 +114,17 @@ The 1.0.4 suite adds dedicated checks that every Table/Plot settings wrapper is 
 
 ## Version 1.0.6 WebApp release regression
 
-The 1.0.6 suite adds a release-build regression that executes the WebApp staging builder and verifies that the upload-ready bundle contains the current Output-panel implementation, current-version cache keys on the launcher and generated JS/CSS bundles, the current nested editor URL, `.htaccess` cache controls, and `WEB_BUILD_INFO.txt`. Current baseline: **333/333 automated tests passing** with **19/19 permanent validation models**.
+The 1.0.6 suite added a release-build regression that executes the WebApp staging builder and verifies that the upload-ready bundle contains the current Output-panel implementation, current-version cache keys on the launcher and generated JS/CSS bundles, the current nested editor URL, `.htaccess` cache controls, and `WEB_BUILD_INFO.txt`. Historical 1.0.6 baseline: **333/333 automated tests passing** with **19/19 permanent validation models**.
+
+## Dialog Enter / Shift+Enter keyboard regression
+
+The current dialog keyboard convention uses **Enter** to apply changes and **Shift+Enter** to insert a line break in multiline fields. The dialog-level handler applies this consistently even inside CodeMirror, while leaving Enter available to select an active autocomplete suggestion. Help and shortcut documentation are synchronized with the behavior. Current baseline: **336/336 automated tests passing** with **19/19 permanent validation models**.
+
+
+### Keyboard and selection refinement
+Enter now applies the Time Unit dialog and opens the equation/properties editor for one selected model variable when used on the canvas. M selects the Mouse tool. Undo/Redo and Mouse tooltips show their shortcuts. Attached Flow endpoint anchors use staged selection: a first click in a Stock selects the Stock; select the Flow first (for example via its valve) before selecting an attached endpoint for detaching or repositioning.
+
+
+## Version 1.1 Calibration Sandbox regression additions
+
+The 1.1 suite adds regression coverage for Calibration Sandbox launch and layout, plot variable selection, live constant controls, reset behavior, responsive transient reruns, `.sysrun` sandbox persistence, universal Reference/Simulated styling, and underscore-number naming for copied entities. Current release baseline: **348/348 automated tests passing** with **19/19 permanent validation models**.

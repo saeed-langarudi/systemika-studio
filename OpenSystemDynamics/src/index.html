@@ -13,7 +13,7 @@ terms of the Affero General Public License (http://www.gnu.org/licenses/agpl-3.0
 
 <head>
 
-	<title>Systemika</title>
+	<title>Systemika Studio</title>
 
 	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 	<!-- Prevent rightclick contextmenu -->
@@ -71,7 +71,8 @@ terms of the Affero General Public License (http://www.gnu.org/licenses/agpl-3.0
 	<script type="text/javascript" src="systemika-units.js"></script>
 	<script type="text/javascript" src="systemika-plot-pages.js"></script>
 	<script type="text/javascript" src="systemika-documentation.js"></script>
-	<script type="text/javascript" src="editor.js?v=1.0.6"></script>
+	<script type="text/javascript" src="editor.js?v=1.1.0"></script>
+	<script type="text/javascript" src="systemika-calibration-sandbox.js?v=1.1.0"></script>
 	<!-- endbuild -->
 
 	<!-- build:css opensystemdynamics.css  -->
@@ -79,7 +80,7 @@ terms of the Affero General Public License (http://www.gnu.org/licenses/agpl-3.0
 	<link rel="stylesheet" href="./codemirror/theme/stochsdtheme.css" />
 	<link rel="stylesheet" href="./codemirror/theme/oneline.css" />
 	<link rel="stylesheet" href="./codemirror/theme/resize.css" />
-	<link rel="stylesheet" type="text/css" href="style/editor.css?v=1.0.6">
+	<link rel="stylesheet" type="text/css" href="style/editor.css?v=1.1.0">
 	<link rel="stylesheet" type="text/css" href="style/systemika-runs.css" />
 	<link class="include" rel="stylesheet" type="text/css" href="jquery/jqplot-1.0.8/jquery.jqplot.min.css" />
 	<link rel="stylesheet" href="jquery/jquery-ui-1.12.1/jquery-ui.css" />
@@ -101,7 +102,7 @@ terms of the Affero General Public License (http://www.gnu.org/licenses/agpl-3.0
 					<button class="menuButton" id="btn_file">File</button>
 					<div class="menuContent">
 						<span>
-							<button id="btn_new">New</button>
+							<button id="btn_new" data-title="New (Ctrl+N)"><u>N</u>ew<span class="shortcut">Ctrl N</span></button>
 						</span>
 						<span>
 							<button id="btn_load"><u>O</u>pen<span class="shortcut">Ctrl O</span></button>
@@ -197,16 +198,16 @@ terms of the Affero General Public License (http://www.gnu.org/licenses/agpl-3.0
 
 		<div class="tool-panel run-tool-panel" aria-label="Editor and simulation controls">
 			<div class="tool-grouping editor-actions" aria-label="Selection and history tools">
-				<button id="btn_mouse" data-title="Mouse" class="tool-button" data-tool="mouse">
+				<button id="btn_mouse" data-title="Mouse (M)" class="tool-button" data-tool="mouse">
 					<img src="graphics/mouse.svg" />
 				</button>
 				<button id="btn_delete" data-title="Delete" class="tool-button" data-tool="delete">
 					<img src="graphics/delete.svg" />
 				</button>
-				<button id="btn_undo" data-title="Undo" class="tool-button" data-tool="undo" disabled>
+				<button id="btn_undo" data-title="Undo (Ctrl+Z)" class="tool-button" data-tool="undo" disabled>
 					<img src="graphics/undo.svg" />
 				</button>
-				<button id="btn_redo" data-title="Redo" class="tool-button" data-tool="redo" disabled>
+				<button id="btn_redo" data-title="Redo (Ctrl+Y)" class="tool-button" data-tool="redo" disabled>
 					<img src="graphics/redo.svg" />
 				</button>
 			</div>
@@ -255,6 +256,9 @@ terms of the Affero General Public License (http://www.gnu.org/licenses/agpl-3.0
 				</button>
 				<button id="btn_histoplot" data-title="Histogram (H)" class="tool-button" data-tool="histoplot">
 					<img src="graphics/histoplot.svg" />
+				</button>
+				<button id="btn_calibration_sandbox" type="button" data-title="Calibration Sandbox" class="tool-button" aria-label="Calibration Sandbox">
+					<img src="graphics/calibration-sandbox.svg" alt="" aria-hidden="true" />
 				</button>
 			</div>
 			<div class="tool-grouping" id="runControllerArea">

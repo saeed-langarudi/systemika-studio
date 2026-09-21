@@ -339,6 +339,16 @@
         if (["pi", "e", "eps", "epsilon"].includes(key)) return resultUnit(dimensionlessUnit());
         if (["true", "false"].includes(key)) return booleanResult();
         if (["time", "t", "dt"].includes(key)) return context.timeUnit ? resultUnit(context.timeUnit) : unknown("Model time unit is not specified.");
+        // The native Systemika expression parser represents ordinary model names
+        // such as Rabbits and Rabbit_Growth_Rate as identifiers, while bracketed
+        // names are represented as references. Both forms must resolve through
+        // the same model-entity unit table.
+        const target = context.referenceUnits.get(key);
+        if (target) {
+          if (target.error) return unknown(`Referenced model entity '${target.name}' has an invalid unit.`);
+          if (!target.unit) return unknown(`Referenced model entity '${target.name}' has no declared unit.`);
+          return resultUnit(target.unit);
+        }
         addIssue(context, "unknown", "unknown-identifier", `Unit checking does not recognize identifier '${ast.name}'.`);
         return unknown(`Unknown identifier '${ast.name}'.`);
       }
@@ -495,9 +505,21 @@
     return item.type || "Entity";
   }
 
+  function normalizeStoredExpression(expression) {
+    // Model definitions are persisted with physical line breaks encoded as the
+    // two characters "\\n". The numerical/editor path decodes them before
+    // parsing; unit checking must do the same or the expression parser sees an
+    // unexpected backslash. Whitespace is dimensionally insignificant, so a
+    // real newline is the faithful parser-facing representation.
+    return String(expression == null ? "" : expression)
+      .replace(/\\r\\n/g, "\n")
+      .replace(/\\n/g, "\n")
+      .replace(/\\r/g, "\n");
+  }
+
   function expressionFor(item) {
-    if (item.type === "Stock") return item.initial == null ? "" : String(item.initial);
-    if (item.type === "Flow" || item.type === "Variable") return item.equation == null ? "" : String(item.equation);
+    if (item.type === "Stock") return item.initial == null ? "" : normalizeStoredExpression(item.initial);
+    if (item.type === "Flow" || item.type === "Variable") return item.equation == null ? "" : normalizeStoredExpression(item.equation);
     return null;
   }
 

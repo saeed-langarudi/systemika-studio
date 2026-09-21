@@ -30,7 +30,7 @@ The legacy `.ssd` attribute `OnlyPositive` is retained only for file-format comp
 
 ## Multiline equations
 
-The native tokenizer treats line breaks as ordinary whitespace. The Equation Editor therefore supports multiline formulas directly; this is especially useful for formatting nested `IfThenElse(...)` expressions. No continuation/escape character is required. Enter inserts a line break, Tab moves to the next properties field, and Ctrl+Enter (Windows/Linux) or Cmd+Enter (macOS) applies the equation.
+The native tokenizer treats line breaks as ordinary whitespace. The Equation Editor therefore supports multiline formulas directly; this is especially useful for formatting nested `IfThenElse(...)` expressions. No continuation/escape character is required. Enter applies the equation, Shift+Enter inserts a line break, and Tab moves to the next properties field.
 
 ## Programming and statistical functions in 0.8.x
 

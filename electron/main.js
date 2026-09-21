@@ -113,7 +113,11 @@ function createWindow() {
 
 	mainWindow.maximize();
 	mainWindow.setMenuBarVisibility(false);
-	mainWindow.setTitle(`Systemika ${app.getVersion()}`);
+	mainWindow.setTitle(`Systemika Studio ${app.getVersion()}`);
+	mainWindow.on("page-title-updated", (event) => {
+		event.preventDefault();
+		mainWindow.setTitle(`Systemika Studio ${app.getVersion()}`);
+	});
 	// The Output panel uses window.open() when detached. Electron maps that to a
 	// real BrowserWindow, so the detached panel can be moved to another monitor.
 	// Keep that popup independent of the main window rather than constraining it

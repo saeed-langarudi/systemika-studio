@@ -11,7 +11,7 @@
 6. Use **Run/Pause** for ordinary simulations or **Advance** for stepwise exploration.
 7. Save with Save/Save As. The red **Unsaved Changes** indicator is clickable.
 
-Equations may span multiple lines without an escape character. **Enter** inserts a line break and **Tab** moves to the next property field; use **Apply** to save the definition. Double-clicking a model entity opens its properties with the cursor in **Name** first. The **Comment** field is for documentation only and does not affect simulation behavior.
+Equations may span multiple lines without an escape character. **Enter** applies the changes, **Shift+Enter** inserts a line break, and **Tab** moves to the next property field. Double-clicking a model entity opens its properties with the cursor in **Name** first. The **Comment** field is for documentation only and does not affect simulation behavior.
 
 Flow definitions may evaluate to positive or negative values. Systemika does not impose bounds on Flow rates; a negative stock-to-stock Flow reverses the effective transfer direction.
 
@@ -19,9 +19,12 @@ Flow definitions may evaluate to positive or negative values. Systemika does not
 
 | Action | Shortcut |
 |---|---|
+| New model | Ctrl/Cmd+N |
 | Open | Ctrl/Cmd+O |
 | Save / Save As | Ctrl/Cmd+S / Ctrl/Cmd+Shift+S |
 | Undo / Redo | Ctrl/Cmd+Z / Ctrl/Cmd+Y |
+| Open equation/properties for selected model variable | Enter |
+| Mouse tool | M |
 | Cut / Copy / Paste | Ctrl/Cmd+X / Ctrl/Cmd+C / Ctrl/Cmd+V |
 | Select all | Ctrl/Cmd+A |
 | Delete selection | Delete or Backspace |
@@ -40,6 +43,8 @@ Flow definitions may evaluate to positive or negative values. Systemika does not
 | Lookup / Ghost | K / G |
 | Hide / unhide definition question marks | Q |
 | Rotate entity name | R |
+| Apply changes in dialog | Enter |
+| Insert line break in a multiline dialog field | Shift+Enter |
 | Close dialog | Esc |
 
 When exactly one rendered Figure is selected, **Copy** (toolbar or Ctrl/Cmd+C) also places a high-resolution transparent PNG of that Figure on the operating-system clipboard, while retaining Systemika's normal internal model-object copy for Paste. **Cut** (toolbar or Ctrl/Cmd+X) copies the same Figure image to the operating-system clipboard before removing the Figure from the model, so it can be pasted directly into Word, PowerPoint, presentation software, or an image editor.

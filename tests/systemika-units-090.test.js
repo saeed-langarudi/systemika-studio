@@ -49,6 +49,18 @@ test('multiplication and division derive compound units', () => {
   assert.equal(r.unknowns.length, 0);
 });
 
+test('stored multiline equations are decoded before unit parsing', () => {
+  const r = report([
+    { id: 'rabbits', name: 'Rabbits', type: 'Stock', units: 'rabbit', initial: '100' },
+    { id: 'wolves', name: 'Wolves', type: 'Stock', units: 'wolf', initial: '10' },
+    { id: 'growth', name: 'Rabbit_Growth_Rate', type: 'Variable', isConstant: true, units: '1/Year', equation: '0.1' },
+    { id: 'death', name: 'Rabbit_Death_Rate', type: 'Variable', isConstant: true, units: '1/(wolf*Year)', equation: '0.01' },
+    { id: 'net', name: 'Net_Growth_of_Rabbits', type: 'Flow', units: 'rabbit/Year', equation: 'Rabbits * Rabbit_Growth_Rate -\\nRabbits * Wolves * Rabbit_Death_Rate' }
+  ]);
+  assert.deepEqual(r.errors, []);
+  assert.deepEqual(r.unknowns, []);
+});
+
 test('addition rejects different declared symbols without synonym matching', () => {
   const r = report([
     { id: 'a', name: 'A', type: 'Variable', units: 'USD', equation: '10' },
@@ -218,4 +230,41 @@ test('all five statistical distributions have explicit strict unit rules', () =>
   ]);
   assert.deepEqual(r.errors, []);
   assert.deepEqual(r.unknowns, []);
+});
+
+test('unbracketed model identifiers resolve units, including stocks in flow equations', () => {
+  const r = report([
+    { id: 's', name: 'Rabbits', type: 'Stock', units: 'rabbit', initial: '100' },
+    { id: 'r', name: 'Rabbit_Growth_Rate', type: 'Variable', isConstant: true, units: '1/year', equation: '0.1' },
+    { id: 'f', name: 'Net_Growth_of_Rabbits', type: 'Flow', units: 'rabbit/year', equation: 'Rabbits*Rabbit_Growth_Rate', targetId: 's' }
+  ], 'year');
+  assert.deepEqual(r.errors, []);
+  assert.deepEqual(r.unknowns, []);
+});
+
+test('lookup declared unit is an unrestricted black-box output unit', () => {
+  const r = report([
+    { id: 'input', name: 'Input', type: 'Variable', units: 'Year', equation: '1' },
+    { id: 'lookup', name: 'Transformation', type: 'Converter', units: 'USD/Person' },
+    { id: 'out', name: 'Output', type: 'Variable', units: 'USD/Person', equation: '[Transformation]' }
+  ]);
+  assert.deepEqual(r.errors, []);
+  assert.deepEqual(r.unknowns, []);
+});
+
+test('lookup output unit participates in downstream dimensional checking', () => {
+  const r = report([
+    { id: 'lookup', name: 'Transformation', type: 'Converter', units: 'USD' },
+    { id: 'out', name: 'Output', type: 'Variable', units: 'Person', equation: '[Transformation]' }
+  ]);
+  assert.ok(hasError(r, 'Declared unit is Person, but the definition evaluates dimensionally to USD.'));
+});
+
+test('lookup properties expose and save a Unit field', () => {
+  const editor = fs.readFileSync(path.join(root, 'OpenSystemDynamics', 'src', 'editor.js'), 'utf8');
+  const converter = editor.slice(editor.indexOf('class ConverterDialog'), editor.indexOf('class DefinitionEditor'));
+  assert.match(converter, /class="unit-field enter-apply"/);
+  assert.match(converter, /getUnits\(this\.primitive\)/);
+  assert.match(converter, /setUnits\(this\.primitive, this\.unitField/);
+  assert.match(converter, /black-box transformation/);
 });
