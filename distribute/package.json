@@ -1,6 +1,6 @@
 {
   "name": "systemika-studio-build",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Systemika Studio packaging tools",
   "author": "Systemika Desktop",
   "devDependencies": {

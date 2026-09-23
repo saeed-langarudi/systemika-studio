@@ -4,7 +4,7 @@ Systemika Studio is educational System Dynamics software designed for learning a
 
 ## Release status
 
-Version **1.1** (package version **1.1.0**) is the current Systemika Studio release. It introduces the manual Calibration Sandbox while retaining the existing Systemika simulation engine. The source package includes the desktop/web interfaces, platform build helpers, 19 permanent validation models, and an automated regression suite.
+Version **1.1** (package version **1.1.1**) is the current Systemika Studio release. It introduces the manual Calibration Sandbox while retaining the existing Systemika simulation engine. The source package includes the desktop/web interfaces, platform build helpers, 19 permanent validation models, and an automated regression suite.
 
 The 1.0.0 release includes the finalized comparative Histogram implementation. Histogram output is always count-based (the obsolete PDF/scaling selector has been removed). A single-run Histogram uses light gray bars with black borders and no point markers; multiple selected runs use common bins and translucent overlays with an external run legend. It also includes the **Hide/Unhide Question Marks (Q)** display toggle for missing-definition markers.
 
@@ -49,7 +49,7 @@ Convenience launchers are included for Windows, macOS, and Linux. See `BUILD_AND
 
 For source-tree WebApp testing, use `npm run web` or the corresponding `RUN_SYSTEMIKA_WEB_*` launcher rather than opening `start.html` directly with `file://`.
 
-For public web deployment, run `node distribute/build.js` and upload the **contents** of `distribute/output/web/1.1.0/`. The web build now versions generated JS/CSS URLs automatically and includes `.htaccess` cache-control rules plus `WEB_BUILD_INFO.txt`, preventing an older browser-cached interface from surviving an in-place upgrade.
+For public web deployment, run `node distribute/build.js` and upload the **contents** of `distribute/output/web/1.1.1/`. The web build now versions generated JS/CSS URLs automatically and includes `.htaccess` cache-control rules plus `WEB_BUILD_INFO.txt`, preventing an older browser-cached interface from surviving an in-place upgrade.
 
 ## Building installers
 
@@ -84,4 +84,4 @@ Systemika Studio was developed from the open-source StochSD codebase. The curren
 
 ### Windows WebApp build
 
-For a one-click WebApp build on Windows, run `BUILD_WEBAPP_WINDOWS.bat` from the source-package root. It invokes the canonical `distribute\build.js` builder and writes the upload-ready release to `distribute\output\web\1.1.0`. Upload the contents of that version folder together; do not merge them with an older WebApp release. Cache-busting URLs are generated from the central Systemika version automatically.
+For a one-click WebApp build on Windows, run `BUILD_WEBAPP_WINDOWS.bat` from the source-package root. It invokes the canonical `distribute\build.js` builder and writes the upload-ready release to `distribute\output\web\1.1.1`. Upload the contents of that version folder together; do not merge them with an older WebApp release. Cache-busting URLs are generated from the central Systemika version automatically.

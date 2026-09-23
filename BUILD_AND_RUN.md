@@ -47,7 +47,7 @@ node distribute/build.js
 
 Upload the **contents** of:
 
-`distribute/output/web/1.1.0/`
+`distribute/output/web/1.1.1/`
 
 to the server folder that serves Systemika Studio (for example `systemika.no/studio/`). Do not merge files selectively with an older web build; replace the previous WebApp files as one set.
 
@@ -64,7 +64,7 @@ The WebApp builder automatically:
 npm test
 ```
 
-Release 1.1 baseline: **348 tests passing** plus **19 permanent validation models**.
+Release 1.1.1 verification baseline: **376 tests passing** plus **19 permanent validation models**.
 
 ## Build student/public installers
 
@@ -110,4 +110,4 @@ The root-level platform builders and platform guides are the preferred release p
 
 ### Windows WebApp build
 
-For a one-click WebApp build on Windows, run `BUILD_WEBAPP_WINDOWS.bat` from the source-package root. It invokes the canonical `distribute\build.js` builder and writes the upload-ready release to `distribute\output\web\1.1.0`. Upload the contents of that version folder together; do not merge them with an older WebApp release. Cache-busting URLs are generated from the central Systemika version automatically.
+For a one-click WebApp build on Windows, run `BUILD_WEBAPP_WINDOWS.bat` from the source-package root. It invokes the canonical `distribute\build.js` builder and writes the upload-ready release to `distribute\output\web\1.1.1`. Upload the contents of that version folder together; do not merge them with an older WebApp release. Cache-busting URLs are generated from the central Systemika version automatically.

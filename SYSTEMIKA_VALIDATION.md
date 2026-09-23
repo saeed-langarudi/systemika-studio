@@ -9,7 +9,7 @@ Systemika Studio 1.1 retains the permanent regression baseline established durin
 
 ## Current release result
 
-Systemika Studio 1.1 has **19 permanent validation models** and **348/348 passing automated regression tests**. The milestone notes below are retained as a development history of how that baseline grew.
+Systemika Studio 1.1.1 has **19 permanent validation models** and **376/376 passing automated regression tests**. The milestone notes below are retained as a development history of how that baseline grew.
 
 ## Permanent validation models
 

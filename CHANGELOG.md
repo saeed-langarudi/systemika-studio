@@ -1,3 +1,28 @@
+## 2026-09-23 — Systemika Studio 1.1.1 — Stock label readability and Find Ghosts icon
+- Stock names now render in a dedicated top SVG layer, preventing flow pipes, valves, links, and other model graphics from obscuring the text.
+- Added a compact 72%-opaque rounded background behind Stock names; it follows the text bounds and automatically uses a light or dark fill according to the label colour.
+- The Stock-name background refreshes after renaming, recolouring, or Rotate Name changes and is applied to Stock Ghosts as well.
+- Fixed the Stock-name background so it clears the *visible* Stock outline, including the half-stroke and anti-aliasing margin; the border now remains crisp for names above, below, left, or right of the Stock.
+- Replaced the Find Ghosts toolbar icon with the newly supplied SVG artwork.
+- Release verification: 376/376 automated tests passing; 19/19 permanent validation models retained.
+
+## 2026-09-23 — Systemika Studio 1.1.1 — Find Ghosts
+- Added a Find Ghosts toolbar action beside Find with Ctrl+G/Cmd+G cycling through all Ghosts and back to the original variable.
+- Find Ghosts remains disabled unless exactly one ghostable variable or Ghost is selected, and reports when the selected original has no Ghosts.
+- Replaced the Find and Ghost toolbar artwork with the supplied icons and added the supplied Find Ghosts icon.
+- Updated the Keyboard Shortcuts dialog and regression coverage.
+- Release verification: 366/366 automated tests passing; 19/19 permanent validation models retained.
+
+## 2026-09-23 — Systemika Studio 1.1.1 — Constant information links
+- Added a Ctrl+F Find-variable toolbar tool with sortable Name/Type results and canvas centering.
+- Constants can now accept incoming information Links from Stocks, Flows, Auxiliaries, other Constants, and Lookups.
+- Links terminating at Constants are rendered as dashed information arrows, matching the existing visual treatment for Links terminating at Stocks.
+- Constants are now evaluated once at the simulation start; linked sources contribute their start-of-simulation values so derived Constants remain fixed throughout the run.
+- Constant property dialogs now expose linked model entities for insertion and autocomplete.
+- Added **View → Hide Information Links / Show Information Links** to temporarily hide all dashed information Links without changing model structure.
+- Updated release/cache identifiers to 1.1.1 and rebuilt desktop/WebApp staging output.
+- Release verification: 357/357 automated tests passing; 19/19 permanent validation models retained.
+
 ## 2026-09-21 — Systemika Studio 1.1 — Manual Calibration Sandbox
 - Added the Calibration Sandbox with six fixed-format comparison plots and live sliders for model constants.
 - Added purple dashed Reference and teal solid Simulated trajectories with one universal sandbox legend.

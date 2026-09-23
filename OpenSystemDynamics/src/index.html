@@ -71,8 +71,8 @@ terms of the Affero General Public License (http://www.gnu.org/licenses/agpl-3.0
 	<script type="text/javascript" src="systemika-units.js"></script>
 	<script type="text/javascript" src="systemika-plot-pages.js"></script>
 	<script type="text/javascript" src="systemika-documentation.js"></script>
-	<script type="text/javascript" src="editor.js?v=1.1.0"></script>
-	<script type="text/javascript" src="systemika-calibration-sandbox.js?v=1.1.0"></script>
+	<script type="text/javascript" src="editor.js?v=1.1.1"></script>
+	<script type="text/javascript" src="systemika-calibration-sandbox.js?v=1.1.1"></script>
 	<!-- endbuild -->
 
 	<!-- build:css opensystemdynamics.css  -->
@@ -80,7 +80,7 @@ terms of the Affero General Public License (http://www.gnu.org/licenses/agpl-3.0
 	<link rel="stylesheet" href="./codemirror/theme/stochsdtheme.css" />
 	<link rel="stylesheet" href="./codemirror/theme/oneline.css" />
 	<link rel="stylesheet" href="./codemirror/theme/resize.css" />
-	<link rel="stylesheet" type="text/css" href="style/editor.css?v=1.1.0">
+	<link rel="stylesheet" type="text/css" href="style/editor.css?v=1.1.1">
 	<link rel="stylesheet" type="text/css" href="style/systemika-runs.css" />
 	<link class="include" rel="stylesheet" type="text/css" href="jquery/jqplot-1.0.8/jquery.jqplot.min.css" />
 	<link rel="stylesheet" href="jquery/jquery-ui-1.12.1/jquery-ui.css" />
@@ -172,6 +172,9 @@ terms of the Affero General Public License (http://www.gnu.org/licenses/agpl-3.0
 						<span>
 							<button id="btn_zoom_reset">Reset Zoom</button>
 						</span>
+						<span class="menuSeparator">
+							<button id="btn_toggle_information_links" aria-pressed="false">Hide Information Links</button>
+						</span>
 					</div>
 				</div>
 				<!-- Simulation Settings are intentionally hidden from the menu bar for the current release. -->
@@ -209,6 +212,12 @@ terms of the Affero General Public License (http://www.gnu.org/licenses/agpl-3.0
 				</button>
 				<button id="btn_redo" data-title="Redo (Ctrl+Y)" class="tool-button" data-tool="redo" disabled>
 					<img src="graphics/redo.svg" />
+				</button>
+				<button id="btn_find_variable" type="button" data-title="Find (Ctrl+F)" class="toolbar-action-button" aria-label="Find variable">
+					<img class="toolbar-inline-icon" src="graphics/find.png" alt="" aria-hidden="true" />
+				</button>
+				<button id="btn_find_ghosts" type="button" data-title="Find Ghosts (Ctrl+G)" class="toolbar-action-button" aria-label="Find next ghost of selected variable" disabled>
+					<img class="toolbar-inline-icon" src="graphics/find_ghost.svg" alt="" aria-hidden="true" />
 				</button>
 			</div>
 			<div class="tool-grouping editing-actions" aria-label="Clipboard and colour tools">
@@ -381,6 +390,9 @@ terms of the Affero General Public License (http://www.gnu.org/licenses/agpl-3.0
 				<g class="layer link"></g>
 				<g class="layer plot"></g>
 				<g class="layer anchor"></g>
+				<!-- Stock names are isolated in the final SVG layer so flows, links,
+				     valves, and other model graphics can never paint over them. -->
+				<g class="layer stock-label"></g>
 			</svg>
 		</div>
 		<div id="systemika-output-splitter" class="systemika-output-splitter systemika-output-hidden" role="separator" aria-orientation="vertical" aria-label="Resize modeling and output panels"></div>

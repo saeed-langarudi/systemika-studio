@@ -1,8 +1,8 @@
 Systemika Studio 1.1 - Release verification
-Date: 2026-09-21
+Date: 2026-09-23
 
 Automated regression verification:
-- 348/348 tests passing with: npm test
+- 374/374 tests passing with: npm test
 - 19 permanent validation models under validation-models/
 
 Verified output workspace:
@@ -26,6 +26,11 @@ Verified classroom interface:
 - Hide/Unhide Question Marks toolbar control and Q shortcut are present; hiding markers does not disable definition validation.
 - Preferences, About, license text, and third-party notices use current Systemika terminology/provenance.
 - Keyboard Shortcuts help matches the current interface; obsolete Ctrl/Cmd+Enter equation guidance/binding is removed. Enter inserts equation line breaks and Apply saves definitions.
+- Find uses the supplied magnifying-glass artwork and opens the sortable Name/Type variable finder with Ctrl/Cmd+F.
+- Find Ghosts uses the newly supplied SVG magnifying-glass/ghost artwork, is enabled only for one selected ghostable variable/Ghost, and Ctrl/Cmd+G cycles through every Ghost and back to the original variable.
+- Stock names render in a dedicated top SVG layer so Flow pipes, valves, Links, and overlapping model entities cannot obscure the label text.
+- Stock names use a compact rounded 72%-opaque adaptive background that follows the text bounds, switches light/dark according to label colour, and refreshes after rename/recolour/Rotate Name changes; Stock Ghost labels use the same treatment.
+- The Ghost creation tool uses the supplied Ghost SVG artwork.
 - The menu bar no longer contains top-right provenance hyperlinks; About Systemika contains links to Systemika (https://systemika.no), StochSD, and Insight Maker.
 
 Simulation and validation:
@@ -53,7 +58,7 @@ Desktop packaging:
 
 WebApp packaging:
 - distribute/build.js rebuilds the WebApp from current source rather than using a stale prebuilt editor bundle.
-- Generated MSA and OpenSystemDynamics JS/CSS references carry ?v=1.1.0 cache keys.
+- Generated MSA and OpenSystemDynamics JS/CSS references carry ?v=1.1.1 cache keys.
 - The upload-ready WebApp includes .htaccess no-cache rules and WEB_BUILD_INFO.txt.
 
 - Paged Figures: Time/Compare/XY/Histogram page persistence and legacy compatibility covered by regression tests; page navigation/add/delete controls live on the Figure, with the last page protected from deletion.

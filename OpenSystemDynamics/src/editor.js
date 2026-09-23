@@ -30,6 +30,8 @@ var aboutDialog;
 var gettingStartedDialog;
 /** @type {KeyboardShortcutsDialog} */
 var keyboardShortcutsDialog;
+/** @type {FindVariableDialog} */
+var findVariableDialog;
 /** @type {FunctionsAndEquationsDialog} */
 var functionsAndEquationsDialog;
 /** @type {UnitsHelpDialog} */
@@ -178,10 +180,39 @@ function markModelSaved(savedState = null) {
 	History.markSaved(savedState);
 }
 
-function refreshSelectionStacking() {
-	if (typeof SVG === "undefined" || !SVG.svgElement || typeof get_selected_root_objects !== "function") return;
+function getSelectedGhostNavigationContext() {
+	if (typeof get_selected_root_objects !== "function") return null;
 	let selected = Object.values(get_selected_root_objects() || {}).filter(Boolean);
-	SVG.svgElement.classList.toggle("selection-on-top", selected.length > 0);
+	if (selected.length !== 1) return null;
+
+	let visual = selected[0];
+	let ghostableTypes = ["stock", "variable", "constant", "converter", "flow"];
+	if (!visual || (!visual.is_ghost && !ghostableTypes.includes(String(visual.type || "").toLowerCase()))) return null;
+
+	let selectedId = String(visual.id || "");
+	let primitive = selectedId ? findID(selectedId) : null;
+	if (!primitive) return null;
+
+	let sourceId = selectedId;
+	if (visual.is_ghost || getType(primitive) === "Ghost") {
+		sourceId = String(primitive.getAttribute("Source") || "");
+	}
+	if (!sourceId || !findID(sourceId) || !get_object(sourceId)) return null;
+
+	return { selectedId, sourceId, selectedVisual: visual };
+}
+
+function updateFindGhostsButtonState() {
+	let button = typeof document !== "undefined" ? document.getElementById("btn_find_ghosts") : null;
+	if (button) button.disabled = getSelectedGhostNavigationContext() == null;
+}
+
+function refreshSelectionStacking() {
+	if (typeof SVG !== "undefined" && SVG.svgElement && typeof get_selected_root_objects === "function") {
+		let selected = Object.values(get_selected_root_objects() || {}).filter(Boolean);
+		SVG.svgElement.classList.toggle("selection-on-top", selected.length > 0);
+	}
+	updateFindGhostsButtonState();
 }
 
 function timeAxisLabel() {
@@ -806,6 +837,11 @@ class BaseObject {
 		this.selector_array = [];
 		this.icons; 	// SVG.group with icons such as ghost and questionmark
 		this.group = null;
+		// Stock names are re-parented into a dedicated top SVG layer.  Keep
+		// the overlay group here so it follows the primitive and is cleaned up
+		// with the rest of the visual.
+		this.name_overlay_group = null;
+		this.name_background_element = null;
 
 		this.namePosList = [[0, this.name_radius + 8], [this.name_radius, 0], [0, -this.name_radius], [-this.name_radius, 0]];
 	}
@@ -823,6 +859,7 @@ class BaseObject {
 		}
 		// AnchorPoint has no primitive
 		this.primitive?.setAttribute("Color", this.color);
+		this.updateStockNameBackground();
 	}
 
 	updateDefinitionError() {
@@ -858,6 +895,14 @@ class BaseObject {
 		this.clearImage();
 	}
 	clearImage() {
+		// A stock name can live in the dedicated top label layer rather than
+		// inside the primitive group. Remove that wrapper as part of the same
+		// visual lifecycle.
+		if (this.name_overlay_group) {
+			this.name_overlay_group.remove();
+			this.name_overlay_group = null;
+			this.name_background_element = null;
+		}
 		// Do the cleaning
 		for (let i in this.selector_array) {
 			this.selector_array[i].remove();
@@ -915,6 +960,155 @@ class BaseObject {
 			return;
 		}
 		this.name_element.innerHTML = new_name;
+		this.updateStockNameBackground();
+	}
+
+	getStockNameTextRgb() {
+		if (!this.name_element) {
+			return null;
+		}
+		let fill = this.name_element.getAttribute("fill") || this.color || "black";
+		try {
+			if (typeof window !== "undefined" && window.getComputedStyle) {
+				fill = window.getComputedStyle(this.name_element).fill || fill;
+			}
+		} catch (error) {
+			// Fall back to the SVG fill attribute if computed style is unavailable.
+		}
+
+		let match = String(fill).match(/rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)/i);
+		if (match) {
+			return [Number(match[1]), Number(match[2]), Number(match[3])];
+		}
+		match = String(fill).trim().match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+		if (match) {
+			let hex = match[1];
+			if (hex.length === 3) {
+				hex = hex.split("").map(character => character + character).join("");
+			}
+			return [
+				parseInt(hex.slice(0, 2), 16),
+				parseInt(hex.slice(2, 4), 16),
+				parseInt(hex.slice(4, 6), 16)
+			];
+		}
+		return null;
+	}
+
+	getStockNameBackgroundColor() {
+		const rgb = this.getStockNameTextRgb();
+		if (!rgb) {
+			return "#ffffff";
+		}
+		const linear = rgb.map(value => {
+			const channel = Math.max(0, Math.min(255, value)) / 255;
+			return channel <= 0.03928
+				? channel / 12.92
+				: Math.pow((channel + 0.055) / 1.055, 2.4);
+		});
+		const luminance = 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
+		return luminance > 0.5 ? "#111111" : "#ffffff";
+	}
+
+	updateStockNameBackground() {
+		if (!this.name_background_element || !this.name_element) {
+			return;
+		}
+		if (!String(this.name_element.textContent || "").trim()) {
+			this.name_background_element.setAttribute("visibility", "hidden");
+			return;
+		}
+		let box;
+		try {
+			box = this.name_element.getBBox();
+		} catch (error) {
+			return;
+		}
+		if (!box || !Number.isFinite(box.x) || !Number.isFinite(box.y) || !Number.isFinite(box.width) || !Number.isFinite(box.height)) {
+			return;
+		}
+		const paddingX = 4;
+		const paddingY = 2;
+		let backgroundX = box.x - paddingX;
+		let backgroundY = box.y - paddingY;
+		let backgroundWidth = box.width + paddingX * 2;
+		let backgroundHeight = box.height + paddingY * 2;
+
+		// Keep the translucent label background clear of the Stock outline.
+		// A Stock rectangle's stroke is centred on its geometric boundary, so
+		// merely stopping at stockTop/stockBottom/etc. still paints over half of
+		// the visible border. Reserve the half-stroke plus a small anti-aliasing
+		// gap so the outline remains fully crisp while the label background stays
+		// close to the name. Clamp only the edge facing the Stock; the other three
+		// sides retain their normal padding.
+		if (this.type === "stock" && typeof this.getSize === "function") {
+			const [stockWidth, stockHeight] = this.getSize();
+			const stockLeft = -stockWidth / 2;
+			const stockRight = stockWidth / 2;
+			const stockTop = -stockHeight / 2;
+			const stockBottom = stockHeight / 2;
+			const outlineElement = this.element_array.find(element =>
+				element && element.getAttribute && element.getAttribute("class") === "element"
+			);
+			let outlineStrokeWidth = Number(outlineElement?.getAttribute("stroke-width"));
+			if (!(outlineStrokeWidth > 0)) {
+				try {
+					outlineStrokeWidth = parseFloat(window.getComputedStyle(outlineElement).strokeWidth);
+				} catch (error) {
+					outlineStrokeWidth = 1;
+				}
+			}
+			if (!(outlineStrokeWidth > 0)) {
+				outlineStrokeWidth = 1;
+			}
+			const borderClearance = outlineStrokeWidth / 2 + 1;
+			const stockOuterLeft = stockLeft - borderClearance;
+			const stockOuterRight = stockRight + borderClearance;
+			const stockOuterTop = stockTop - borderClearance;
+			const stockOuterBottom = stockBottom + borderClearance;
+
+			switch (Number(this.name_pos)) {
+				case 0: { // Below
+					const overlap = stockOuterBottom - backgroundY;
+					if (overlap > 0) {
+						backgroundY += overlap;
+						backgroundHeight = Math.max(0, backgroundHeight - overlap);
+					}
+					break;
+				}
+				case 1: { // Right
+					const overlap = stockOuterRight - backgroundX;
+					if (overlap > 0) {
+						backgroundX += overlap;
+						backgroundWidth = Math.max(0, backgroundWidth - overlap);
+					}
+					break;
+				}
+				case 2: { // Above
+					const backgroundBottom = backgroundY + backgroundHeight;
+					const overlap = backgroundBottom - stockOuterTop;
+					if (overlap > 0) {
+						backgroundHeight = Math.max(0, backgroundHeight - overlap);
+					}
+					break;
+				}
+				case 3: { // Left
+					const backgroundRight = backgroundX + backgroundWidth;
+					const overlap = backgroundRight - stockOuterLeft;
+					if (overlap > 0) {
+						backgroundWidth = Math.max(0, backgroundWidth - overlap);
+					}
+					break;
+				}
+			}
+		}
+
+		this.name_background_element.setAttribute("x", backgroundX);
+		this.name_background_element.setAttribute("y", backgroundY);
+		this.name_background_element.setAttribute("width", backgroundWidth);
+		this.name_background_element.setAttribute("height", backgroundHeight);
+		this.name_background_element.setAttribute("fill", this.getStockNameBackgroundColor());
+		this.name_background_element.setAttribute("visibility", "visible");
 	}
 
 	attributeChangeHandler(attributeName, value) {
@@ -1027,6 +1221,27 @@ class OnePointer extends BaseObject {
 			console.log("group", this.id, this.primitive, this.name, this.type, this.getLayer() ,this.group);
 		this.group.setAttribute("node_id", this.id);
 
+		// Stock labels must remain readable even when a flow pipe, valve, link,
+		// or another primitive crosses the label. SVG paints later siblings on
+		// top, so move only the stock name into the final stock-label layer.
+		// Keeping the text element itself preserves its existing rename and
+		// selection event handlers. Ghosts of Stocks use the same visual type
+		// and therefore receive the same protection.
+		if (this.type === "stock" && this.name_element && SVG.stockLabelLayer) {
+			this.name_background_element = SVG.rect(0, 0, 0, 0, "none", "#ffffff", "stock-name-background", {
+				"fill-opacity": "0.72",
+				"rx": "3",
+				"ry": "3",
+				"pointer-events": "none"
+			});
+			this.name_overlay_group = SVG.append(
+				SVG.stockLabelLayer,
+				SVG.group([this.name_background_element, this.name_element])
+			);
+			this.name_overlay_group.setAttribute("node_id", this.id);
+			this.updateStockNameBackground();
+		}
+
 		this.update();
 
 		for (let key in this.element_array) {
@@ -1066,7 +1281,11 @@ class OnePointer extends BaseObject {
 		refreshSelectionStacking();
 	}
 	update() {
-		this.group.setAttribute("transform", "translate(" + this.pos[0] + "," + this.pos[1] + ")");
+		const primitiveTransform = "translate(" + this.pos[0] + "," + this.pos[1] + ")";
+		this.group.setAttribute("transform", primitiveTransform);
+		if (this.name_overlay_group) {
+			this.name_overlay_group.setAttribute("transform", primitiveTransform);
+		}
 
 		let prim = this.is_ghost ? findID(this.primitive.getAttribute("Source")) : this.primitive;
 		if (this.icons && prim) {
@@ -5520,6 +5739,24 @@ class LineVisual extends TwoPointer {
 	}
 }
 
+let informationLinksVisible = true;
+
+function updateInformationLinksMenuButton() {
+	let button = document.getElementById("btn_toggle_information_links");
+	if (!button) return;
+	button.textContent = informationLinksVisible ? "Hide Information Links" : "Show Information Links";
+	button.setAttribute("aria-pressed", informationLinksVisible ? "false" : "true");
+}
+
+function setInformationLinksVisible(visible) {
+	informationLinksVisible = Boolean(visible);
+	for (let id in connection_array) {
+		let connection = connection_array[id];
+		if (connection instanceof LinkVisual) connection.updateInformationLinkPresentation();
+	}
+	updateInformationLinksMenuButton();
+}
+
 class LinkVisual extends BaseConnection {
 	constructor(id, type, pos0, pos1) {
 		super(id, type, pos0, pos1);
@@ -5640,7 +5877,7 @@ class LinkVisual extends BaseConnection {
 	}
 
 	isAcceptableEndAttach(attachVisual) {
-		let okAttachTypes = ["stock", "variable", "converter", "flow"];
+		let okAttachTypes = ["stock", "variable", "constant", "converter", "flow"];
 		if (attachVisual.getType() === "converter") {
 			// A Lookup has exactly zero or one incoming Link. Outgoing Links do not
 			// consume that input slot. Ignore this Link itself when an existing
@@ -5672,11 +5909,7 @@ class LinkVisual extends BaseConnection {
 		let old_end_attach = this._end_attach;
 		let attached = super.setEndAttach(new_end_attach);
 		if (attached === false) return false;
-		if (new_end_attach != null && new_end_attach.getType() == "stock") {
-			this.dashLine();
-		} else {
-			this.undashLine();
-		}
+		this.updateInformationLinkPresentation();
 		if (old_end_attach) {
 			old_end_attach.updateDefinitionError();
 			old_end_attach.update();
@@ -5779,6 +6012,28 @@ class LinkVisual extends BaseConnection {
 		let ny = ux;
 		this.polarityLabel.setAttribute("x", this.endX - ux * 18 + nx * 10);
 		this.polarityLabel.setAttribute("y", this.endY - uy * 18 + ny * 10);
+	}
+	isInformationLink() {
+		let end = this.getEndAttach();
+		return end != null && ["stock", "constant"].includes(end.getType());
+	}
+	setInformationLinkVisible(visible) {
+		let shouldShow = Boolean(visible);
+		if (!shouldShow && this.selected) this.unselect();
+		for (let element of [this.curve, this.group, this.b1_line, this.b2_line]) {
+			if (!element) continue;
+			if (shouldShow) element.removeAttribute("display");
+			else element.setAttribute("display", "none");
+		}
+		if (!shouldShow) {
+			for (let anchor of this.getAnchors()) anchor.setVisible(false);
+		}
+	}
+	updateInformationLinkPresentation() {
+		let informationLink = this.isInformationLink();
+		if (informationLink) this.dashLine();
+		else this.undashLine();
+		this.setInformationLinkVisible(!informationLink || informationLinksVisible);
 	}
 	dashLine() {
 		this.curve.setAttribute("stroke-dasharray", "6 4");
@@ -5901,6 +6156,7 @@ class LinkVisual extends BaseConnection {
 		// update anchors
 		this.getAnchors().map(anchor => anchor.updatePosition());
 		this.updateGraphics();
+		this.updateInformationLinkPresentation();
 	}
 	keepRelativeHandlePositions() {
 		this.b1_anchor.setPos(this.localToWorld(this.b1Local));
@@ -7420,6 +7676,7 @@ function update_name_pos(node_id) {
 		name_element.setAttribute("x", 0); //Set path's data
 		name_element.setAttribute("y", 0); //Set path's data
 		name_element.setAttribute("text-anchor", "middle");
+		object.updateStockNameBackground();
 		return;
 	}
 
@@ -7446,6 +7703,7 @@ function update_name_pos(node_id) {
 			name_element.setAttribute("text-anchor", "end");
 			break;
 	}
+	object.updateStockNameBackground();
 }
 
 // Canvas zoom.
@@ -8136,6 +8394,20 @@ $(window).load(function () {
 		// The toolbar Run Name field handles its own intentional Enter/Ctrl+Run
 		// exceptions before the event can reach this document handler.
 		let eventTarget = event.target;
+		let commandModifier = (!isMac && event.ctrlKey) || (isMac && event.metaKey);
+		// Find is an application-level command, so Ctrl/Cmd+F should open the
+		// variable finder even when focus is in a non-dialog text field such as
+		// Run Name. Other editor shortcuts remain disabled while typing.
+		if (commandModifier && String(event.key || "").toLowerCase() === "f" && !jqDialog.blockingDialogOpen) {
+			event.preventDefault();
+			if (findVariableDialog) findVariableDialog.show();
+			return;
+		}
+		if (commandModifier && String(event.key || "").toLowerCase() === "g" && !jqDialog.blockingDialogOpen) {
+			event.preventDefault();
+			findNextGhostOfSelection();
+			return;
+		}
 		let editableTarget = eventTarget && (
 			/^(INPUT|TEXTAREA|SELECT)$/.test(String(eventTarget.tagName || "").toUpperCase()) ||
 			eventTarget.isContentEditable || $(eventTarget).closest("[contenteditable='true']").length
@@ -8386,6 +8658,13 @@ $(window).load(function () {
 	$("#btn_copy").click(function () { void copySelectionWithFigureImage(); });
 	$("#btn_cut").click(function () { void cutSelectionWithFigureImage(); });
 	$("#btn_paste").click(function () { Clipboard.paste(); });
+	$("#btn_find_variable").click(function () {
+		if (findVariableDialog) findVariableDialog.show();
+	});
+	$("#btn_find_ghosts").click(function () {
+		findNextGhostOfSelection();
+	});
+	updateFindGhostsButtonState();
 	let closeColourPicker = () => {
 		let picker = document.getElementById("toolbar-colour-picker");
 		let button = document.getElementById("btn_colour");
@@ -8495,6 +8774,10 @@ $(window).load(function () {
 	$("#btn_zoom_reset").click(function () {
 		Zoom.zoomReset();
 	});
+	$("#btn_toggle_information_links").click(function () {
+		setInformationLinksVisible(!informationLinksVisible);
+	});
+	updateInformationLinksMenuButton();
 
 	applyPlatformShortcutLabels();
 	if (fileManager.hasSaveAs()) {
@@ -8537,6 +8820,7 @@ $(window).load(function () {
 	debugDialog = new DebugDialog();
 	aboutDialog = new AboutDialog();
 	gettingStartedDialog = new GettingStartedDialog();
+	findVariableDialog = new FindVariableDialog();
 	keyboardShortcutsDialog = new KeyboardShortcutsDialog();
 	functionsAndEquationsDialog = new FunctionsAndEquationsDialog();
 	unitsHelpDialog = new UnitsHelpDialog();
@@ -13596,6 +13880,205 @@ class GettingStartedDialog extends CloseDialog {
 	}
 }
 
+function focusModelEntityById(id) {
+	let visual = get_object(String(id));
+	if (!visual || typeof visual.select !== "function") return false;
+
+	// A Find result should leave the editor in normal selection mode, with only
+	// the located entity highlighted.
+	if (typeof ToolBox !== "undefined" && ToolBox && typeof ToolBox.setTool === "function") {
+		ToolBox.setTool("mouse");
+	}
+	unselect_all();
+	visual.select();
+	mouse.lastClickedPrimitive = visual;
+	refreshSelectionStacking();
+
+	let pos = typeof visual.getPos === "function" ? visual.getPos() : null;
+	let view = Zoom.view;
+	if (view && Array.isArray(pos) && Number.isFinite(pos[0]) && Number.isFinite(pos[1])) {
+		view.scrollLeft = Math.max(0, pos[0] * Zoom.level - view.clientWidth / 2);
+		view.scrollTop = Math.max(0, pos[1] * Zoom.level - view.clientHeight / 2);
+	}
+	return true;
+}
+
+function findNextGhostOfSelection() {
+	let context = getSelectedGhostNavigationContext();
+	if (!context) return false;
+
+	let ghostIds = findGhostsOfID(context.sourceId)
+		.map(String)
+		.filter(id => !!get_object(id));
+	if (!ghostIds.length) {
+		let source = findID(context.sourceId);
+		let name = source ? String(getName(source) || "") : "";
+		xAlert(name ? `The selected variable “${name}” has no ghosts.` : "The selected variable has no ghosts.");
+		return false;
+	}
+
+	let nextId;
+	if (context.selectedId === context.sourceId) {
+		nextId = ghostIds[0];
+	} else {
+		let currentIndex = ghostIds.indexOf(context.selectedId);
+		nextId = currentIndex >= 0 && currentIndex < ghostIds.length - 1
+			? ghostIds[currentIndex + 1]
+			: context.sourceId;
+	}
+
+	return focusModelEntityById(nextId);
+}
+
+class FindVariableDialog extends jqDialog {
+	constructor() {
+		super();
+		this.sortColumn = "name";
+		this.sortDirection = 1;
+		this.selectedId = null;
+		this.visibleRows = [];
+		this.setTitle("Find");
+		this.setHtml(`
+		<div class="systemika-find-dialog">
+			<label class="systemika-find-label" for="systemika-find-input">Find variable</label>
+			<input id="systemika-find-input" class="systemika-find-input" type="search" autocomplete="off" spellcheck="false" placeholder="Type a variable name or type..." aria-label="Find variable">
+			<div class="systemika-find-table-wrap">
+				<table class="modern-table zebra systemika-find-table" aria-label="Model variables">
+					<thead><tr>
+						<th scope="col"><button type="button" class="systemika-find-sort" data-sort="name">Name <span class="systemika-find-sort-indicator"></span></button></th>
+						<th scope="col"><button type="button" class="systemika-find-sort" data-sort="type">Type <span class="systemika-find-sort-indicator"></span></button></th>
+					</tr></thead>
+					<tbody class="systemika-find-results"></tbody>
+				</table>
+			</div>
+			<div class="systemika-find-count" aria-live="polite"></div>
+		</div>`);
+
+		let root = $(this.dialogContent);
+		root.find(".systemika-find-input").on("input", () => {
+			this.selectedId = null;
+			this.renderRows();
+		});
+		root.find(".systemika-find-input").on("keydown", event => {
+			if (event.key === "ArrowDown") {
+				event.preventDefault();
+				this.selectRelativeRow(1);
+			} else if (event.key === "ArrowUp") {
+				event.preventDefault();
+				this.selectRelativeRow(-1);
+			} else if (event.key === "Enter" && !event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey) {
+				event.preventDefault();
+				this.findSelected();
+			}
+		});
+		root.find(".systemika-find-sort").click(event => {
+			let column = String($(event.currentTarget).attr("data-sort") || "name");
+			if (this.sortColumn === column) this.sortDirection *= -1;
+			else {
+				this.sortColumn = column;
+				this.sortDirection = 1;
+			}
+			this.renderRows();
+		});
+	}
+	beforeCreateDialog() {
+		this.dialogParameters.width = 560;
+		this.dialogParameters.buttons = {
+			"Find": () => this.findSelected(),
+			"Close": () => $(this.dialog).dialog("close")
+		};
+	}
+	collectRows() {
+		let query = String($(this.dialogContent).find(".systemika-find-input").val() || "").trim().toLowerCase();
+		let rows = getPrimitiveList().map(primitive => ({
+			id: String(getID(primitive)),
+			name: String(getName(primitive) || ""),
+			type: String(getSystemikaType(primitive) || getTypeNew(primitive) || "")
+		})).filter(row => !query || row.name.toLowerCase().includes(query) || row.type.toLowerCase().includes(query));
+
+		let primary = this.sortColumn;
+		let direction = this.sortDirection;
+		rows.sort((a, b) => {
+			let av = String(a[primary] || "");
+			let bv = String(b[primary] || "");
+			let result = av.localeCompare(bv, undefined, { sensitivity: "base", numeric: true });
+			if (result === 0 && primary !== "name") result = a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true });
+			if (result === 0) result = a.id.localeCompare(b.id, undefined, { numeric: true });
+			return result * direction;
+		});
+		return rows;
+	}
+	renderRows() {
+		this.visibleRows = this.collectRows();
+		if (this.selectedId && !this.visibleRows.some(row => row.id === this.selectedId)) this.selectedId = null;
+		let body = $(this.dialogContent).find(".systemika-find-results");
+		if (!this.visibleRows.length) {
+			body.html(`<tr><td colspan="2" class="systemika-find-empty">No matching variables.</td></tr>`);
+		} else {
+			body.html(this.visibleRows.map(row => `<tr class="systemika-find-row${row.id === this.selectedId ? " selected" : ""}" data-id="${htmlEscape(row.id)}" tabindex="0" aria-selected="${row.id === this.selectedId ? "true" : "false"}"><td>${htmlEscape(row.name)}</td><td>${htmlEscape(row.type)}</td></tr>`).join(""));
+			body.find(".systemika-find-row").on("click focus", event => this.selectRow(String($(event.currentTarget).attr("data-id") || "")));
+			body.find(".systemika-find-row").on("dblclick", event => {
+				this.selectRow(String($(event.currentTarget).attr("data-id") || ""));
+				this.findSelected();
+			});
+			body.find(".systemika-find-row").on("keydown", event => {
+				if (event.key === "Enter") {
+					event.preventDefault();
+					this.selectRow(String($(event.currentTarget).attr("data-id") || ""));
+					this.findSelected();
+				} else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+					event.preventDefault();
+					this.selectRelativeRow(event.key === "ArrowDown" ? 1 : -1);
+				}
+			});
+		}
+		$(this.dialogContent).find(".systemika-find-count").text(`${this.visibleRows.length} variable${this.visibleRows.length === 1 ? "" : "s"}`);
+		$(this.dialogContent).find(".systemika-find-sort").each((_, button) => {
+			let column = String($(button).attr("data-sort") || "");
+			let indicator = $(button).find(".systemika-find-sort-indicator");
+			indicator.text(column === this.sortColumn ? (this.sortDirection > 0 ? "▲" : "▼") : "");
+			button.setAttribute("aria-sort", column === this.sortColumn ? (this.sortDirection > 0 ? "ascending" : "descending") : "none");
+		});
+	}
+	selectRow(id) {
+		if (!id || !this.visibleRows.some(row => row.id === id)) return;
+		this.selectedId = id;
+		let rows = $(this.dialogContent).find(".systemika-find-row");
+		rows.removeClass("selected").attr("aria-selected", "false");
+		let selected = rows.filter(`[data-id="${CSS.escape(id)}"]`);
+		selected.addClass("selected").attr("aria-selected", "true");
+	}
+	selectRelativeRow(delta) {
+		if (!this.visibleRows.length) return;
+		let index = this.visibleRows.findIndex(row => row.id === this.selectedId);
+		if (index < 0) index = delta > 0 ? -1 : 0;
+		index = Math.max(0, Math.min(this.visibleRows.length - 1, index + delta));
+		let id = this.visibleRows[index].id;
+		this.selectRow(id);
+		let row = $(this.dialogContent).find(`.systemika-find-row[data-id="${CSS.escape(id)}"]`)[0];
+		if (row) {
+			row.focus();
+			row.scrollIntoView({ block: "nearest" });
+		}
+	}
+	findSelected() {
+		if (!this.visibleRows.length) return;
+		let id = this.selectedId || this.visibleRows[0].id;
+		if (!focusModelEntityById(id)) return;
+		this.selectedId = id;
+		$(this.dialog).dialog("close");
+	}
+	beforeShow() {
+		this.selectedId = null;
+		$(this.dialogContent).find(".systemika-find-input").val("");
+		this.renderRows();
+	}
+	afterShow() {
+		let field = $(this.dialogContent).find(".systemika-find-input");
+		setTimeout(() => field.trigger("focus"), 0);
+	}
+}
+
 class KeyboardShortcutsDialog extends CloseDialog {
 	constructor() {
 		super();
@@ -13612,6 +14095,8 @@ class KeyboardShortcutsDialog extends CloseDialog {
 		<tr><td>Mouse tool</td><td>M</td></tr>
 		<tr><td>Cut / Copy / Paste</td><td>${modifierKey}+X / ${modifierKey}+C / ${modifierKey}+V<br/><small>Copy/Cut of one selected Figure also copies its image to the system clipboard.</small></td></tr>
 		<tr><td>Select all</td><td>${modifierKey}+A</td></tr>
+		<tr><td>Find variable</td><td>${modifierKey}+F</td></tr>
+			<tr><td>Find next Ghost / return to original variable</td><td>${modifierKey}+G</td></tr>
 		<tr><td>Delete selection</td><td>Delete or Backspace</td></tr>
 		<tr><td>Zoom in / out</td><td>${modifierKey}++ / ${modifierKey}+-</td></tr>
 		<tr><td>Return canvas to origin</td><td>${modifierKey}+Home</td></tr>
@@ -14423,12 +14908,10 @@ class DefinitionEditor extends jqDialog {
 		}
 
 		let referenceHTML = "";
-		if (!(this.primitive.value.nodeName === "Variable" && this.primitive.getAttribute("isConstant") === "true")) {
-			if (referenceList.length > 0) {
-				referenceHTML = "<b>Linked model entities:</b><br/>" + referenceListToHtml(referenceList);
-			} else {
-				referenceHTML = "No linked model entities";
-			}
+		if (referenceList.length > 0) {
+			referenceHTML = "<b>Linked model entities:</b><br/>" + referenceListToHtml(referenceList);
+		} else {
+			referenceHTML = "No linked model entities";
 		}
 		$(this.referenceDiv).html(referenceHTML);
 
@@ -14454,7 +14937,7 @@ class DefinitionEditor extends jqDialog {
 			"Stock": "The initial value of the stock is set in the definition. (The stock's value over time increases or decreases by inflows and outflows.)",
 			"Flow": "The content in a stock will enter or leave through a flow at the rate determined by the definition.",
 			"Variable": "The auxiliary will take on the value calculated from the definition. The value will be recalculated as the simulation progresses.",
-			"Constant": "The constant will take on the value calculated from the definition. It is treated as state-independent during the simulation."
+			"Constant": "The constant is evaluated once at the start of the simulation. Linked model entities may be used in its definition; their start-of-simulation values are used, so the resulting constant does not change over time."
 		}
 		this.setHelpButtonInfo("definition-help", "Definition Help",
 			`<div style="max-width: 400px;">

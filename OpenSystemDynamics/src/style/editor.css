@@ -1484,3 +1484,89 @@ b[data-arg]::before {
     border-collapse: collapse;
     border-spacing: 0;
 }
+
+
+/* Global model-variable finder (Ctrl/Cmd+F). */
+.systemika-find-dialog {
+    width: min(520px, calc(100vw - 90px));
+}
+.systemika-find-label {
+    display: block;
+    margin-bottom: 4px;
+    font-weight: 600;
+}
+.systemika-find-input {
+    box-sizing: border-box;
+    width: 100%;
+    height: 30px;
+    padding: 4px 7px;
+    margin-bottom: 8px;
+}
+.systemika-find-table-wrap {
+    height: 330px;
+    max-height: 52vh;
+    overflow: auto;
+    border: 1px solid #cfcfcf;
+}
+.systemika-find-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+.systemika-find-table th:first-child,
+.systemika-find-table td:first-child {
+    width: 68%;
+}
+.systemika-find-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 0;
+    background: #f1f1f1;
+    border-bottom: 1px solid #cfcfcf;
+}
+.systemika-find-sort {
+    width: 100%;
+    padding: 6px 8px;
+    border: 0;
+    background: transparent;
+    text-align: left;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+.systemika-find-sort:hover,
+.systemika-find-sort:focus-visible {
+    background: #e5e5e5;
+}
+.systemika-find-sort-indicator {
+    float: right;
+    min-width: 1em;
+}
+.systemika-find-row {
+    cursor: pointer;
+}
+.systemika-find-row td {
+    padding: 6px 8px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.systemika-find-row:hover td,
+.systemika-find-row:focus td {
+    background: #ececec;
+}
+.systemika-find-row.selected td {
+    background: var(--color-highlight-primary);
+}
+.systemika-find-empty {
+    padding: 16px 8px !important;
+    text-align: center;
+    color: #666;
+}
+.systemika-find-count {
+    min-height: 18px;
+    padding-top: 5px;
+    color: #666;
+    font-size: 0.9em;
+}

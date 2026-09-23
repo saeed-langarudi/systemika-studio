@@ -626,6 +626,7 @@
       const nameKey = normalizeKey(name);
       if (nameMap.has(nameKey)) throw new SystemikaEngineError(`Duplicate model entity name '${name}'.`);
       const item = Object.assign({}, raw, { id, name, type });
+      item.isConstant = type === "variable" && (raw.isConstant === true || String(raw.isConstant).toLowerCase() === "true");
       if (type === "stock") {
         item.initial = String(raw.initial == null ? "0" : raw.initial);
         item.ast = parseExpression(item.initial);
@@ -657,6 +658,7 @@
     const stocks = items.filter(x => x.type === "stock");
     const flows = items.filter(x => x.type === "flow");
     const variables = items.filter(x => x.type === "variable");
+    const constants = variables.filter(x => x.isConstant);
     const converters = items.filter(x => x.type === "converter");
 
     flows.forEach(flow => {
@@ -693,7 +695,7 @@
     return {
       timeStart, timeLength, timeEnd, dt, method, randomSeed,
       pauseInterval: spec.pauseInterval == null ? null : Number(spec.pauseInterval),
-      items, stocks, flows, variables, converters, idMap, nameMap,
+      items, stocks, flows, variables, constants, converters, idMap, nameMap,
       memory: specialRegistry.stateful, memoryMap, lags: specialRegistry.lags, lagMap,
       hasRandomFunctions: specialRegistry.randomCount > 0
     };
@@ -708,26 +710,44 @@
       this.randomSeed = compiled.randomSeed == null ? automaticSeed() : seedToUint32(compiled.randomSeed);
       this.overrides = new Map();
       this.lagHistories = new Map(compiled.lags.map(lag => [lag.callId, []]));
+      this.constantValues = Object.create(null);
       this.dynamicStateIds = compiled.stocks.map(stock => stock.id);
       compiled.memory.forEach(memory => memory.stageIds.forEach(id => this.dynamicStateIds.push(id)));
-      this.initializeStocks();
+      this.initializeInitialValues();
       this.initializeMemory();
       this.commitLagSamples();
     }
 
-    initializeStocks() {
+    initializeInitialValues() {
       const resolving = new Set();
       const cache = new Map();
       const resolveInitial = (item) => {
-        if (Object.prototype.hasOwnProperty.call(this.state, item.id)) return this.state[item.id];
-        if (item.type !== "stock") return this.evaluateItem(item, this.state, this.model.timeStart, cache, resolving, true, resolveInitial);
-        if (resolving.has(item.id)) throw new SystemikaEngineError(`Circular dependency while evaluating initial value of '${item.name}'.`);
+        if (item.type === "stock" && Object.prototype.hasOwnProperty.call(this.state, item.id)) return this.state[item.id];
+        if (item.type === "variable" && item.isConstant && Object.prototype.hasOwnProperty.call(this.constantValues, item.id)) {
+          return this.constantValues[item.id];
+        }
+        const fixedAtStart = item.type === "stock" || (item.type === "variable" && item.isConstant);
+        if (!fixedAtStart) {
+          return this.evaluateItem(item, this.state, this.model.timeStart, cache, resolving, true, resolveInitial);
+        }
+        if (resolving.has(item.id)) {
+          throw new SystemikaEngineError(`Circular dependency while evaluating initial value of '${item.name}'.`);
+        }
         resolving.add(item.id);
-        const value = this.evaluateAstFor(item.ast, this.state, this.model.timeStart, cache, resolving, true, resolveInitial);
+        const value = finiteNumber(
+          this.evaluateAstFor(item.ast, this.state, this.model.timeStart, cache, resolving, true, resolveInitial),
+          `${item.type === "stock" ? "Initial value" : "Constant value"} of '${item.name}'`
+        );
         resolving.delete(item.id);
-        this.state[item.id] = item.nonNegative ? Math.max(0, finiteNumber(value, `Initial value of '${item.name}'`)) : finiteNumber(value, `Initial value of '${item.name}'`);
-        return this.state[item.id];
+        if (item.type === "stock") {
+          this.state[item.id] = item.nonNegative ? Math.max(0, value) : value;
+          return this.state[item.id];
+        }
+        this.constantValues[item.id] = value;
+        cache.set(item.id, value);
+        return value;
       };
+      this.model.constants.forEach(resolveInitial);
       this.model.stocks.forEach(resolveInitial);
     }
 
@@ -820,6 +840,10 @@
         if (initializing && resolveInitial) return resolveInitial(item);
         throw new SystemikaEngineError(`Stock '${item.name}' has no current value.`);
       }
+      if (item.type === "variable" && item.isConstant) {
+        if (Object.prototype.hasOwnProperty.call(this.constantValues, item.id)) return this.constantValues[item.id];
+        if (initializing && resolveInitial) return resolveInitial(item);
+      }
       return this.evaluateItem(item, state, time, cache, stack, initializing, resolveInitial);
     }
 
@@ -910,6 +934,10 @@
 
     evaluateItem(item, state, time, cache, stack, initializing, resolveInitial) {
       if (item.type === "stock") return state[item.id];
+      if (item.type === "variable" && item.isConstant) {
+        if (Object.prototype.hasOwnProperty.call(this.constantValues, item.id)) return this.constantValues[item.id];
+        if (initializing && resolveInitial) return resolveInitial(item);
+      }
       if (cache.has(item.id)) return cache.get(item.id);
       if (stack.has(item.id)) {
         const cycle = [...stack, item.id].map(id => this.model.idMap.get(id)?.name || id).join(" -> ");
@@ -922,7 +950,13 @@
         if (normalizeKey(item.sourceId) === "time") input = time;
         else {
           const source = this.model.idMap.get(item.sourceId);
-          input = source.type === "stock" ? state[source.id] : this.evaluateItem(source, state, time, cache, stack, initializing, resolveInitial);
+          if (source.type === "stock") {
+            input = Object.prototype.hasOwnProperty.call(state, source.id)
+              ? state[source.id]
+              : (initializing && resolveInitial ? resolveInitial(source) : state[source.id]);
+          } else {
+            input = this.evaluateItem(source, state, time, cache, stack, initializing, resolveInitial);
+          }
         }
         value = interpolate(item.points, finiteNumber(input, `Input to lookup '${item.name}'`), item.interpolation);
       } else {
@@ -1355,7 +1389,8 @@
         });
       } else if (type === "Variable") {
         variables.push({
-          id: String(cell.id), name: itemName(cell), equation: decodeStoredExpression(cell.getAttribute("Equation") || "0")
+          id: String(cell.id), name: itemName(cell), equation: decodeStoredExpression(cell.getAttribute("Equation") || "0"),
+          isConstant: String(cell.getAttribute("isConstant")).toLowerCase() === "true"
         });
       } else if (type === "Converter") {
         converters.push({
