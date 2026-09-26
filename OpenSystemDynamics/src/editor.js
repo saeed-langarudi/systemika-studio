@@ -8231,6 +8231,26 @@ class Clipboard {
 			primitive.value.setAttribute("Primitives", remapped.join(","));
 		}
 	}
+	// Link bezier handles and Flow bend points are stored in absolute canvas
+	// coordinates, so they must move by the same offset as the pasted connector.
+	static translateConnectorGeometry(primitive, delta) {
+		let [dx, dy] = delta;
+		for (let [xAttribute, yAttribute] of [["b1x", "b1y"], ["b2x", "b2y"]]) {
+			let x = primitive.getAttribute(xAttribute);
+			let y = primitive.getAttribute(yAttribute);
+			if (x == null || y == null) continue;
+			primitive.value.setAttribute(xAttribute, Number(x) + dx);
+			primitive.value.setAttribute(yAttribute, Number(y) + dy);
+		}
+		let middlePoints = primitive.getAttribute("MiddlePoints");
+		if (middlePoints && String(middlePoints).trim()) {
+			let shifted = String(middlePoints).trim().split(/\s+/).map(point => {
+				let [x, y] = point.split(",").map(Number);
+				return `${x + dx},${y + dy} `;
+			}).join("");
+			primitive.value.setAttribute("MiddlePoints", shifted);
+		}
+	}
 	static getPasteTarget() {
 		let source = this.selectionCenter || [0, 0];
 		let lastCanvas = [mouse.lastCanvasX, mouse.lastCanvasY];
@@ -8309,6 +8329,7 @@ class Clipboard {
 			if (entry.skip) continue;
 			let pos = entry.item.position;
 			setCenterPosition(entry.clone, [pos[0] + delta[0], pos[1] + delta[1]]);
+			this.translateConnectorGeometry(entry.clone, delta);
 		}
 
 		clearPrimitiveCache();

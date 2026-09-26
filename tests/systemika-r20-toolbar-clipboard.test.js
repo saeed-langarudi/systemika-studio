@@ -94,6 +94,28 @@ test('clipboard duplicate naming and formula remapping produce coherent copied s
   assert.equal(mapped, '[Capital_2] * [Rate_1] + 1');
 });
 
+test('pasting translates Link bezier handles and Flow bend points with the connector', () => {
+  const start = editor.indexOf('class Clipboard {');
+  const end = editor.indexOf('\nClipboard.init();', start);
+  const source = editor.slice(start, end) + '\nthis.Clipboard = Clipboard;';
+  const context = { Set, Map, Number, Math, String };
+  vm.createContext(context);
+  vm.runInContext(source, context);
+  const fakePrimitive = (attributes) => {
+    const value = { setAttribute(name, v) { attributes[name] = String(v); } };
+    return { value, attributes, getAttribute(name) { return name in attributes ? attributes[name] : null; } };
+  };
+  const link = fakePrimitive({ b1x: '100', b1y: '50', b2x: '200', b2y: '60' });
+  context.Clipboard.translateConnectorGeometry(link, [40, -10]);
+  assert.deepEqual(link.attributes, { b1x: '140', b1y: '40', b2x: '240', b2y: '50' });
+  const flow = fakePrimitive({ MiddlePoints: '15,17 19,12 ' });
+  context.Clipboard.translateConnectorGeometry(flow, [5, 3]);
+  assert.equal(flow.attributes.MiddlePoints, '20,20 24,15 ');
+  const stock = fakePrimitive({});
+  context.Clipboard.translateConnectorGeometry(stock, [5, 3]);
+  assert.deepEqual(stock.attributes, {});
+});
+
 
 test('toolbar Delete uses the selected-object deletion path', () => {
   const start = editor.indexOf('class DeleteTool extends BaseTool');
