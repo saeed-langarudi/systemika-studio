@@ -128,3 +128,22 @@ test('legacy sanitizer/updater code and Insight Maker license headers are absent
   assert.doesNotMatch(combined, /alert\(["']in update model["']\)/);
   assert.doesNotMatch(html, /Sanitize\.js|Updater\.js|mxShim\.js/);
 });
+
+test('Systemika model normalization repairs literal bracketed entity names from legacy WebApp saves', () => {
+  const ctx = makeContext();
+  const doc = new FakeElement('#document', null, 9); doc.ownerDocument = doc;
+  const stock = new ctx.SystemikaNodeCtor(element(doc,'Stock',{id:'2',name:'[J]',InitialValue:'[BD] * [JBS]'})); stock.id='2';
+  const bd = new ctx.SystemikaNodeCtor(element(doc,'Variable',{id:'3',name:'[BD]',Equation:'1',isConstant:'true'})); bd.id='3';
+  const jbs = new ctx.SystemikaNodeCtor(element(doc,'Variable',{id:'4',name:'[JBS]',Equation:'2',isConstant:'true'})); jbs.id='4';
+  const setting = new ctx.SystemikaNodeCtor(element(doc,'Setting',{id:'5',Version:'36'})); setting.id='5';
+  const items=[stock,bd,jbs,setting];
+  ctx.primitives = type => !type ? items : items.filter(x => x.value.nodeName === type);
+  ctx.getSetting = () => setting;
+  ctx.findID = id => items.find(item => String(item.id) === String(id)) || null;
+  ctx.primitiveBank = {setting: element(doc,'Setting',{Version:'36'})};
+  ctx.systemikaNormalizeLoadedModel();
+  assert.equal(stock.getAttribute('name'),'J');
+  assert.equal(bd.getAttribute('name'),'BD');
+  assert.equal(jbs.getAttribute('name'),'JBS');
+  assert.equal(stock.getAttribute('InitialValue'),'BD * JBS');
+});

@@ -27,7 +27,7 @@ test('Docked Table keeps its own viewport and sticky headings inside the table s
 
 
 test('WebApp source entry points use the current release cache key', () => {
-  assert.match(index, /editor\.js\?v=1\.1\.1/);
-  assert.match(index, /style\/editor\.css\?v=1\.1\.1/);
-  assert.match(msaSettings, /OpenSystemDynamics\/src\/index\.html\?v=1\.1\.1/);
+  assert.match(index, /editor\.js\?v=1\.1\.2/);
+  assert.match(index, /style\/editor\.css\?v=1\.1\.2/);
+  assert.match(msaSettings, /OpenSystemDynamics\/src\/index\.html\?v=1\.1\.2/);
 });

@@ -73,7 +73,7 @@ ZIP_PATH="$BUILD_DIR/$ZIP_NAME"
 rm -rf "$WORK_DIR" "$APP_PATH" "$DMG_PATH" "$ZIP_PATH"
 mkdir -p "$WORK_DIR/bin" "$APP_PATH/Contents/MacOS" "$APP_PATH/Contents/Resources/app"
 
-LAUNCHER_SOURCE="$ROOT/desktop-launcher/macos/main.go"
+LAUNCHER_SOURCE="$ROOT/platform/native-launcher/macos/main.go"
 if [ ! -f "$LAUNCHER_SOURCE" ]; then
   echo "macOS launcher source was not found: $LAUNCHER_SOURCE" >&2
   exit 1
@@ -202,5 +202,5 @@ printf '  %s\n' "$ZIP_PATH"
 printf '  %s\n' "$BUILD_DIR/SHA256SUMS.txt"
 printf '\nThe DMG is the normal file to give to students and public users.\n'
 if [ -z "$SIGN_IDENTITY" ]; then
-  printf 'This build is not Developer ID signed/notarized. See MACOS_INSTALLER_GUIDE.md before public distribution.\n'
+  printf 'This build is not Developer ID signed/notarized. See docs/guides/MACOS_INSTALLER_GUIDE.md before public distribution.\n'
 fi

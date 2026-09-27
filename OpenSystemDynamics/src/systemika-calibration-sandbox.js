@@ -6,7 +6,7 @@
   const state = {
     win: null, decision: null, running: false, rerunPending: false,
     defaults: new Map(), ranges: new Map(), plots: Array.from({length: 6}, () => ({reference: null, simulated: null})),
-    timer: null, persistTimer: null, runToken: 0, initialRunStarted: false, panelWidth: 408
+    timer: null, persistTimer: null, feedbackTimer: null, runToken: 0, initialRunStarted: false, panelWidth: 408
   };
 
   const esc = value => String(value == null ? '' : value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -34,12 +34,12 @@
       .plot{background:#fff;border:1px solid #777;display:flex;flex-direction:column;min-height:240px}.chart{flex:1;min-height:150px;position:relative}.chart svg{width:100%;height:100%;display:block}
       .plot-controls{border-top:1px solid #ddd;padding:6px;display:flex;justify-content:flex-end;gap:5px}.plot-controls button{font-size:11px;padding:5px 7px}
       .splitter{cursor:col-resize;background:#eee;border-left:1px solid #aaa;border-right:1px solid #aaa;touch-action:none}.splitter:hover{background:#ddd} aside{padding:18px 14px;overflow:auto;background:#fff;min-width:300px} aside h2{font-size:22px;font-weight:400;margin:0 0 14px}
-      .top-actions{display:flex;gap:7px;margin-bottom:12px}.top-actions button,.add{padding:7px 10px}.add{width:100%;margin-bottom:12px}
+      .top-actions{display:flex;gap:7px;align-items:center;margin-bottom:5px}.top-actions button,.add{padding:7px 10px}.top-actions button:disabled{opacity:.55;cursor:default}.save-status{min-height:18px;margin:0 0 7px;font-size:11px;color:#27632d}.add{width:100%;margin-bottom:12px}
       table{border-collapse:collapse;width:100%;font-size:12px}th,td{border:1px solid #aaa;padding:5px;text-align:center}th{font-size:10px;background:#fafafa}td.name{text-align:left;font-weight:600;max-width:85px;overflow:hidden;text-overflow:ellipsis}
       input[type=number]{width:58px;padding:4px}input[type=range]{width:105px}.slider-cell{min-width:115px}.current{font-variant-numeric:tabular-nums;font-size:11px;display:block;margin-top:2px}.reset{font-size:10px;padding:4px}
       .empty{color:#666;font-size:12px;text-align:center;padding:15px}.picker{position:fixed;inset:0;background:rgba(0,0,0,.22);display:flex;align-items:center;justify-content:center;z-index:10}.picker-card{background:#fff;border:1px solid #777;box-shadow:0 8px 28px #0003;width:360px;max-height:70vh;padding:14px;display:flex;flex-direction:column;gap:9px}.picker-card input{padding:7px}.picker-list{overflow:auto;border:1px solid #ccc}.picker-list button{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid #eee;background:#fff;padding:7px}.picker-list button:hover{background:#eee}.picker-actions{text-align:right}
       @media(max-width:1000px){.plots{grid-template-columns:repeat(2,minmax(200px,1fr))}}
-    </style></head><body><div class="shell"><main class="main"><h1>Calibration Sandbox</h1><div class="universal-legend"><span class="legend-item"><span class="legend-line legend-reference"></span>Reference</span><span class="legend-item"><span class="legend-line legend-simulated"></span>Simulated</span></div><div id="plots" class="plots"></div></main><div id="panel-splitter" class="splitter" title="Drag to resize parameter panel"></div><aside><h2>Parameter Sliders</h2><div class="top-actions"><button id="reset-all">Reset All</button><button id="save-default">Save as Default</button></div><button id="add-constant" class="add">Select Constant</button><div id="parameters"></div></aside></div><div id="picker-host"></div></body></html>`;
+    </style></head><body><div class="shell"><main class="main"><h1>Calibration Sandbox</h1><div class="universal-legend"><span class="legend-item"><span class="legend-line legend-reference"></span>Reference</span><span class="legend-item"><span class="legend-line legend-simulated"></span>Simulated</span></div><div id="plots" class="plots"></div></main><div id="panel-splitter" class="splitter" title="Drag to resize parameter panel"></div><aside><h2>Parameter Sliders</h2><div class="top-actions"><button id="reset-all">Reset All</button><button id="save-default" disabled>Save as Default</button></div><div id="save-default-status" class="save-status" role="status" aria-live="polite"></div><button id="add-constant" class="add">Select Constant</button><div id="parameters"></div></aside></div><div id="picker-host"></div></body></html>`;
   }
 
   function openWindow() {
@@ -83,21 +83,37 @@
   function chooseConstant(){ choose('Select Constant', constants().filter(p=>!state.ranges.has(String(p.id))), p=>{const v=numericValue(p), span=Math.max(Math.abs(v)*.5,1);state.ranges.set(String(p.id),{min:v-span,max:v+span,step:Math.max(span/100,.01)});if(!state.defaults.has(String(p.id)))state.defaults.set(String(p.id),v);renderParameters();schedulePersist();}); }
   function choosePlot(index, role){ choose(role==='reference'?'Select Reference Mode':'Select Simulated Variable', variables(), p=>{state.plots[index][role]=String(p.id);renderPlots();schedulePersist();}); }
 
+  function hasDefaultChanges(){
+    for(const id of state.ranges.keys()){const p=findID(id);if(!p)continue;const saved=state.defaults.get(id),current=numericValue(p);if(saved==null||Math.abs(current-saved)>1e-12)return true;}
+    return false;
+  }
+  function updateSaveDefaultState(clearStatus=false){
+    if(!state.win||state.win.closed)return;const button=state.win.document.getElementById('save-default'),status=state.win.document.getElementById('save-default-status');
+    if(button){button.disabled=!hasDefaultChanges();if(clearStatus||button.textContent!=='Saved')button.textContent='Save as Default';}
+    if(clearStatus){root.clearTimeout(state.feedbackTimer);if(status)status.textContent='';}
+  }
+  function showDefaultSavedFeedback(){
+    if(!state.win||state.win.closed)return;const button=state.win.document.getElementById('save-default'),status=state.win.document.getElementById('save-default-status');
+    if(button){button.disabled=true;button.textContent='Saved';}if(status)status.textContent='Changes have been saved as the default parameter values.';
+    root.clearTimeout(state.feedbackTimer);state.feedbackTimer=root.setTimeout(()=>{if(!state.win||state.win.closed)return;if(button)button.textContent='Save as Default';updateSaveDefaultState(false);},1800);
+  }
+
   function renderParameters(){
     if(!state.win||state.win.closed)return; const d=state.win.document, host=d.getElementById('parameters');
-    if(!state.ranges.size){host.innerHTML='<div class="empty">Select model constants to add calibration sliders.</div>';return;}
+    if(!state.ranges.size){host.innerHTML='<div class="empty">Select model constants to add calibration sliders.</div>';updateSaveDefaultState(false);return;}
     let body=''; state.ranges.forEach((r,id)=>{const p=findID(id);if(!p)return;const v=numericValue(p);body+=`<tr data-id="${esc(id)}"><td class="name" title="${esc(getName(p))}">${esc(getName(p))}</td><td><input class="min" type="number" value="${r.min}"></td><td class="slider-cell"><input class="slider" type="range" min="${r.min}" max="${r.max}" step="${r.step}" value="${v}"><span class="current">${v}</span></td><td><input class="max" type="number" value="${r.max}"></td><td><input class="step" type="number" min="0" value="${r.step}"></td><td><button class="reset">Reset</button></td></tr>`;});
     host.innerHTML=`<table><thead><tr><th>PARAMETER</th><th>MIN</th><th>SLIDER</th><th>MAX</th><th>INCREMENT</th><th></th></tr></thead><tbody>${body}</tbody></table>`;
     host.querySelectorAll('tr[data-id]').forEach(tr=>{const id=tr.dataset.id,p=findID(id),r=state.ranges.get(id),slider=tr.querySelector('.slider'),current=tr.querySelector('.current');
       const syncBounds=()=>{r.min=num(tr.querySelector('.min').value)??r.min;r.max=num(tr.querySelector('.max').value)??r.max;r.step=Math.max(num(tr.querySelector('.step').value)??r.step,Number.EPSILON);slider.min=r.min;slider.max=r.max;slider.step=r.step;schedulePersist();};
       tr.querySelector('.min').onchange=syncBounds;tr.querySelector('.max').onchange=syncBounds;tr.querySelector('.step').onchange=syncBounds;
-      slider.oninput=()=>{const v=num(slider.value);if(v==null)return;current.textContent=String(v);setNumericValue(p,v);scheduleRerun();schedulePersist();};
-      tr.querySelector('.reset').onclick=()=>{const v=state.defaults.get(id);if(v==null)return;setNumericValue(p,v);slider.value=v;current.textContent=String(v);scheduleRerun();schedulePersist();};
+      slider.oninput=()=>{const v=num(slider.value);if(v==null)return;current.textContent=String(v);setNumericValue(p,v);updateSaveDefaultState(true);scheduleRerun();schedulePersist();};
+      tr.querySelector('.reset').onclick=()=>{const v=state.defaults.get(id);if(v==null)return;setNumericValue(p,v);slider.value=v;current.textContent=String(v);updateSaveDefaultState(true);scheduleRerun();schedulePersist();};
     });
+    updateSaveDefaultState(false);
   }
 
-  function resetAll(){state.ranges.forEach((_r,id)=>{const p=findID(id),v=state.defaults.get(id);if(p&&v!=null)setNumericValue(p,v);});renderParameters();scheduleRerun();schedulePersist();}
-  function saveAsDefault(){state.ranges.forEach((_r,id)=>{const p=findID(id);if(p)state.defaults.set(id,numericValue(p));});if(typeof History!=='undefined'&&typeof History.storeUndoState==='function')History.storeUndoState();if(root.InfoBar&&typeof InfoBar.update==='function')InfoBar.update();renderParameters();schedulePersist();}
+  function resetAll(){state.ranges.forEach((_r,id)=>{const p=findID(id),v=state.defaults.get(id);if(p&&v!=null)setNumericValue(p,v);});renderParameters();updateSaveDefaultState(true);scheduleRerun();schedulePersist();}
+  function saveAsDefault(){state.ranges.forEach((_r,id)=>{const p=findID(id);if(p)state.defaults.set(id,numericValue(p));});if(typeof History!=='undefined'&&typeof History.storeUndoState==='function')History.storeUndoState();if(root.InfoBar&&typeof InfoBar.update==='function')InfoBar.update();renderParameters();showDefaultSavedFeedback();schedulePersist();}
 
   function snapshot(){return {version:1,plots:state.plots.map(p=>({...p})),parameters:Array.from(state.ranges.entries()).map(([id,r])=>({id,min:r.min,max:r.max,step:r.step,defaultValue:state.defaults.get(id),value:(()=>{const p=findID(id);return p?numericValue(p):null;})()})),panelWidth:state.panelWidth};}
   function restore(saved){if(!saved||saved.version!==1)return;state.plots=Array.from({length:6},(_,i)=>({...((saved.plots&&saved.plots[i])||{reference:null,simulated:null})}));state.ranges.clear();(saved.parameters||[]).forEach(x=>{if(!findID(String(x.id)))return;state.ranges.set(String(x.id),{min:Number(x.min),max:Number(x.max),step:Number(x.step)});if(Number.isFinite(Number(x.defaultValue)))state.defaults.set(String(x.id),Number(x.defaultValue));if(Number.isFinite(Number(x.value)))setNumericValue(findID(String(x.id)),Number(x.value));});if(Number.isFinite(Number(saved.panelWidth)))state.panelWidth=Math.max(300,Number(saved.panelWidth));}

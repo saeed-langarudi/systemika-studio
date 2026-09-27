@@ -16,12 +16,127 @@ app.setName("Systemika Studio");
 
 // Paths are relative to this file so the same code works both run from the
 // repo root in development ("electron .") and from the copy the packaging build assembles
-// under distribute/output — both keep electron/ as a sibling of start.html
+// under build/output — both keep electron/ as a sibling of start.html
 // and app-icons/.
 const appRoot = path.join(__dirname, "..");
 const entryPoint = path.join(appRoot, "start.html");
 const iconPath = path.join(appRoot, "app-icons", "systemika.png");
 const fileExtension = ".ssd";
+
+const systemikaDownloadUrl = "https://systemika.no/download/";
+const systemikaWebAppRoot = "https://systemika.no/studio/app/";
+const systemikaUpdateManifestUrls = [
+	new URL("systemika-update.json", systemikaWebAppRoot).toString(),
+	new URL("update.json", systemikaWebAppRoot).toString(),
+];
+const systemikaReleasePageUrls = [
+	new URL("MultiSimulationAnalyser/index.html", systemikaWebAppRoot).toString(),
+	new URL("OpenSystemDynamics/src/index.html", systemikaWebAppRoot).toString(),
+];
+
+function cacheBustedRemoteUrl(url) {
+	const value = new URL(url);
+	value.searchParams.set("_", String(Date.now()));
+	return value.toString();
+}
+
+function metaValueFromHtml(source, metaName) {
+	const tags = String(source == null ? "" : source).match(/<meta\b[^>]*>/gi) || [];
+	for (const tag of tags) {
+		const nameMatch = tag.match(/\bname\s*=\s*["']([^"']+)["']/i);
+		if (!nameMatch || nameMatch[1].toLowerCase() !== String(metaName).toLowerCase()) continue;
+		const contentMatch = tag.match(/\bcontent\s*=\s*["']([^"']*)["']/i);
+		if (contentMatch) return contentMatch[1].trim();
+	}
+	return "";
+}
+
+function manifestFromReleaseHtml(html, sourceName) {
+	const source = String(html == null ? "" : html);
+	const explicitVersion = metaValueFromHtml(source, "systemika-version");
+	const explicitBuild = metaValueFromHtml(source, "systemika-build");
+	if (explicitVersion) {
+		return {
+			version: explicitVersion,
+			buildId: explicitBuild,
+			downloadUrl: systemikaDownloadUrl,
+			source: sourceName,
+		};
+	}
+
+	// Compatibility fallback for a deployment whose HTML predates the meta tags
+	// but already contains the release/build query on its application assets.
+	const versionMatch = source.match(/(?:MultiSimulationAnalyser\/index\.html|OpenSystemDynamics\/src\/index\.html|opensystemdynamics(?:\.min)?\.js|multisimulationanalyser(?:\.min)?\.js)[^"'<>]*[?&]v=([^&"'<>\s]+)/i);
+	if (!versionMatch) throw new Error(`${sourceName} does not expose Systemika release metadata.`);
+	const buildMatch = source.match(/(?:MultiSimulationAnalyser\/index\.html|OpenSystemDynamics\/src\/index\.html|opensystemdynamics(?:\.min)?\.js|multisimulationanalyser(?:\.min)?\.js)[^"'<>]*[?&]b=([^&"'<>\s]+)/i);
+	return {
+		version: decodeURIComponent(versionMatch[1]),
+		buildId: buildMatch ? decodeURIComponent(buildMatch[1]) : "",
+		downloadUrl: systemikaDownloadUrl,
+		source: sourceName,
+	};
+}
+
+async function fetchRemoteText(url, accept, sourceName, timeoutMs = 7000) {
+	const response = await fetch(cacheBustedRemoteUrl(url), {
+		cache: "no-store",
+		signal: AbortSignal.timeout(timeoutMs),
+		headers: { "Accept": accept },
+	});
+	if (!response.ok) throw new Error(`${sourceName} returned HTTP ${response.status}.`);
+	return response.text();
+}
+
+async function fetchManifestUrl(url) {
+	const response = await fetch(cacheBustedRemoteUrl(url), {
+		cache: "no-store",
+		signal: AbortSignal.timeout(7000),
+		headers: { "Accept": "application/json" },
+	});
+	if (!response.ok) throw new Error(`Update manifest returned HTTP ${response.status}.`);
+	const manifest = await response.json();
+	if (!manifest || typeof manifest.version !== "string" || !manifest.version.trim()) {
+		throw new Error("Update manifest is missing a version.");
+	}
+	return {
+		...manifest,
+		version: manifest.version.trim(),
+		downloadUrl: String(manifest.downloadUrl || systemikaDownloadUrl),
+	};
+}
+
+async function fetchSystemikaUpdateManifest() {
+	const diagnostics = [];
+	for (const url of systemikaUpdateManifestUrls) {
+		try {
+			return await fetchManifestUrl(url);
+		} catch (error) {
+			diagnostics.push(error && error.message ? error.message : String(error));
+		}
+	}
+
+	for (const url of systemikaReleasePageUrls) {
+		try {
+			const html = await fetchRemoteText(url, "text/html", "Systemika WebApp page");
+			return manifestFromReleaseHtml(html, url);
+		} catch (error) {
+			diagnostics.push(error && error.message ? error.message : String(error));
+		}
+	}
+
+	console.warn("Systemika update check diagnostics:", diagnostics.join(" "));
+	throw new Error("The Systemika update service is currently unavailable. Please try again later.");
+}
+
+async function currentSystemikaBuildId() {
+	try {
+		const text = await fs.readFile(path.join(appRoot, "SYSTEMIKA_BUILD_INFO.json"), "utf8");
+		const info = JSON.parse(text);
+		return typeof info.buildId === "string" ? info.buildId.trim() : "";
+	} catch (error) {
+		return "";
+	}
+}
 
 let mainWindow;
 // A file path the app was launched with (double-clicked, "Open with…", or a
@@ -245,6 +360,15 @@ ipcMain.handle("clipboard:write-png", async (event, base64Contents) => {
 
 ipcMain.handle("shell:open-external", async (event, url) => {
 	await shell.openExternal(url);
+});
+
+ipcMain.handle("systemika:update:check", async () => {
+	const currentBuildId = await currentSystemikaBuildId();
+	try {
+		return { ok: true, manifest: await fetchSystemikaUpdateManifest(), currentVersion: app.getVersion(), currentBuildId };
+	} catch (error) {
+		return { ok: false, currentVersion: app.getVersion(), currentBuildId, error: error && error.message ? error.message : String(error) };
+	}
 });
 
 

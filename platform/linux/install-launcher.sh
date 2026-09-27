@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Installs a built Systemika Studio AppImage and registers a Linux application launcher.
-# Run from the Systemika Studio source root after BUILD_LINUX_APPIMAGE.sh has completed.
+# Run after BUILD_LINUX_APPIMAGE.sh has completed. The source root is resolved automatically.
 # No sudo is required.
 
 if [ "${EUID:-$(id -u)}" -eq 0 ]; then
@@ -11,19 +11,16 @@ if [ "${EUID:-$(id -u)}" -eq 0 ]; then
   exit 1
 fi
 
-ROOT="${1:-$(pwd)}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DEFAULT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+ROOT="${1:-$DEFAULT_ROOT}"
 if [ ! -f "$ROOT/BUILD_LINUX_APPIMAGE.sh" ]; then
-  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-  if [ -f "$SCRIPT_DIR/BUILD_LINUX_APPIMAGE.sh" ]; then
-    ROOT="$SCRIPT_DIR"
-  else
-    echo "Could not find the Systemika Studio source root." >&2
-    echo "Run this script from the source root, or pass the source root as its first argument." >&2
-    exit 1
-  fi
+  echo "Could not find the Systemika Studio source root." >&2
+  echo "Pass the source root as the first argument if this helper was moved." >&2
+  exit 1
 fi
 
-OUT="$ROOT/distribute/output/dist-electron"
+OUT="$ROOT/build/output/dist-electron"
 APPIMAGE="$(find "$OUT" -maxdepth 1 -type f -name '*.AppImage' -printf '%T@ %p\n' 2>/dev/null | sort -nr | head -n1 | cut -d' ' -f2- || true)"
 if [ -z "$APPIMAGE" ] || [ ! -f "$APPIMAGE" ]; then
   echo "No AppImage was found in:" >&2

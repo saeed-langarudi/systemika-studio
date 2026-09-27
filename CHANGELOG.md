@@ -1,3 +1,20 @@
+- Update checking no longer guesses WebApp deployment paths. Browser builds refetch the editor page already running; desktop builds use `https://systemika.no/download/systemika-update.json` and can fall back to discovering a semantic version from the public download tree. User-facing failures are concise while probe diagnostics stay in the console.
+- Model loading repairs legacy/malformed entity names stored literally as `[Name]` while preserving ordinary annotations.
+- Links and link handles now paint below model entities so nearby links cannot block entity selection/property access.
+- Updated Systemika application/logo/favicon artwork.
+- Text Boxes now support font family, size, bold, italic, underline, and left/center/right alignment.
+## 2026-09-26 — Systemika Studio 1.1.2 — Update checks and classroom/UI corrections
+- Added automatic startup update checking plus Help → Check for Updates, backed by a generated `/studio/update.json` manifest.
+- Added clear Calibration Sandbox Save-as-Default dirty/saved feedback.
+- Made variable-name validation reject raw whitespace immediately, before name normalization trims the input.
+- Extended protected translucent name backgrounds from Stocks to Auxiliaries and clipped Auxiliary backgrounds clear of the circular outline.
+- Fixed Lookup rename propagation so exact equation references are updated model-wide.
+- Replaced the Link and Find toolbar icons with the supplied SVG artwork.
+- Reworked WebApp cache invalidation so all local resources receive release/build fingerprints; expanded no-store headers and immediate service-worker activation prevent stale interface assets after deployment.
+- Disabled toolbar icons remain visually inactive while their tooltips stay fully opaque and readable.
+- Reorganized source support files under `build/`, `docs/`, and `platform/`; Windows and Linux WebApp builders now share one canonical builder and output layout.
+- Release verification baseline: 384 automated tests; 19 permanent validation models retained.
+
 ## 2026-09-23 — Systemika Studio 1.1.1 — Stock label readability and Find Ghosts icon
 - Stock names now render in a dedicated top SVG layer, preventing flow pipes, valves, links, and other model graphics from obscuring the text.
 - Added a compact 72%-opaque rounded background behind Stock names; it follows the text bounds and automatically uses a light or dark fill according to the label colour.

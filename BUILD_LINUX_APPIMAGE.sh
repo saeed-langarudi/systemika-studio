@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
-DIST="$ROOT/distribute"
+DIST="$ROOT/build"
 
 printf 'Systemika Linux AppImage Builder\n\n'
 if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then

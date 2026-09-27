@@ -30,6 +30,7 @@ terms of the Affero General Public License (http://www.gnu.org/licenses/agpl-3.0
 	<!-- environment.js determines whether to use web or Electron. Must be executed early to work -->
 	<script type="text/javascript" src="environment.js"></script>
 	<script type="text/javascript" src="systemika-localization.js"></script>
+	<script type="text/javascript" src="systemika-update.js"></script>
 	<script type="text/javascript" src="systemika-entities.js"></script>
 	<script type="text/javascript" src="systemika-model-utils.js"></script>
 	<script type="text/javascript" src="systemika-model-api.js"></script>
@@ -71,8 +72,8 @@ terms of the Affero General Public License (http://www.gnu.org/licenses/agpl-3.0
 	<script type="text/javascript" src="systemika-units.js"></script>
 	<script type="text/javascript" src="systemika-plot-pages.js"></script>
 	<script type="text/javascript" src="systemika-documentation.js"></script>
-	<script type="text/javascript" src="editor.js?v=1.1.1"></script>
-	<script type="text/javascript" src="systemika-calibration-sandbox.js?v=1.1.1"></script>
+	<script type="text/javascript" src="editor.js?v=1.1.2"></script>
+	<script type="text/javascript" src="systemika-calibration-sandbox.js?v=1.1.2"></script>
 	<!-- endbuild -->
 
 	<!-- build:css opensystemdynamics.css  -->
@@ -80,7 +81,7 @@ terms of the Affero General Public License (http://www.gnu.org/licenses/agpl-3.0
 	<link rel="stylesheet" href="./codemirror/theme/stochsdtheme.css" />
 	<link rel="stylesheet" href="./codemirror/theme/oneline.css" />
 	<link rel="stylesheet" href="./codemirror/theme/resize.css" />
-	<link rel="stylesheet" type="text/css" href="style/editor.css?v=1.1.1">
+	<link rel="stylesheet" type="text/css" href="style/editor.css?v=1.1.2">
 	<link rel="stylesheet" type="text/css" href="style/systemika-runs.css" />
 	<link class="include" rel="stylesheet" type="text/css" href="jquery/jqplot-1.0.8/jquery.jqplot.min.css" />
 	<link rel="stylesheet" href="jquery/jquery-ui-1.12.1/jquery-ui.css" />
@@ -188,7 +189,8 @@ terms of the Affero General Public License (http://www.gnu.org/licenses/agpl-3.0
 						<span><button id="btn_shortcuts">Keyboard Shortcuts</button></span>
 						<span><button id="btn_functions_help">Functions &amp; Equations</button></span>
 						<span><button id="btn_units_help">Unit Checking</button></span>
-						<span class="menuSeparator"><button id="btn_preferences">Preferences</button></span>
+						<span class="menuSeparator"><button id="btn_check_updates">Check for Updates...</button></span>
+						<span><button id="btn_preferences">Preferences</button></span>
 						<span class="menuSeparator"><button id="btn_about">About Systemika</button></span>
 						<span><button id="btn_license">Systemika License</button></span>
 						<span><button id="btn_thirdparty">Third-party Notices</button></span>
@@ -214,7 +216,7 @@ terms of the Affero General Public License (http://www.gnu.org/licenses/agpl-3.0
 					<img src="graphics/redo.svg" />
 				</button>
 				<button id="btn_find_variable" type="button" data-title="Find (Ctrl+F)" class="toolbar-action-button" aria-label="Find variable">
-					<img class="toolbar-inline-icon" src="graphics/find.png" alt="" aria-hidden="true" />
+					<img class="toolbar-inline-icon" src="graphics/find.svg" alt="" aria-hidden="true" />
 				</button>
 				<button id="btn_find_ghosts" type="button" data-title="Find Ghosts (Ctrl+G)" class="toolbar-action-button" aria-label="Find next ghost of selected variable" disabled>
 					<img class="toolbar-inline-icon" src="graphics/find_ghost.svg" alt="" aria-hidden="true" />
@@ -382,15 +384,17 @@ terms of the Affero General Public License (http://www.gnu.org/licenses/agpl-3.0
 				style="position: absolute; left: 0px; top: 0px; display: none; z-index: 110; width: 100%; height: 100%; background-color: red; opacity: 0;">
 			</div>
 			<svg draggable="false" id="svgplane" width="6000" height="2000" style="background-color: white;">
+				<!-- Links and their draggable handles paint first. All model entities therefore
+				     remain visually and interactively above a nearby/crossing link. -->
+				<g class="layer link"></g>
+				<g class="layer anchor"></g>
 				<g class="layer stock"></g>
 				<g class="layer variable"></g>
 				<g class="layer constant"></g>
 				<g class="layer converter"></g>
 				<g class="layer flow"></g>
-				<g class="layer link"></g>
 				<g class="layer plot"></g>
-				<g class="layer anchor"></g>
-				<!-- Stock names are isolated in the final SVG layer so flows, links,
+				<!-- Stock and Auxiliary names are isolated in the final SVG layer so flows, links,
 				     valves, and other model graphics can never paint over them. -->
 				<g class="layer stock-label"></g>
 			</svg>

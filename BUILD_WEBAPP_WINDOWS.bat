@@ -10,7 +10,14 @@ if errorlevel 1 (
   pause
   exit /b 1
 )
-node distribute\build.js
+node -e "const [M,m]=process.versions.node.split('.').map(Number); process.exit(M > 22 || (M === 22 && m >= 12) ? 0 : 1)"
+if errorlevel 1 (
+  echo.
+  echo ERROR: Systemika WebApp builds require Node.js 22.12 or newer.
+  pause
+  exit /b 1
+)
+node build\build.js
 if errorlevel 1 (
   echo.
   echo ERROR: WebApp build failed.
@@ -22,7 +29,7 @@ set VER=%VER: =%
 set VER=%VER:"=%
 echo.
 echo WebApp build completed.
-echo Output: distribute\output\web\%VER%
+echo Output: build\output\web\%VER%
 echo Upload the CONTENTS of that folder as one complete release.
 pause
 endlocal

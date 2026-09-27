@@ -1,8 +1,8 @@
-Systemika Studio 1.1 - Release verification
-Date: 2026-09-23
+Systemika Studio 1.1.2 - Release verification
+Date: 2026-09-26
 
 Automated regression verification:
-- 374/374 tests passing with: npm test
+- 393/393 tests passing with: npm test
 - 19 permanent validation models under validation-models/
 
 Verified output workspace:
@@ -19,6 +19,7 @@ Verified output workspace:
 - Number Box creation UI and N shortcut are removed; legacy Number Box models remain loadable.
 
 Verified classroom interface:
+- Automatic startup update checking and Help → Check for Updates are present; desktop checks use the Electron update bridge and WebApp checks use the deployed update manifest.
 - Help menu is Systemika-specific: Getting Started, Keyboard Shortcuts, Functions & Equations, Unit Checking, Preferences, About, License, Third-party Notices.
 - Obsolete StochSD manuals/support links, Full Potential CSS material, restart items, and hidden legacy plugin-menu access are absent.
 - Histogram output is available on the toolbar with shortcut H and supports multi-run comparison with shared bins and translucent overlays.
@@ -26,10 +27,10 @@ Verified classroom interface:
 - Hide/Unhide Question Marks toolbar control and Q shortcut are present; hiding markers does not disable definition validation.
 - Preferences, About, license text, and third-party notices use current Systemika terminology/provenance.
 - Keyboard Shortcuts help matches the current interface; obsolete Ctrl/Cmd+Enter equation guidance/binding is removed. Enter inserts equation line breaks and Apply saves definitions.
-- Find uses the supplied magnifying-glass artwork and opens the sortable Name/Type variable finder with Ctrl/Cmd+F.
+- Find uses the newly supplied SVG magnifying-glass artwork and opens the sortable Name/Type variable finder with Ctrl/Cmd+F.
 - Find Ghosts uses the newly supplied SVG magnifying-glass/ghost artwork, is enabled only for one selected ghostable variable/Ghost, and Ctrl/Cmd+G cycles through every Ghost and back to the original variable.
 - Stock names render in a dedicated top SVG layer so Flow pipes, valves, Links, and overlapping model entities cannot obscure the label text.
-- Stock names use a compact rounded 72%-opaque adaptive background that follows the text bounds, switches light/dark according to label colour, and refreshes after rename/recolour/Rotate Name changes; Stock Ghost labels use the same treatment.
+- Stock and Auxiliary names use compact rounded 72%-opaque adaptive backgrounds in the protected top label layer; matching Ghost labels use the same treatment.
 - The Ghost creation tool uses the supplied Ghost SVG artwork.
 - The menu bar no longer contains top-right provenance hyperlinks; About Systemika contains links to Systemika (https://systemika.no), StochSD, and Insight Maker.
 
@@ -52,14 +53,15 @@ Desktop packaging:
 - Electron is pinned to 44.3.0 for Electron-based source and Electron-based packaging.
 - Release packaging uses electron-builder 26.16.1 as its only npm packaging dependency; Gulp/useref packaging dependencies are removed.
 - Linux AppImage packaging pins the static AppImage toolset 1.0.3 to avoid the legacy FUSE2/libfuse.so.2 runtime requirement.
-- Installer staging is handled by dependency-free distribute/build.js; electron-builder native-module rebuilding is disabled because Systemika has no native npm modules.
+- Installer staging is handled by dependency-free build/build.js; electron-builder native-module rebuilding is disabled because Systemika has no native npm modules.
 - Public packaging metadata consistently uses Systemika Studio 1.1.
 - macOS Universal app builder is included as BUILD_MACOS_INSTALLER.command.
 
 WebApp packaging:
-- distribute/build.js rebuilds the WebApp from current source rather than using a stale prebuilt editor bundle.
-- Generated MSA and OpenSystemDynamics JS/CSS references carry ?v=1.1.1 cache keys.
-- The upload-ready WebApp includes .htaccess no-cache rules and WEB_BUILD_INFO.txt.
+- build/build.js rebuilds the WebApp from current source rather than using a stale prebuilt editor bundle.
+- Generated launcher/editor JS, CSS, SVG, PNG, favicon, and other local asset references carry ?v=1.1.2 plus a content-derived &b=<build-id> cache key.
+- The WebApp build emits non-cached `update.json` metadata used by startup/manual update checks.
+- The upload-ready WebApp includes .htaccess no-store rules for application assets and WEB_BUILD_INFO.txt with the generated build ID.
 
 - Paged Figures: Time/Compare/XY/Histogram page persistence and legacy compatibility covered by regression tests; page navigation/add/delete controls live on the Figure, with the last page protected from deletion.
 - Print Equations: integral/differential/difference forms, type/name/computation sorting, explicit stock Initial Condition fields, persistent model-entity comments, and TXT/CSV/LaTeX export covered by regression tests.
@@ -67,6 +69,8 @@ WebApp packaging:
 - Figure clipboard: Electron 44 uses clipboard.write() + ClipboardItem for PNG images; toolbar/keyboard Copy and Cut of a single Figure also place a high-resolution transparent PNG on the system clipboard for direct paste into document/presentation software.
 
 Equation/editor refinements:
+- Variable-name validation reacts on the input event so spaces/invalid characters are flagged immediately.
+- Lookup renames update exact references across equation-bearing model entities without depending on visual Link traversal.
 - Canonical Systemika references use bare entity names; legacy bracketed references remain accepted for older `.ssd` files.
 - Multiline nested equations require no continuation/escape character.
 - Double-click focuses Name first; Tab moves through property fields rather than inserting a tab character.
@@ -77,7 +81,7 @@ Run management refinement:
 
 
 Systemika Studio 1.1 Calibration Sandbox verification:
-- Calibration Sandbox toolbar action, six plot slots, Reference/Simulated selectors, universal line-style legend, resizable parameter panel, constant sliders, reset controls, and Save as Default are covered by regression tests.
+- Calibration Sandbox toolbar action, six plot slots, Reference/Simulated selectors, universal line-style legend, resizable parameter panel, constant sliders, reset controls, and Save as Default are covered by regression tests; Save as Default now shows explicit saved/dirty feedback.
 - Slider-driven reruns use the existing Systemika engine and avoid run-file persistence after the initial named run for responsive manual calibration.
 - Reset and Reset All refresh plots and preserve subsequent live interaction.
 - Calibration state persists in associated .sysrun metadata and restores plot/parameter configuration.

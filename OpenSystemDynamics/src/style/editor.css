@@ -215,8 +215,12 @@ text.name_element {
     border-color: black;
 }
 .model-tool-panel button.tool-button:disabled {
-    opacity: 0.45;
+    opacity: 1;
     cursor: not-allowed;
+}
+.model-tool-panel button.tool-button:disabled > img,
+.model-tool-panel button.tool-button:disabled > svg {
+    opacity: 0.45;
 }
 .model-tool-panel button.tool-button.pressed {
     background-color: var(--color-highlight-neutral);
@@ -245,8 +249,12 @@ text.name_element {
     border-color: black;
 }
 .tool-panel button.toolbar-action-button:disabled {
-    opacity: 0.5;
+    opacity: 1;
     cursor: not-allowed;
+}
+.tool-panel button.toolbar-action-button:disabled > img,
+.tool-panel button.toolbar-action-button:disabled > svg {
+    opacity: 0.5;
 }
 .toolbar-colour-control {
     position: relative;
@@ -364,8 +372,12 @@ button.tool-button img {
     border-color: black;
 }
 .tool-panel button.tool-button:disabled {
-    opacity: 0.5;
+    opacity: 1;
     cursor: not-allowed;
+}
+.tool-panel button.tool-button:disabled > img,
+.tool-panel button.tool-button:disabled > svg {
+    opacity: 0.5;
 }
 /* progress bar */
 #progress-bar {
@@ -1569,4 +1581,33 @@ b[data-arg]::before {
     padding-top: 5px;
     color: #666;
     font-size: 0.9em;
+}
+
+/* Systemika Text Box formatting controls. */
+.systemika-text-formatting {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    margin-top: 8px;
+    padding: 8px;
+    border: 1px solid var(--color-border);
+    background: #fafafa;
+}
+.systemika-text-formatting label {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+.systemika-text-formatting select,
+.systemika-text-formatting input[type="number"] {
+    min-height: 28px;
+}
+.systemika-text-formatting .text-font-size {
+    width: 58px;
+}
+.systemika-text-style-toggle {
+    padding: 3px 5px;
+    border: 1px solid #ccc;
+    background: white;
 }

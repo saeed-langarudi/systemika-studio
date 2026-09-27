@@ -25,6 +25,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
 	writeBase64File: (filePath, base64Contents) => ipcRenderer.invoke("file:write-base64", filePath, base64Contents),
 	copyPngToClipboard: (base64Contents) => ipcRenderer.invoke("clipboard:write-png", base64Contents),
 	openExternal: (url) => ipcRenderer.invoke("shell:open-external", url),
+	checkForUpdates: () => ipcRenderer.invoke("systemika:update:check"),
 
 	// Persistent simulation-run storage is exposed through the same bridge as
 	// ordinary model file operations. The editor already relies on electronAPI

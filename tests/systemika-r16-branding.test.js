@@ -16,7 +16,7 @@ test('Systemika exposes a capitalized user-facing product name while keeping the
 });
 
 test('desktop packagers use the Systemika logo assets', () => {
-  const builder = read('distribute/electron-builder.json');
+  const builder = read('build/electron-builder.json');
   assert.match(builder, /systemika\.ico/);
   assert.match(builder, /systemika\.icns/);
   assert.match(builder, /systemika\.png/);

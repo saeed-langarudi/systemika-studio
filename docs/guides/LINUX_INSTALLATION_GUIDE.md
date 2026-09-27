@@ -52,7 +52,7 @@ The easiest method is to open your file manager, open the Systemika Studio sourc
 Alternatively, use `cd` in a terminal. For example:
 
 ```bash
-cd ~/Downloads/Systemika-Studio-1.1.1-Source
+cd ~/Downloads/Systemika-Studio-1.1.2-Source
 ```
 
 Replace that path with the actual location of your source folder.
@@ -67,9 +67,10 @@ You should see files including:
 
 ```text
 BUILD_LINUX_APPIMAGE.sh
-INSTALL_SYSTEMIKA_LINUX_LAUNCHER.sh
+BUILD_WEBAPP_LINUX.sh
 package.json
-distribute
+build
+platform
 ```
 
 ## 4. Build the Linux AppImage
@@ -99,17 +100,17 @@ The build script will:
 3. Stage Systemika with a dependency-free Node build script.
 4. Build the Linux AppImage with Electron 44.3.0 using Electron Builder's static AppImage runtime toolset (`1.0.3`).
 
-The 1.1.1 source no longer uses Gulp or the older electron-builder 26.0.x toolchain that produced the earlier `tar@6.2.1`, Git `node-gyp`, and high/critical audit warnings. npm can still display upstream deprecation notices from electron-builder's own build-only transitive packages. Those packages are not Systemika runtime application dependencies. The AppImage is also built with the modern static runtime, so students should not need the legacy `libfuse.so.2`/FUSE2 package merely to launch Systemika. Do not run `npm audit fix --force` on the release source. See `BUILD_TOOLCHAIN_SECURITY.md` for details.
+The 1.1.2 source no longer uses Gulp or the older electron-builder 26.0.x toolchain that produced the earlier `tar@6.2.1`, Git `node-gyp`, and high/critical audit warnings. npm can still display upstream deprecation notices from electron-builder's own build-only transitive packages. Those packages are not Systemika runtime application dependencies. The AppImage is also built with the modern static runtime, so students should not need the legacy `libfuse.so.2`/FUSE2 package merely to launch Systemika. Do not run `npm audit fix --force` on the release source. See `docs/guides/BUILD_TOOLCHAIN_SECURITY.md` for details.
 
 When the build succeeds, the script prints the location of the generated `.AppImage` file. It is normally located in:
 
 ```text
-distribute/output/dist-electron/
+build/output/dist-electron/
 ```
 
-### Important: do not use `distribute/build.sh` as the Linux installer
+### Important: do not use `build/build.sh` as the Linux installer
 
-`distribute/build.sh` is an internal application-build script. It is **not** the recommended Linux packaging or installation command.
+`build/build.sh` is an internal application-build script. It is **not** the recommended Linux packaging or installation command.
 
 For Linux, use the root-level script:
 
@@ -119,16 +120,18 @@ For Linux, use the root-level script:
 
 ## 5. Install the Systemika Studio launcher
 
+A convenient installer is provided directly in the source root as `INSTALL_LINUX_LAUNCHER.sh`. It delegates to the implementation under `platform/linux/`, so users do not need to navigate the internal source layout.
+
 After the AppImage has been built successfully, give the launcher installer permission to run:
 
 ```bash
-chmod +x INSTALL_SYSTEMIKA_LINUX_LAUNCHER.sh
+chmod +x INSTALL_LINUX_LAUNCHER.sh
 ```
 
 Then run it:
 
 ```bash
-./INSTALL_SYSTEMIKA_LINUX_LAUNCHER.sh
+./INSTALL_LINUX_LAUNCHER.sh
 ```
 
 Again, do **not** use `sudo`.
@@ -168,7 +171,7 @@ When you obtain an updated Systemika Studio source package:
 2. Run the launcher installer again:
 
    ```bash
-   ./INSTALL_SYSTEMIKA_LINUX_LAUNCHER.sh
+   ./INSTALL_LINUX_LAUNCHER.sh
    ```
 
 The installer replaces the previously installed AppImage with the newly built version while keeping the same Applications-menu entry and shortcut location.
@@ -202,14 +205,14 @@ If you enter:
 or:
 
 ```bash
-./INSTALL_SYSTEMIKA_LINUX_LAUNCHER.sh
+./INSTALL_LINUX_LAUNCHER.sh
 ```
 
 and Linux reports `Permission denied`, give the file executable permission:
 
 ```bash
 chmod +x BUILD_LINUX_APPIMAGE.sh
-chmod +x INSTALL_SYSTEMIKA_LINUX_LAUNCHER.sh
+chmod +x INSTALL_LINUX_LAUNCHER.sh
 ```
 
 Then run the command again.
@@ -243,7 +246,7 @@ chmod +x BUILD_LINUX_APPIMAGE.sh
 After it succeeds, run:
 
 ```bash
-./INSTALL_SYSTEMIKA_LINUX_LAUNCHER.sh
+./INSTALL_LINUX_LAUNCHER.sh
 ```
 
 ### Systemika Studio does not appear immediately in the Applications menu
@@ -264,7 +267,7 @@ Search for **Systemika Studio** in the Applications menu. The Applications-menu 
 
 ### The AppImage reports a FUSE-related error
 
-The Systemika Studio 1.1 builder uses Electron Builder's static AppImage runtime (`toolsets.appimage = 1.0.3`), so the finished AppImage should **not** require the legacy FUSE2 library (`libfuse.so.2`) merely to start. If a newly built Systemika AppImage still reports a FUSE2/libfuse2 error, first confirm that you are building from the 1.1.1 source package and rebuild it with `./BUILD_LINUX_APPIMAGE.sh`. Do not install an obsolete FUSE2 package solely as a workaround for an AppImage produced by an older Systemika build configuration.
+The Systemika Studio 1.1 builder uses Electron Builder's static AppImage runtime (`toolsets.appimage = 1.0.3`), so the finished AppImage should **not** require the legacy FUSE2 library (`libfuse.so.2`) merely to start. If a newly built Systemika AppImage still reports a FUSE2/libfuse2 error, first confirm that you are building from the 1.1.2 source package and rebuild it with `./BUILD_LINUX_APPIMAGE.sh`. Do not install an obsolete FUSE2 package solely as a workaround for an AppImage produced by an older Systemika build configuration.
 
 ## 10. Quick installation summary
 
@@ -274,8 +277,8 @@ For users who already have Node.js and npm installed, the complete process from 
 chmod +x BUILD_LINUX_APPIMAGE.sh
 ./BUILD_LINUX_APPIMAGE.sh
 
-chmod +x INSTALL_SYSTEMIKA_LINUX_LAUNCHER.sh
-./INSTALL_SYSTEMIKA_LINUX_LAUNCHER.sh
+chmod +x INSTALL_LINUX_LAUNCHER.sh
+./INSTALL_LINUX_LAUNCHER.sh
 ```
 
 No `sudo` is required for either command.

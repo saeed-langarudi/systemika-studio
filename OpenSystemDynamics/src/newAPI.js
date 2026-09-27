@@ -259,14 +259,17 @@ function replaceName(definition, oldName, newName) {
 	let text = String(definition == null ? "" : definition);
 	let escapeRegex = value => String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 	let oldEscaped = escapeRegex(oldName);
-	// Preserve compatibility with legacy [Name] references while Systemika's
-	// canonical syntax uses bare identifiers. Comments are left untouched.
+	// The Systemika engine resolves model-entity identifiers case-insensitively.
+	// Rename propagation must use the same rule: an equation containing
+	// `growthrate` still refers to an entity named `GrowthRate`. Replace only
+	// complete identifiers (and legacy [Name] references), never substrings, and
+	// leave documentation comments untouched.
 	return text.split("\n").map(line => {
 		let hash = line.indexOf("#");
 		let code = hash === -1 ? line : line.slice(0, hash);
 		let comment = hash === -1 ? "" : line.slice(hash);
-		code = code.replace(new RegExp("\\[\\s*" + oldEscaped + "\\s*\\]", "g"), newName);
-		code = code.replace(new RegExp("\\b" + oldEscaped + "\\b", "g"), newName);
+		code = code.replace(new RegExp("\\[\\s*" + oldEscaped + "\\s*\\]", "gi"), newName);
+		code = code.replace(new RegExp("\\b" + oldEscaped + "\\b", "gi"), newName);
 		return code + comment;
 	}).join("\n");
 }
@@ -279,31 +282,34 @@ function replaceName(definition, oldName, newName) {
  * @param {string} 				newName
  */
 function changeReferencesToName(id, oldName, newName) {
-	let objWLinkedPrims = findLinkedOutPrimitives(id);
-	objWLinkedPrims.map((p) => {
-		switch (p.value.nodeName) {
-			case "Flow":
-				let newFlowRate = replaceName(p.getAttribute("FlowRate"), oldName, newName);
-				p.setAttribute("FlowRate", newFlowRate);
-				break;
-			case "Variable":
-				let newEquation = replaceName(p.getAttribute("Equation"), oldName, newName);
-				p.setAttribute("Equation", newEquation);
-				break;
-			case "Stock":
-				let newInitialValue = replaceName(p.getAttribute("InitialValue"), oldName, newName);
-				p.setAttribute("InitialValue", newInitialValue);
-				break;
-			default:
-				break;
+	// All Systemika named model entities share the same equation namespace. A
+	// Stock, Flow, Auxiliary, Constant, or Lookup may therefore be referenced by
+	// any equation-bearing entity. Do not infer dependencies from visual Links:
+	// Links are pedagogical/structural information and imported models may omit
+	// them. Scan every equation-bearing primitive instead.
+	//
+	// Use getValue()/setValue() rather than mutating raw XML attributes. Stored
+	// definitions encode newlines as "\n"; decoding first ensures comments are
+	// handled per logical line and references after a commented line are not
+	// accidentally skipped. This also keeps storage canonicalization in one place.
+	let changed = [];
+	for (let p of findAll()) {
+		if (!p || !p.value) continue;
+		if (!["Stock", "Flow", "Variable"].includes(p.value.nodeName)) continue;
+
+		let current = getValue(p);
+		let updated = replaceName(current, oldName, newName);
+		if (updated !== current) {
+			setValue(p, updated);
+			changed.push(p);
 		}
-	});
-	if (findID(id).value.nodeName !== "Ghost") {
-		let ghosts = findGhostsOfID(id).map(findID);
-		ghosts.map(g => {
-			ghost_id = g.getAttribute("id");
-			changeReferencesToName(ghost_id, oldName, newName);
-		});
+	}
+
+	// Lookup inputs, Link endpoints, Flow stock attachments, and Ghost sources are
+	// stored by entity id, so they remain valid across a rename. setName() already
+	// propagates the visible name to Ghosts. Only textual equations need rewriting.
+	if (typeof DefinitionError !== "undefined" && typeof DefinitionError.check === "function") {
+		changed.forEach(p => DefinitionError.check(p));
 	}
 }
 

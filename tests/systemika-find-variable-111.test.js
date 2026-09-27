@@ -8,8 +8,8 @@ const css = fs.readFileSync('OpenSystemDynamics/src/style/editor.css', 'utf8');
 
 test('Find variable is exposed as a top-toolbar action with Ctrl+F and an icon', () => {
   assert.match(html, /id="btn_find_variable"[^>]*data-title="Find \(Ctrl\+F\)"/);
-  assert.match(html, /id="btn_find_variable"[\s\S]*?graphics\/find\.png/);
-  assert.ok(fs.existsSync('OpenSystemDynamics/src/graphics/find.png'));
+  assert.match(html, /id="btn_find_variable"[\s\S]*?graphics\/find\.svg/);
+  assert.ok(fs.existsSync('OpenSystemDynamics/src/graphics/find.svg'));
 });
 
 test('Ctrl/Cmd+F opens the Find dialog and the shortcut is documented', () => {

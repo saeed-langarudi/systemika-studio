@@ -1,6 +1,6 @@
 # Systemika Studio 1.1 Validation Baseline
 
-Date: 2026-09-21
+Date: 2026-09-26
 
 ## Purpose
 
@@ -9,7 +9,7 @@ Systemika Studio 1.1 retains the permanent regression baseline established durin
 
 ## Current release result
 
-Systemika Studio 1.1.1 has **19 permanent validation models** and **376/376 passing automated regression tests**. The milestone notes below are retained as a development history of how that baseline grew.
+Systemika Studio 1.1.2 has **19 permanent validation models** and **393/393 passing automated regression tests**. The milestone notes below are retained as a development history of how that baseline grew.
 
 ## Permanent validation models
 
@@ -128,3 +128,17 @@ Enter now applies the Time Unit dialog and opens the equation/properties editor 
 ## Version 1.1 Calibration Sandbox regression additions
 
 The 1.1 suite adds regression coverage for Calibration Sandbox launch and layout, plot variable selection, live constant controls, reset behavior, responsive transient reruns, `.sysrun` sandbox persistence, universal Reference/Simulated styling, and underscore-number naming for copied entities. Current release baseline: **348/348 automated tests passing** with **19/19 permanent validation models**.
+
+## Version 1.1.2 corrective regression coverage
+
+The 1.1.2 release fixes three classroom-facing regressions found after 1.1.2 deployment: all local WebApp assets now receive release/build cache fingerprints (including Link/Find SVGs), Auxiliary label backgrounds are clipped clear of the circular outline, and raw whitespace in model-entity names is rejected immediately before trimming. The release also uses a network-only immediately activated service worker so a legacy worker cannot remain in control after an upgrade. Current release baseline: **393/393 automated tests passing** with **19/19 permanent validation models**.
+
+## Version 1.1.2 refinement regression additions
+
+The 1.1.2 suite adds focused coverage for startup/manual update checking and generated WebApp update metadata, immediate name-validation feedback, Calibration Sandbox Save-as-Default saved/dirty state, Auxiliary label backgrounds, model-wide exact Lookup rename propagation, and the supplied Link/Find SVG assets. Current release baseline: **393/393 automated tests passing** with **19/19 permanent validation models**.
+
+
+
+### 1.1.2 update-check resilience
+
+The 1.1.2 maintenance suite verifies that WebApp update checks refetch the editor page that is actually running instead of guessing a server directory, and that desktop builds use the confirmed canonical WebApp root `https://systemika.no/studio/app/`. The desktop checker starts with the generated root manifest and can fall back to the exact deployed analyser/editor HTML. Detailed failed probes are retained only in diagnostics; the visible alert remains concise. Generated WebApp HTML and packaged desktop staging share the same content-derived build ID so a corrected 1.1.2 build can be distinguished without changing the semantic version.

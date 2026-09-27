@@ -9,7 +9,7 @@ const root = path.resolve(__dirname, '..');
 const read = rel => fs.readFileSync(path.join(root, rel), 'utf8');
 const editor = read('OpenSystemDynamics/src/editor.js');
 const html = read('OpenSystemDynamics/src/index.html');
-const help = read('SYSTEMIKA_HELP.md');
+const help = read('docs/reference/SYSTEMIKA_HELP.md');
 
 test('keyboard shortcut help matches current output, run, canvas, and dialog shortcuts', () => {
   const start = editor.indexOf('class KeyboardShortcutsDialog extends CloseDialog');

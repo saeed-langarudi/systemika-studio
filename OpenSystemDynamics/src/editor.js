@@ -837,8 +837,8 @@ class BaseObject {
 		this.selector_array = [];
 		this.icons; 	// SVG.group with icons such as ghost and questionmark
 		this.group = null;
-		// Stock names are re-parented into a dedicated top SVG layer.  Keep
-		// the overlay group here so it follows the primitive and is cleaned up
+		// Stock and Auxiliary names may be re-parented into a dedicated top SVG layer.
+		// Keep the overlay group here so it follows the primitive and is cleaned up
 		// with the rest of the visual.
 		this.name_overlay_group = null;
 		this.name_background_element = null;
@@ -895,7 +895,7 @@ class BaseObject {
 		this.clearImage();
 	}
 	clearImage() {
-		// A stock name can live in the dedicated top label layer rather than
+		// A Stock or Auxiliary name can live in the dedicated top label layer rather than
 		// inside the primitive group. Remove that wrapper as part of the same
 		// visual lifecycle.
 		if (this.name_overlay_group) {
@@ -1101,6 +1101,60 @@ class BaseObject {
 					break;
 				}
 			}
+		} else if (this.type === "variable" && typeof this.getRadius === "function") {
+			// Auxiliary names use the same top-layer background as Stock names.
+			// Because that overlay is painted above the Auxiliary circle, trim only
+			// the edge facing the circle so the background never covers its outline.
+			const outlineElement = this.element_array.find(element =>
+				element && element.getAttribute && element.getAttribute("class") === "element"
+			);
+			let outlineStrokeWidth = Number(outlineElement?.getAttribute("stroke-width"));
+			if (!(outlineStrokeWidth > 0)) {
+				try {
+					outlineStrokeWidth = parseFloat(window.getComputedStyle(outlineElement).strokeWidth);
+				} catch (error) {
+					outlineStrokeWidth = 1;
+				}
+			}
+			if (!(outlineStrokeWidth > 0)) {
+				outlineStrokeWidth = 1;
+			}
+			const auxiliaryOuterRadius = this.getRadius() + outlineStrokeWidth / 2 + 1;
+
+			switch (Number(this.name_pos)) {
+				case 0: { // Below
+					const overlap = auxiliaryOuterRadius - backgroundY;
+					if (overlap > 0) {
+						backgroundY += overlap;
+						backgroundHeight = Math.max(0, backgroundHeight - overlap);
+					}
+					break;
+				}
+				case 1: { // Right
+					const overlap = auxiliaryOuterRadius - backgroundX;
+					if (overlap > 0) {
+						backgroundX += overlap;
+						backgroundWidth = Math.max(0, backgroundWidth - overlap);
+					}
+					break;
+				}
+				case 2: { // Above
+					const backgroundBottom = backgroundY + backgroundHeight;
+					const overlap = backgroundBottom + auxiliaryOuterRadius;
+					if (overlap > 0) {
+						backgroundHeight = Math.max(0, backgroundHeight - overlap);
+					}
+					break;
+				}
+				case 3: { // Left
+					const backgroundRight = backgroundX + backgroundWidth;
+					const overlap = backgroundRight + auxiliaryOuterRadius;
+					if (overlap > 0) {
+						backgroundWidth = Math.max(0, backgroundWidth - overlap);
+					}
+					break;
+				}
+			}
 		}
 
 		this.name_background_element.setAttribute("x", backgroundX);
@@ -1221,13 +1275,13 @@ class OnePointer extends BaseObject {
 			console.log("group", this.id, this.primitive, this.name, this.type, this.getLayer() ,this.group);
 		this.group.setAttribute("node_id", this.id);
 
-		// Stock labels must remain readable even when a flow pipe, valve, link,
-		// or another primitive crosses the label. SVG paints later siblings on
-		// top, so move only the stock name into the final stock-label layer.
-		// Keeping the text element itself preserves its existing rename and
-		// selection event handlers. Ghosts of Stocks use the same visual type
-		// and therefore receive the same protection.
-		if (this.type === "stock" && this.name_element && SVG.stockLabelLayer) {
+		// Stock and Auxiliary labels must remain readable even when a flow pipe, valve,
+		// link, or another primitive crosses the label. SVG paints later siblings on
+		// top, so move those names into the final label layer and put the same
+		// semi-transparent contrast background behind them. Keeping the text element
+		// itself preserves its existing rename and selection event handlers. Ghosts
+		// of Stocks/Auxiliaries receive the same treatment through their visual type.
+		if ((this.type === "stock" || this.type === "variable") && this.name_element && SVG.stockLabelLayer) {
 			this.name_background_element = SVG.rect(0, 0, 0, 0, "none", "#ffffff", "stock-name-background", {
 				"fill-opacity": "0.72",
 				"rx": "3",
@@ -5052,14 +5106,27 @@ class TextAreaVisual extends HtmlTwoPointer {
 		} else {
 			this.element.setAttribute("visibility", "visible");
 		}
-		// space is replaced with span "&nbsp;" does not work since it does not work with overflow-wrap: break-word
-		// Replace <, >, space, new line
-		let formatedText = newText
-			.replace(/</g, "&lt;")
-			.replace(/>/g, "&gt;")
-			.replace(/ /g, "<span style='display:inline-block; width:5px;'></span>")
-			.replace(/\n/g, "<br/>");
-		this.updateHTML(formatedText);
+
+		const defaultFontFamily = "Arial, Helvetica, sans-serif";
+		const fontFamily = this.primitive.getAttribute("FontFamily") || defaultFontFamily;
+		const requestedFontSize = Number(this.primitive.getAttribute("FontSize"));
+		const fontSize = Number.isFinite(requestedFontSize) ? Math.max(8, Math.min(96, requestedFontSize)) : 16;
+		const fontWeight = this.primitive.getAttribute("FontWeight") === "bold" ? "bold" : "normal";
+		const fontStyle = this.primitive.getAttribute("FontStyle") === "italic" ? "italic" : "normal";
+		const textDecoration = this.primitive.getAttribute("TextDecoration") === "underline" ? "underline" : "none";
+		const requestedAlign = this.primitive.getAttribute("TextAlign");
+		const textAlign = ["left", "center", "right"].includes(requestedAlign) ? requestedAlign : "left";
+
+		const content = this.htmlElement.contentDiv;
+		content.style.fontFamily = fontFamily;
+		content.style.fontSize = `${fontSize}px`;
+		content.style.fontWeight = fontWeight;
+		content.style.fontStyle = fontStyle;
+		content.style.textDecoration = textDecoration;
+		content.style.textAlign = textAlign;
+		content.style.whiteSpace = "pre-wrap";
+		content.style.overflowWrap = "anywhere";
+		this.updateHTML(htmlEscape(newText));
 	}
 	setColor(color) {
 		super.setColor(color);
@@ -14719,13 +14786,20 @@ class DefinitionEditor extends jqDialog {
 				functionHelperDiv.css("height", "")
 		});
 
-		$(this.dialogContent).find(".name-field").keyup((event) => {
-			let newName = stripBrackets($(event.target).val());
+		$(this.dialogContent).find(".name-field").on("input", (event) => {
+			// Validate exactly what the user has typed. stripBrackets() intentionally
+			// trims surrounding whitespace for saved names, but using that trimmed
+			// value alone here made a newly typed trailing space invisible until the
+			// next character was entered. Any whitespace is invalid in a Systemika
+			// model-entity identifier, so flag it immediately on the input event.
+			let rawName = String($(event.target).val() ?? "");
+			let newName = stripBrackets(rawName);
+			let containsWhitespace = /\s/.test(rawName);
 			let nameFree = isNameFree(newName, this.primitive.id);
 			// valid according to the legacy .ssd equation-name rules
 			let validName = validPrimitiveName(newName, this.primitive);
-			// valid for tools StatRes etc.
-			let validToolVarName = isValidToolName(newName);
+			// valid for tools StatRes etc. A space must be rejected before trimming.
+			let validToolVarName = !containsWhitespace && isValidToolName(newName);
 			if (nameFree && validName && validToolVarName) {
 				$(event.target).css("background-color", "white");
 				$(this.dialogContent).find(".name-warning-div").html("");
@@ -15098,6 +15172,28 @@ class TextAreaDialog extends DisplayDialog {
 					<b>Text:</b><span>${this.renderHelpButtonHtml("text-help")}</span>
 			</div>
 			<textarea class="text enter-apply" style="resize: none;"></textarea>
+			<div class="systemika-text-formatting" aria-label="Text formatting">
+				<label>Font
+					<select class="text-font-family enter-apply">
+						<option value="Arial, Helvetica, sans-serif">Arial</option>
+						<option value="Verdana, Geneva, sans-serif">Verdana</option>
+						<option value="Georgia, serif">Georgia</option>
+						<option value="'Times New Roman', Times, serif">Times New Roman</option>
+						<option value="'Courier New', Courier, monospace">Courier New</option>
+					</select>
+				</label>
+				<label>Size <input class="text-font-size enter-apply" type="number" min="8" max="96" step="1" /></label>
+				<label class="systemika-text-style-toggle"><input class="text-bold" type="checkbox" /> <b>B</b></label>
+				<label class="systemika-text-style-toggle"><input class="text-italic" type="checkbox" /> <i>I</i></label>
+				<label class="systemika-text-style-toggle"><input class="text-underline" type="checkbox" /> <u>U</u></label>
+				<label>Alignment
+					<select class="text-align enter-apply">
+						<option value="left">Left</option>
+						<option value="center">Center</option>
+						<option value="right">Right</option>
+					</select>
+				</label>
+			</div>
 			<div class="vertical-space"></div>
 			<table class="modern-table zebra"><tr title="Only hides when there is any text.">
 				<td>Hide frame when there is text:</td>
@@ -15116,12 +15212,24 @@ class TextAreaDialog extends DisplayDialog {
 
 		this.textArea = $(this.dialogContent).find(".text");
 		this.hideFrameCheckbox = $(this.dialogContent).find(".hide-frame-checkbox");
+		this.fontFamilyField = $(this.dialogContent).find(".text-font-family");
+		this.fontSizeField = $(this.dialogContent).find(".text-font-size");
+		this.boldField = $(this.dialogContent).find(".text-bold");
+		this.italicField = $(this.dialogContent).find(".text-italic");
+		this.underlineField = $(this.dialogContent).find(".text-underline");
+		this.alignField = $(this.dialogContent).find(".text-align");
 		this.bindEnterApplyEvents();
 	}
 	beforeShow() {
 		let oldText = getName(this.primitive);
 		this.textArea.val(oldText);
 		this.hideFrameCheckbox.prop("checked", this.primitive.getAttribute("HideFrame") === "true");
+		this.fontFamilyField.val(this.primitive.getAttribute("FontFamily") || "Arial, Helvetica, sans-serif");
+		this.fontSizeField.val(this.primitive.getAttribute("FontSize") || "16");
+		this.boldField.prop("checked", this.primitive.getAttribute("FontWeight") === "bold");
+		this.italicField.prop("checked", this.primitive.getAttribute("FontStyle") === "italic");
+		this.underlineField.prop("checked", this.primitive.getAttribute("TextDecoration") === "underline");
+		this.alignField.val(["left", "center", "right"].includes(this.primitive.getAttribute("TextAlign")) ? this.primitive.getAttribute("TextAlign") : "left");
 		$(this.dialogContent).find(".text").focus();
 	}
 	afterShow() {
@@ -15134,7 +15242,7 @@ class TextAreaDialog extends DisplayDialog {
 		let width = this.getWidth();
 		let height = this.getHeight();
 		this.textArea.width(width - 10);
-		this.textArea.height(height - 70);
+		this.textArea.height(Math.max(90, height - 165));
 	}
 	beforeCreateDialog() {
 		this.dialogParameters.width = "500";
@@ -15144,6 +15252,15 @@ class TextAreaDialog extends DisplayDialog {
 		let newText = $(this.dialogContent).find(".text").val();
 		setName(this.primitive, newText);
 		this.primitive.setAttribute("HideFrame", this.hideFrameCheckbox.prop("checked"));
+		this.primitive.setAttribute("FontFamily", this.fontFamilyField.val() || "Arial, Helvetica, sans-serif");
+		let fontSize = Number(this.fontSizeField.val());
+		if (!Number.isFinite(fontSize)) fontSize = 16;
+		fontSize = Math.round(Math.max(8, Math.min(96, fontSize)));
+		this.primitive.setAttribute("FontSize", String(fontSize));
+		this.primitive.setAttribute("FontWeight", this.boldField.prop("checked") ? "bold" : "normal");
+		this.primitive.setAttribute("FontStyle", this.italicField.prop("checked") ? "italic" : "normal");
+		this.primitive.setAttribute("TextDecoration", this.underlineField.prop("checked") ? "underline" : "none");
+		this.primitive.setAttribute("TextAlign", ["left", "center", "right"].includes(this.alignField.val()) ? this.alignField.val() : "left");
 	}
 }
 

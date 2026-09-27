@@ -23,7 +23,7 @@ test('SVG exposes the dedicated stock-label layer', () => {
 });
 
 test('stock names and backgrounds are re-parented to the top label layer and track stock movement', () => {
-  assert.match(editor, /this\.type === "stock" && this\.name_element && SVG\.stockLabelLayer/);
+  assert.match(editor, /\(this\.type === "stock" \|\| this\.type === "variable"\) && this\.name_element && SVG\.stockLabelLayer/);
   assert.match(editor, /SVG\.group\(\[this\.name_background_element, this\.name_element\]\)/);
   assert.match(editor, /this\.name_overlay_group\.setAttribute\("transform", primitiveTransform\)/);
 });

@@ -295,7 +295,13 @@ primitiveBank.histoplot = addValueAttributes(createTemplate("HistoPlot", {
 
 primitiveBank.textarea = addValueAttributes(createTemplate("TextArea", {
 	HideFrame: false,
-	Color: "black"
+	Color: "black",
+	FontFamily: "Arial, Helvetica, sans-serif",
+	FontSize: "16",
+	FontWeight: "normal",
+	FontStyle: "normal",
+	TextDecoration: "none",
+	TextAlign: "left"
 }));
 
 primitiveBank.rectangle = addValueAttributes(createTemplate("Rectangle", {

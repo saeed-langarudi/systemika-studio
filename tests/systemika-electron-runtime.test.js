@@ -5,9 +5,9 @@ const path = require('node:path');
 
 const root = path.join(__dirname, '..');
 const rootPackage = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
-const distPackage = JSON.parse(fs.readFileSync(path.join(root, 'distribute', 'package.json'), 'utf8'));
-const builderConfig = JSON.parse(fs.readFileSync(path.join(root, 'distribute', 'electron-builder.json'), 'utf8'));
-const linuxLauncher = fs.readFileSync(path.join(root, 'run-systemika-linux.sh'), 'utf8');
+const distPackage = JSON.parse(fs.readFileSync(path.join(root, 'build', 'package.json'), 'utf8'));
+const builderConfig = JSON.parse(fs.readFileSync(path.join(root, 'build', 'electron-builder.json'), 'utf8'));
+const linuxLauncher = fs.readFileSync(path.join(root, 'RUN_SYSTEMIKA_LINUX.sh'), 'utf8');
 
 test('portable source runtime and packaged builds use the same exact Electron 44.3.0 runtime', () => {
   assert.equal(rootPackage.devDependencies.electron, '44.3.0');

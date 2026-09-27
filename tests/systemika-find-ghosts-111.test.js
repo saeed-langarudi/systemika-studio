@@ -15,10 +15,10 @@ test('Find Ghosts is beside Find, uses Ctrl+G, and starts disabled', () => {
 });
 
 test('supplied Find, Find Ghosts, and Ghost icons are installed', () => {
-  assert.equal(sha256('OpenSystemDynamics/src/graphics/find.png'), 'bb8a6d51ecc7361779d1fbde6caf8ec8d37a86d96b65ecbbcfee33b58119046e');
+  assert.equal(sha256('OpenSystemDynamics/src/graphics/find.svg'), '0fe55a98de91171ccc010cf7f9ae43441e8d21a7c5b53ea9777b91f602fdf237');
   assert.equal(sha256('OpenSystemDynamics/src/graphics/find_ghost.svg'), '46357bf31aff30911d0fee80e0c188f3ccd413ada4a7d472db14f487b6fcd4d7');
   assert.equal(sha256('OpenSystemDynamics/src/graphics/ghost.svg'), 'ed438e79ac62e4376ef4f68372117ac9359851fc452afb61e1b3544692a4c86a');
-  assert.match(html, /id="btn_find_variable"[\s\S]*?graphics\/find\.png/);
+  assert.match(html, /id="btn_find_variable"[\s\S]*?graphics\/find\.svg/);
   assert.match(html, /id="btn_ghost"[\s\S]*?graphics\/ghost\.svg/);
 });
 

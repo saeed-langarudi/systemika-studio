@@ -168,6 +168,30 @@ function systemikaNormalizeLoadedModel() {
         }
     }
 
+    // Some older/partial WebApp saves can contain square brackets in the name
+    // attribute itself (for example name="[Jobs]"). Brackets belong only to the
+    // legacy equation-reference syntax; they are not part of a Systemika entity
+    // name. Repair only the unambiguous [Identifier] form and avoid creating a
+    // duplicate if a bare entity with that name already exists.
+    const namedTypes = new Set(["Stock", "Flow", "Variable", "Converter"]);
+    const namedItems = primitives().filter(item => item && item.value && namedTypes.has(item.value.nodeName));
+    for (const item of namedItems) {
+        const rawName = String(item.getAttribute("name") || "").trim();
+        const bracketed = rawName.match(/^\[([A-Za-z_][A-Za-z0-9_]*)\]$/);
+        if (!bracketed) continue;
+        const cleanName = bracketed[1];
+        const collision = namedItems.some(other => other !== item &&
+            String(other.getAttribute("name") || "").trim().toLowerCase() === cleanName.toLowerCase());
+        if (!collision) item.value.setAttribute("name", cleanName);
+    }
+    // Ghost display names are derived from their source entity and should never
+    // preserve a stale bracketed spelling after the source is normalized.
+    for (const ghost of primitives("Ghost")) {
+        const sourceId = ghost && ghost.getAttribute("Source");
+        const source = sourceId != null && typeof findID === "function" ? findID(sourceId) : null;
+        if (source && source.getAttribute("name")) ghost.value.setAttribute("name", source.getAttribute("name"));
+    }
+
     // Insight Maker / older Systemika files may carry OnlyPositive="true"
     // on Flows. Systemika deliberately permits signed flow rates, so normalize
     // that legacy storage flag away. A negative rate reverses the effective

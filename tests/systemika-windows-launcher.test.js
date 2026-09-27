@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const launcher = fs.readFileSync(path.join(__dirname, '..', 'desktop-launcher', 'windows', 'main.go'), 'utf8');
+const launcher = fs.readFileSync(path.join(__dirname, '..', 'platform', 'native-launcher', 'windows', 'main.go'), 'utf8');
 
 test('Windows launcher repairs installation and shortcuts before reusing an existing session', () => {
   const findPos = launcher.indexOf('existingURL := findExisting()');
