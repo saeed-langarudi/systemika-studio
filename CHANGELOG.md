@@ -1,3 +1,11 @@
+## 2026-09-28 — Systemika Studio 1.1.4 — Flow endpoint and pipe editing
+- Flow endpoint handles now use larger invisible hit targets and are temporarily raised above Stocks while the Flow is selected, making both source/cloud-side and arrow-side attachments straightforward to grab.
+- Dragging an attached Flow endpoint now detaches it before movement; releasing the endpoint over a Stock reattaches it through the existing attachment logic.
+- Completed Flows can now be rerouted after creation: select the Flow, right-click a pipe segment to add an elbow handle, and drag the handle to reshape the pipe.
+- Flow elbows can be removed by right-clicking the elbow handle or by selecting it and pressing Delete/Backspace; deleting an elbow no longer deletes the whole Flow.
+- Added built-in Getting Started guidance for Flow pipe editing and focused 1.1.4 regression coverage.
+- Release verification baseline: 402/402 automated tests passing; 19/19 permanent numerical validation models retained.
+
 ## 2026-09-28 — Systemika Studio 1.1.3 — Detached plots, Histogram, and copied connector geometry
 - Fixed blank Time/Compare/XY/Histogram output after detaching the live Output panel into an external window by rendering jqPlot in its owning editor document and adopting the finished live plot DOM into the detached panel.
 - Restored single-run Histogram rendering by avoiding jqPlot 1.0.8's invalid hidden-legend + `outsideGrid` combination; visible comparison legends remain below the plot.

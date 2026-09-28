@@ -1,6 +1,6 @@
 # Systemika Studio 1.1 Validation Baseline
 
-Date: 2026-09-26
+Date: 2026-09-28
 
 ## Purpose
 
@@ -9,7 +9,7 @@ Systemika Studio 1.1 retains the permanent regression baseline established durin
 
 ## Current release result
 
-Systemika Studio 1.1.3 has **19 permanent validation models** and **397/397 passing automated regression tests**. The milestone notes below are retained as a development history of how that baseline grew.
+Systemika Studio 1.1.4 has **19 permanent validation models** and **402/402 passing automated regression tests**. The milestone notes below are retained as a development history of how that baseline grew.
 
 ## Permanent validation models
 
@@ -131,7 +131,11 @@ The 1.1 suite adds regression coverage for Calibration Sandbox launch and layout
 
 ## Version 1.1.3 corrective regression coverage
 
-The 1.1.3 suite adds focused regression coverage for detached-window plot rendering, the jqPlot hidden-legend failure that broke single-run Histograms, preservation of the reliable one-series Histogram rendering path, and translation of persisted Link Bezier handles and Flow bend points during copy/paste. Current release baseline: **397/397 automated tests passing** with **19/19 permanent validation models**.
+The 1.1.3 suite adds focused regression coverage for detached-window plot rendering, the jqPlot hidden-legend failure that broke single-run Histograms, preservation of the reliable one-series Histogram rendering path, translation of persisted Link Bezier handles and Flow bend points during copy/paste, and copied-equation reference remapping. Final 1.1.3 baseline: **398/398 automated tests passing** with **19/19 permanent validation models**.
+
+## Version 1.1.4 Flow-editing regression coverage
+
+The 1.1.4 suite adds focused coverage for enlarged Flow endpoint/elbow hit targets, a dedicated edit layer that keeps selected Flow handles above Stocks while preserving Stock labels as the final SVG layer, immediate detach-on-drag for both Flow endpoints, right-click elbow insertion/removal on completed Flows, Delete/Backspace removal of selected elbow handles without deleting the Flow, and synchronized Getting Started guidance. Current release baseline: **402/402 automated tests passing** with **19/19 permanent validation models**.
 
 ## Version 1.1.2 corrective regression coverage
 

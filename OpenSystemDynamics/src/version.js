@@ -5,5 +5,5 @@ var stochsd = {
 // Systemika fork/application release version. Keep the legacy StochSD version
 // above for model-engine lineage and compatibility reporting.
 var systemika = {
-	version: "1.1.3"
+	version: "1.1.4"
 };

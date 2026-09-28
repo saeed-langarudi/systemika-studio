@@ -19,6 +19,8 @@ class SVG {
   static anchorLayer;
   /** @type {SVGGElement} @static  */
   static stockLabelLayer;
+  /** @type {SVGGElement} @static  */
+  static flowAnchorEditLayer;
   static init() {
     SVG.svgElement = document.getElementById("svgplane");
     SVG.stockLayer = SVG.svgElement.querySelector("g.layer.stock");
@@ -30,6 +32,7 @@ class SVG {
 		SVG.plotLayer = SVG.svgElement.querySelector("g.layer.plot");
     SVG.anchorLayer = SVG.svgElement.querySelector("g.layer.anchor");
     SVG.stockLabelLayer = SVG.svgElement.querySelector("g.layer.stock-label");
+    SVG.flowAnchorEditLayer = SVG.svgElement.querySelector("g.layer.flow-anchor-edit");
   }
 
   /**

@@ -1492,6 +1492,30 @@ class OrthoAnchorPoint extends AnchorPoint {
 	}
 }
 
+// Flow endpoints and elbows are small visual handles, but they need a larger
+// invisible hit target so they remain easy to grab when they overlap a Stock
+// boundary or a pipe segment.  The visible handle stays at the existing 5 px
+// radius; only pointer interaction is enlarged.
+class FlowAnchorPoint extends AnchorPoint {
+	getImage() {
+		return [
+			SVG.circle(0, 0, 11, "none", "transparent", "flow-anchor-hit-target", { "pointer-events": "all" }),
+			SVG.circle(0, 0, 5, this.color, "white", "element"),
+			SVG.circle(0, 0, 5, "none", this.color, "highlight")
+		];
+	}
+}
+
+class FlowOrthoAnchorPoint extends OrthoAnchorPoint {
+	getImage() {
+		return [
+			SVG.circle(0, 0, 11, "none", "transparent", "flow-anchor-hit-target", { "pointer-events": "all" }),
+			SVG.circle(0, 0, 5, this.color, "white", "element"),
+			SVG.circle(0, 0, 5, "none", this.color, "highlight")
+		];
+	}
+}
+
 function safeDivision(nominator, denominator) {
 	// Make sure division by Zero does not happen
 	return denominator == 0 ? 9999999 : (nominator / denominator);
@@ -2118,6 +2142,11 @@ class FlowVisual extends BaseConnection {
 		this.variable; 		// variable (only svg group-element with circle and text)
 	}
 
+	createInitialAnchors(pos0, pos1) {
+		this.start_anchor = new FlowAnchorPoint(this.id + ".start_anchor", "dummy_anchor", pos0, "start");
+		this.end_anchor = new FlowAnchorPoint(this.id + ".end_anchor", "dummy_anchor", pos1, "end");
+	}
+
 	isAcceptableStartAttach(attachVisual) {
 		return attachVisual.getType() === "stock";
 	}
@@ -2135,6 +2164,14 @@ class FlowVisual extends BaseConnection {
 		anchors = anchors.concat(this.middleAnchors);
 		anchors = anchors.concat([this.end_anchor]);
 		return anchors;
+	}
+
+	setAnchorsInEditLayer(editing) {
+		let layer = editing && SVG.flowAnchorEditLayer ? SVG.flowAnchorEditLayer : SVG.anchorLayer;
+		if (!layer) return;
+		for (let anchor of this.getAnchors()) {
+			if (anchor && anchor.group && anchor.group.parentNode !== layer) layer.appendChild(anchor.group);
+		}
 	}
 
 	getPreviousAnchor(anchor_id) {
@@ -2292,16 +2329,70 @@ class FlowVisual extends BaseConnection {
 		update_relevant_objects("");
 	}
 
-	createMiddleAnchorPoint(x, y) {
-		let index = this.middleAnchors.length;
-		let newAnchor = new OrthoAnchorPoint(
-			this.id + ".point" + index,
+	getFreeMiddleAnchorId() {
+		let serial = 0;
+		while (object_array[this.id + ".point" + serial]) serial++;
+		return this.id + ".point" + serial;
+	}
+
+	reindexMiddleAnchors() {
+		this.middleAnchors.forEach((anchor, index) => {
+			anchor.index = index;
+		});
+	}
+
+	createMiddleAnchorPoint(x, y, insertIndex = this.middleAnchors.length) {
+		insertIndex = Math.max(0, Math.min(this.middleAnchors.length, Number(insertIndex)));
+		let newAnchor = new FlowOrthoAnchorPoint(
+			this.getFreeMiddleAnchorId(),
 			"dummy_anchor",
 			[x, y],
 			"orthoMiddle",
-			index
+			insertIndex
 		);
-		this.middleAnchors.push(newAnchor);
+		this.middleAnchors.splice(insertIndex, 0, newAnchor);
+		this.reindexMiddleAnchors();
+		if (this.isSelected()) this.setAnchorsInEditLayer(true);
+
+		// Inserting on a segment before the valve should not unexpectedly jump the
+		// valve to a different part of the pipe.
+		if (this.valveIndex > insertIndex) this.valveIndex++;
+		this.primitive.setAttribute("ValveIndex", this.valveIndex);
+		return newAnchor;
+	}
+
+	closestPipeSegment(point, maxDistance = Infinity) {
+		let anchors = this.getAnchors();
+		let best = null;
+		for (let segmentIndex = 0; segmentIndex < anchors.length - 1; segmentIndex++) {
+			let a = anchors[segmentIndex].getPos();
+			let b = anchors[segmentIndex + 1].getPos();
+			let dx = b[0] - a[0];
+			let dy = b[1] - a[1];
+			let lengthSquared = dx * dx + dy * dy;
+			let t = 0;
+			if (lengthSquared > 0) {
+				t = ((point[0] - a[0]) * dx + (point[1] - a[1]) * dy) / lengthSquared;
+				t = Math.max(0, Math.min(1, t));
+			}
+			let projected = [a[0] + t * dx, a[1] + t * dy];
+			let d = distance(point, projected);
+			if (!best || d < best.distance) best = { segmentIndex, point: projected, distance: d };
+		}
+		return best && best.distance <= maxDistance ? best : null;
+	}
+
+	middleAnchorNear(point, radius = 12) {
+		let bestIndex = -1;
+		let bestDistance = Infinity;
+		for (let i = 0; i < this.middleAnchors.length; i++) {
+			let d = distance(point, this.middleAnchors[i].getPos());
+			if (d <= radius && d < bestDistance) {
+				bestDistance = d;
+				bestIndex = i;
+			}
+		}
+		return bestIndex;
 	}
 
 	setStartAttach(new_start_attach) {
@@ -2315,13 +2406,20 @@ class FlowVisual extends BaseConnection {
 		for (let i = 0; i < 4; i++) update_twopointer_objects([]);
 	}
 
-	removeLastMiddleAnchorPoint() {
-		// set valveIndex to 0 to avoid valveplacement bug
-		if (this.valveIndex === this.middleAnchors.length) {
-			this.valveIndex = this.middleAnchors.length - 1;
-		}
-		let removedAnchor = this.middleAnchors.pop();
+	removeMiddleAnchorPoint(index) {
+		if (index < 0 || index >= this.middleAnchors.length) return false;
+		let removedAnchor = this.middleAnchors[index];
+		this.middleAnchors.splice(index, 1);
+		if (this.valveIndex > index) this.valveIndex--;
+		this.valveIndex = Math.max(0, Math.min(this.valveIndex, this.middleAnchors.length));
+		this.primitive.setAttribute("ValveIndex", this.valveIndex);
+		this.reindexMiddleAnchors();
 		delete_object(removedAnchor.id);
+		return true;
+	}
+
+	removeLastMiddleAnchorPoint() {
+		return this.removeMiddleAnchorPoint(this.middleAnchors.length - 1);
 	}
 
 
@@ -2353,7 +2451,7 @@ class FlowVisual extends BaseConnection {
 		const points = this.parseMiddlePoints(middlePointsString);
 		for (let point of points) {
 			let index = this.middleAnchors.length;
-			let newAnchor = new OrthoAnchorPoint(
+			let newAnchor = new FlowOrthoAnchorPoint(
 				this.id + ".point" + index,
 				"dummy_anchor",
 				point,
@@ -2561,6 +2659,7 @@ class FlowVisual extends BaseConnection {
 	}
 
 	unselect() {
+		this.setAnchorsInEditLayer(false);
 		super.unselect();
 		this.variable.getElementsByClassName("highlight")[0].setAttribute("visibility", "hidden");
 		this.icons.setColor(this.color);
@@ -2580,6 +2679,7 @@ class FlowVisual extends BaseConnection {
 
 	select() {
 		super.select();
+		this.setAnchorsInEditLayer(true);
 		this.variable.getElementsByClassName("highlight")[0].setAttribute("visibility", "visible");
 		this.icons.setColor("white");
 
@@ -6423,6 +6523,28 @@ class FinishTool extends BaseTool {
 
 class DeleteTool extends BaseTool {
 	static enterTool() {
+		// A selected Flow elbow is a routing handle, not a model entity. Delete it
+		// without deleting the entire Flow. This also gives users a conventional
+		// keyboard alternative to right-clicking an elbow.
+		let selectedAnchor = get_only_selected_anchor_id();
+		if (selectedAnchor) {
+			let parent = connection_array[selectedAnchor.parent_id];
+			let anchor = object_array[selectedAnchor.child_id];
+			if (parent && parent.getType && parent.getType() === "flow" &&
+				anchor && anchor.getAnchorType() === "orthoMiddle") {
+				let elbowIndex = parent.middleAnchors.indexOf(anchor);
+				if (parent.removeMiddleAnchorPoint(elbowIndex)) {
+					parent.update();
+					unselect_all();
+					parent.select();
+					History.storeUndoState();
+					InfoBar.update();
+					ToolBox.setTool("mouse");
+					return;
+				}
+			}
+		}
+
 		if (RunResults.isAdvanceActive()) {
 			runOverlay.requestAdvanceFinish(
 				"Deleting model entities during Advance changes the model structure. Finish the current Advance run to the end, then apply the deletion?",
@@ -6791,6 +6913,11 @@ function get_only_link_selected() {
 	return null;
 }
 
+function get_only_flow_selected() {
+	let roots = Object.values(get_selected_root_objects()).filter(Boolean);
+	return roots.length === 1 && roots[0].getType && roots[0].getType() === "flow" ? roots[0] : null;
+}
+
 class MouseTool extends BaseTool {
 	static leftMouseDown(x, y) {
 		mouse.downX = x;
@@ -6893,12 +7020,38 @@ class MouseTool extends BaseTool {
 		}
 	}
 	static rightMouseDown(x, y) {
-		let only_selected_anchor = get_only_selected_anchor_id();
-		if (only_selected_anchor &&
-			connection_array[only_selected_anchor["parent_id"]].getType() === "flow" &&
-			object_array[only_selected_anchor["child_id"]].getAnchorType() === "end") {
-			FlowTool.rightMouseDown(x, y);
+		let flow = get_only_flow_selected();
+		if (!flow) return;
+
+		let point = [x, y];
+		let elbowIndex = flow.middleAnchorNear(point, 12);
+		if (elbowIndex >= 0) {
+			flow.removeMiddleAnchorPoint(elbowIndex);
+			flow.update();
+			unselect_all();
+			flow.select();
+			InfoBar.update();
+			History.storeUndoState();
+			return;
 		}
+
+		// Right-clicking a selected pipe adds an elbow handle at the nearest point
+		// on that segment. Avoid endpoints and the valve/variable controls so their
+		// normal interactions cannot accidentally create bends.
+		let anchors = flow.getAnchors();
+		let nearEndpoint = distance(point, anchors[0].getPos()) <= 13 ||
+			distance(point, anchors[anchors.length - 1].getPos()) <= 13;
+		let nearValve = distance(point, flow.getValvePos()) <= 14;
+		let nearVariable = distance(point, flow.getVariablePos()) <= flow.getRadius() + 3;
+		if (nearEndpoint || nearValve || nearVariable) return;
+
+		let segment = flow.closestPipeSegment(point, 10);
+		if (!segment) return;
+		let newAnchor = flow.createMiddleAnchorPoint(segment.point[0], segment.point[1], segment.segmentIndex);
+		flow.update();
+		unselect_all_other_anchors(flow.id, newAnchor.id);
+		InfoBar.update();
+		History.storeUndoState();
 	}
 }
 
@@ -7014,6 +7167,16 @@ class FlowTool extends TwoPointerTool {
 		// Function used both during creation and later moving of anchor point
 		let mainAnchor = get_object(anchor_id);
 		let parent = get_parent(mainAnchor);
+
+		// Editing an existing attached Flow should behave like grabbing the visible
+		// endpoint and pulling it away from the Stock.  Do not keep the endpoint
+		// clamped to the Stock while the drag is in progress; detach first, then let
+		// mouse-up attach it again if it is released over a Stock.
+		if (mainAnchor.getAnchorType() === "start" && parent.getStartAttach && parent.getStartAttach()) {
+			parent.setStartAttach(null);
+		} else if (mainAnchor.getAnchorType() === "end" && parent.getEndAttach && parent.getEndAttach()) {
+			parent.setEndAttach(null);
+		}
 
 		parent.requestNewAnchorPos([x, y], anchor_id);
 		parent.update();
@@ -14075,6 +14238,7 @@ class GettingStartedDialog extends CloseDialog {
 				<li><b>Run or explore.</b> <b>Run/Pause</b> performs a normal simulation. <b>Advance</b> steps through the model and allows permitted parameter changes between advances.</li>
 				<li><b>Save the model.</b> Use Save or Save As. The red <b>Unsaved Changes</b> indicator is also clickable.</li>
 			</ol>
+			<p><b>Editing Flow pipes:</b> select a Flow by its valve, then drag either endpoint away from a Stock to detach it. Right-click a selected pipe to add an elbow handle, then drag that handle to reshape the pipe. Right-click an elbow handle, or select it and press Delete/Backspace, to remove the elbow.</p>
 			<p>Press <b>Enter</b> to apply changes. Equations can span multiple lines; press <b>Shift+Enter</b> to insert a line break.</p>
 		</div>`);
 	}
