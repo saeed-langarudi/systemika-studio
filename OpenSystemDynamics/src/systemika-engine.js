@@ -558,7 +558,10 @@
   }
 
   function parseConverterData(data) {
-    const beforeComment = String(data == null ? "" : data).split("#")[0];
+    // Lookup definitions are stored in XML attributes, where editor line breaks
+    // are encoded as the two characters "\\n". Decode them before parsing so
+    // rows separated by semicolon + line break are equivalent to one-line data.
+    const beforeComment = decodeStoredExpression(data).split("#")[0];
     if (!beforeComment.trim()) return [];
     const points = beforeComment.split(";").map((row, index) => {
       const cells = row.trim().split(",");

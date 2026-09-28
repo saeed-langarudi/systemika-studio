@@ -1,10 +1,30 @@
+## 2026-09-28 — Systemika Studio 1.1.5 — Update download URL correction
+- Corrected the update destination from `https://systemika.no/download/` to the public Systemika Studio downloads directory at `https://systemika.no/studio/downloads/` in the browser update checker, Electron desktop update flow, release manifests, and build generator.
+- Added regression checks so the obsolete download URL cannot silently return in the update runtime.
+- Release verification baseline: 412/412 automated tests passing; 19/19 permanent numerical validation models retained.
+
+## 2026-09-28 — Systemika Studio 1.1.5 — Annotation double-click priority correction
+- Corrected the earlier background-layer-only fix for Text Boxes and geometry shapes. SVG layer order alone did not reliably prevent a Rectangle from receiving a double-click over an enclosed model entity in every interaction state.
+- Annotation double-click handlers now explicitly hit-test the model at the pointer location and route the action to the top-most Stock, Auxiliary, Constant, Lookup, or Flow before opening annotation properties.
+- The routed model entity is also selected, matching direct model double-click behavior.
+- Release verification baseline: 412/412 automated tests passing; 19/19 permanent numerical validation models retained.
+
+## 2026-09-28 — Systemika Studio 1.1.5 — Repeated Shift elbows
+- Flow endpoint dragging now treats each distinct Shift key press as a separate elbow command. Releasing Shift re-arms the gesture even if the mouse does not move, so any number of elbows can be added during one continuous drag of either the arrow or cloud endpoint.
+- The existing right-click elbow creation/removal workflow remains available.
+- Added focused 1.1.5 regression coverage for repeated Shift presses during a single Flow drag.
+- Release verification baseline: 406/406 automated tests passing; 19/19 permanent numerical validation models retained.
+
 ## 2026-09-28 — Systemika Studio 1.1.4 — Flow endpoint and pipe editing
+- Corrective 1.1.4 build: Shift while dragging a Flow arrow/cloud endpoint now inserts an elbow during both initial creation and later editing; right-click elbow creation/removal remains available.
+- Lookup definitions now accept rows separated by semicolon plus line break, including the encoded line breaks used when spreadsheet data is pasted and saved.
+- Rectangle corner handles are raised above the rectangle while selected, restoring reliable post-creation resizing.
 - Flow endpoint handles now use larger invisible hit targets and are temporarily raised above Stocks while the Flow is selected, making both source/cloud-side and arrow-side attachments straightforward to grab.
 - Dragging an attached Flow endpoint now detaches it before movement; releasing the endpoint over a Stock reattaches it through the existing attachment logic.
 - Completed Flows can now be rerouted after creation: select the Flow, right-click a pipe segment to add an elbow handle, and drag the handle to reshape the pipe.
 - Flow elbows can be removed by right-clicking the elbow handle or by selecting it and pressing Delete/Backspace; deleting an elbow no longer deletes the whole Flow.
 - Added built-in Getting Started guidance for Flow pipe editing and focused 1.1.4 regression coverage.
-- Release verification baseline: 402/402 automated tests passing; 19/19 permanent numerical validation models retained.
+- Release verification baseline: 405/405 automated tests passing; 19/19 permanent numerical validation models retained.
 
 ## 2026-09-28 — Systemika Studio 1.1.3 — Detached plots, Histogram, and copied connector geometry
 - Fixed blank Time/Compare/XY/Histogram output after detaching the live Output panel into an external window by rendering jqPlot in its owning editor document and adopting the finished live plot DOM into the detached panel.
@@ -14,7 +34,7 @@
 - Copy/paste now rewrites copied Stock, Flow, Auxiliary, and Constant equations so references to copied inputs use the copied entity names (for example `Input * Rate` becomes `Input_1 * Rate_1` when those inputs are copied together); external references remain unchanged.
 - Added focused 1.1.3 regression coverage; release baseline is 398/398 automated tests with 19 permanent validation models retained.
 
-- Update checking no longer guesses WebApp deployment paths. Browser builds refetch the editor page already running; desktop builds use `https://systemika.no/download/systemika-update.json` and can fall back to discovering a semantic version from the public download tree. User-facing failures are concise while probe diagnostics stay in the console.
+- Update checking no longer guesses WebApp deployment paths. Browser builds refetch the editor page already running; desktop builds use the canonical WebApp update manifest at `https://systemika.no/studio/app/systemika-update.json`. When an update is available, users are directed to `https://systemika.no/studio/downloads/`. User-facing failures are concise while probe diagnostics stay in the console.
 - Model loading repairs legacy/malformed entity names stored literally as `[Name]` while preserving ordinary annotations.
 - Links and link handles now paint below model entities so nearby links cannot block entity selection/property access.
 - Updated Systemika application/logo/favicon artwork.

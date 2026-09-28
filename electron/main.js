@@ -23,7 +23,7 @@ const entryPoint = path.join(appRoot, "start.html");
 const iconPath = path.join(appRoot, "app-icons", "systemika.png");
 const fileExtension = ".ssd";
 
-const systemikaDownloadUrl = "https://systemika.no/download/";
+const systemikaDownloadUrl = "https://systemika.no/studio/downloads/";
 const systemikaWebAppRoot = "https://systemika.no/studio/app/";
 const systemikaUpdateManifestUrls = [
 	new URL("systemika-update.json", systemikaWebAppRoot).toString(),

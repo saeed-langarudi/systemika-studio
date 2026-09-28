@@ -237,25 +237,25 @@
 <h1 class="title">Systemika Studio 1.1 - macOS Installer Build
 Guide</h1>
 </header>
-<h1 id="systemika-studio-1.1.4-macos-installer-build-guide">Systemika
-Studio 1.1.4 — macOS Installer Build Guide</h1>
+<h1 id="systemika-studio-1.1.5-macos-installer-build-guide">Systemika
+Studio 1.1.5 — macOS Installer Build Guide</h1>
 <p>This guide is for a person who can use ordinary Mac applications but
 is <strong>not a programmer</strong>. You do not need to understand the
 Systemika source code. The source package contains an automated builder
 named <code>BUILD_MACOS_INSTALLER.command</code> that performs the
 technical build steps for you.</p>
 <p>These instructions correspond specifically to the <strong>Systemika
-Studio 1.1.4 release</strong>. The builder reads the
+Studio 1.1.5 release</strong>. The builder reads the
 version directly from <code>package.json</code>, so the generated
 installer filenames and macOS application metadata will also be
-<code>1.1.4</code>.</p>
+<code>1.1.5</code>.</p>
 <h2 id="what-this-procedure-creates">What this procedure creates</h2>
 <p>The builder creates:</p>
 <ul>
 <li><code>Systemika Studio.app</code> — the Mac application;</li>
-<li><code>Systemika-Studio-1.1.4-macOS-Universal.dmg</code> — the normal
+<li><code>Systemika-Studio-1.1.5-macOS-Universal.dmg</code> — the normal
 installer disk image to give to students;</li>
-<li><code>Systemika-Studio-1.1.4-macOS-Universal.zip</code> — a
+<li><code>Systemika-Studio-1.1.5-macOS-Universal.zip</code> — a
 compressed copy of the app, useful as a backup distribution format;</li>
 <li><code>SHA256SUMS.txt</code> — checksums that can be used to verify
 that the distributed files were not changed or corrupted.</li>
@@ -286,7 +286,7 @@ Mac</h2>
 <li>An internet connection while installing the build tools.</li>
 <li>The complete <strong>Systemika Studio 1.1 source package</strong>,
 extracted to a folder such as
-<code>Systemika-Studio-1.1.4-Source</code>.</li>
+<code>Systemika-Studio-1.1.5-Source</code>.</li>
 <li>Apple Command Line Tools.</li>
 <li>The Go programming language.</li>
 </ol>
@@ -297,7 +297,7 @@ Put the Systemika source folder somewhere simple</h3>
 <p>Download or copy the Systemika Studio source ZIP to the Mac.
 Double-click the ZIP to extract it.</p>
 <p>Move the extracted folder somewhere easy to find, for example:</p>
-<p><code>Downloads/Systemika-Studio-1.1.4-Source</code></p>
+<p><code>Downloads/Systemika-Studio-1.1.5-Source</code></p>
 <p>Do not try to run the builder while the source is still inside the
 ZIP file.</p>
 <h3 id="step-2-install-apple-command-line-tools">Step 2: Install Apple
@@ -373,8 +373,8 @@ source folder:</p>
 <p><code>release/macos/</code></p>
 <p>You should see:</p>
 <pre class="text"><code>Systemika Studio.app
-Systemika-Studio-1.1.4-macOS-Universal.dmg
-Systemika-Studio-1.1.4-macOS-Universal.zip
+Systemika-Studio-1.1.5-macOS-Universal.dmg
+Systemika-Studio-1.1.5-macOS-Universal.zip
 SHA256SUMS.txt</code></pre>
 <p>The <code>.dmg</code> file is the normal file to distribute to
 students and public Mac users. If the Terminal window reports
@@ -388,7 +388,7 @@ once.</p>
 Install from the DMG exactly as a student would</h3>
 <ol type="1">
 <li>Double-click
-<code>Systemika-Studio-1.1.4-macOS-Universal.dmg</code>.</li>
+<code>Systemika-Studio-1.1.5-macOS-Universal.dmg</code>.</li>
 <li>A Finder window opens showing <strong>Systemika Studio.app</strong>
 and an <strong>Applications</strong> shortcut.</li>
 <li>Drag <strong>Systemika Studio.app</strong> onto
@@ -498,7 +498,7 @@ manually.</p>
 <h2 id="part-7-what-to-send-to-students">Part 7 — What to send to
 students</h2>
 <p>For normal Mac installation, send students only:</p>
-<p><code>Systemika-Studio-1.1.4-macOS-Universal.dmg</code></p>
+<p><code>Systemika-Studio-1.1.5-macOS-Universal.dmg</code></p>
 <p>They do <strong>not</strong> need the source folder, Go, Xcode,
 Node.js, or npm.</p>
 <p>If the DMG is not Developer ID signed/notarized, also give students

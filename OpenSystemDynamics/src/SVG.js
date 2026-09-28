@@ -2,6 +2,8 @@ class SVG {
   /** @type {SVGElement} @Static  */
   static svgElement;
   /** @type {SVGGElement} @static  */
+  static annotationLayer;
+  /** @type {SVGGElement} @static  */
   static stockLayer;
   /** @type {SVGGElement} @static  */
   static variableLayer;
@@ -23,6 +25,7 @@ class SVG {
   static flowAnchorEditLayer;
   static init() {
     SVG.svgElement = document.getElementById("svgplane");
+    SVG.annotationLayer = SVG.svgElement.querySelector("g.layer.annotation");
     SVG.stockLayer = SVG.svgElement.querySelector("g.layer.stock");
     SVG.variableLayer = SVG.svgElement.querySelector("g.layer.variable");
 		SVG.constantLayer = SVG.svgElement.querySelector("g.layer.constant");

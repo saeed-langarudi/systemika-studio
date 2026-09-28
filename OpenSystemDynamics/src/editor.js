@@ -2695,6 +2695,47 @@ class FlowVisual extends BaseConnection {
 	}
 }
 
+
+// Decorative annotations must never take double-click priority over a model
+// entity occupying the same canvas position.  SVG/foreignObject hit testing can
+// vary between browsers (and selected annotations use enlarged/invisible hit
+// targets), so layer order alone is not a sufficient interaction guarantee.
+// When an annotation receives a double-click, explicitly check the model geometry
+// at that canvas position and route the action to the top-most model entity first.
+function modelEntityUnderAnnotationEvent(event) {
+	if (!event || typeof mousePosition !== "function" || typeof find_elements_under !== "function") return null;
+	let point = mousePosition(event);
+	let candidates = find_elements_under(point.x, point.y).filter(candidate => {
+		return candidate && ["stock", "variable", "constant", "converter", "flow"].includes(String(candidate.type || "").toLowerCase());
+	});
+	if (!candidates.length) return null;
+
+	// Match the model-layer paint order in index.html.  If two model entities
+	// overlap, the entity in the visually higher layer receives precedence.
+	const layerPriority = { stock: 1, variable: 2, constant: 3, converter: 4, flow: 5 };
+	candidates.sort((a, b) => (layerPriority[String(b.type || "").toLowerCase()] || 0) -
+		(layerPriority[String(a.type || "").toLowerCase()] || 0));
+	return candidates[0];
+}
+
+function routeAnnotationDoubleClick(event) {
+	let modelVisual = modelEntityUnderAnnotationEvent(event);
+	if (!modelVisual) return false;
+
+	// The two preceding mousedown events may have selected the annotation. Restore
+	// the interaction state a direct double-click on the model entity would leave.
+	if (typeof unselect_all === "function") unselect_all();
+	if (typeof modelVisual.select === "function") modelVisual.select();
+	if (typeof mouse !== "undefined") mouse.lastClickedPrimitive = modelVisual;
+	if (typeof refreshSelectionStacking === "function") refreshSelectionStacking();
+
+	if (event.preventDefault) event.preventDefault();
+	if (event.stopImmediatePropagation) event.stopImmediatePropagation();
+	if (event.stopPropagation) event.stopPropagation();
+	if (typeof modelVisual.doubleClick === "function") modelVisual.doubleClick(modelVisual.id);
+	return true;
+}
+
 class RectangleVisual extends TwoPointer {
 	constructor(id, type, pos0, pos1) {
 		super(id, type, pos0, pos1);
@@ -2702,6 +2743,24 @@ class RectangleVisual extends TwoPointer {
 		this.dialog.subscribePool.subscribe(() => {
 			this.updateGraphics();
 		});
+	}
+	setAnchorsInEditLayer(editing) {
+		// Rectangle graphics live in the background annotation layer. Raise selected
+		// corner handles into the existing top editing layer so resize handles remain
+		// easy to grab without ever raising the rectangle itself above model entities.
+		let layer = editing && SVG.flowAnchorEditLayer ? SVG.flowAnchorEditLayer : SVG.anchorLayer;
+		if (!layer) return;
+		for (let anchor of this.getAnchors()) {
+			if (anchor && anchor.group && anchor.group.parentNode !== layer) layer.appendChild(anchor.group);
+		}
+	}
+	select() {
+		super.select();
+		this.setAnchorsInEditLayer(true);
+	}
+	unselect() {
+		super.unselect();
+		this.setAnchorsInEditLayer(false);
 	}
 	makeGraphics() {
 		this.element = SVG.rect(this.getMinX(), this.getMinY(), this.getWidth(), this.getHeight(), defaultStroke, "none", "element");
@@ -2716,7 +2775,7 @@ class RectangleVisual extends TwoPointer {
 		this.clickCoordRect = new CoordRect();
 		this.clickCoordRect.element = this.clickRect;
 
-		this.group = SVG.append(SVG.plotLayer, SVG.group([this.element, this.clickRect]));
+		this.group = SVG.append(SVG.annotationLayer, SVG.group([this.element, this.clickRect]));
 		this.group.setAttribute("node_id", this.id);
 		this.element_array = [this.element];
 		for (let key in this.element_array) {
@@ -2724,10 +2783,11 @@ class RectangleVisual extends TwoPointer {
 		}
 
 		$(this.group).dblclick((event) => {
-			this.doubleClick();
+			this.doubleClick(event);
 		});
 	}
-	doubleClick() {
+	doubleClick(event = null) {
+		if (event && routeAnnotationDoubleClick(event)) return;
 		this.dialog.show();
 	}
 	updateGraphics() {
@@ -2772,14 +2832,15 @@ class EllipseVisual extends TwoPointer {
 		this.selectorCoordRect = new CoordRect();
 		this.selectorCoordRect.element = this.selector;
 		this.element_array = [this.element];
-		this.group = SVG.append(SVG.plotLayer, SVG.group([this.element, this.clickEllipse, this.selector]));
+		this.group = SVG.append(SVG.annotationLayer, SVG.group([this.element, this.clickEllipse, this.selector]));
 		this.group.setAttribute("node_id", this.id);
 
-		$(this.group).dblclick(() => {
-			this.doubleClick();
+		$(this.group).dblclick((event) => {
+			this.doubleClick(event);
 		});
 	}
-	doubleClick() {
+	doubleClick(event = null) {
+		if (event && routeAnnotationDoubleClick(event)) return;
 		this.dialog.show();
 	}
 	updateGraphics() {
@@ -5210,12 +5271,12 @@ class TextAreaVisual extends HtmlTwoPointer {
 		this.coordRect.update();
 	}
 	makeGraphics() {
-		this.element = SVG.append(SVG.plotLayer, SVG.rect(this.getMinX(), this.getMinY(), this.getWidth(), this.getHeight(), defaultStroke, "none", "element", ""));
+		this.element = SVG.append(SVG.annotationLayer, SVG.rect(this.getMinX(), this.getMinY(), this.getWidth(), this.getHeight(), defaultStroke, "none", "element", ""));
 
 		this.coordRect = new CoordRect();
 		this.coordRect.element = this.element;
 
-		this.htmlElement = SVG.append(SVG.plotLayer, SVG.foreign(this.getMinX(), this.getMinY(), this.getWidth(), this.getHeight(), "Text not renderd yet", "white"));
+		this.htmlElement = SVG.append(SVG.annotationLayer, SVG.foreign(this.getMinX(), this.getMinY(), this.getWidth(), this.getHeight(), "Text not renderd yet", "white"));
 
 		$(this.htmlElement.cutDiv).mousedown((event) => {
 			// This is an alternative to having the htmlElement in the group
@@ -5229,11 +5290,11 @@ class TextAreaVisual extends HtmlTwoPointer {
 			this.doubleClick();
 		});
 
-		$(this.htmlElement.cutDiv).dblclick(() => {
-			this.doubleClick();
+		$(this.htmlElement.cutDiv).dblclick((event) => {
+			this.doubleClick(event);
 		});
 
-		this.group = SVG.append(SVG.plotLayer, SVG.group([this.element]));
+		this.group = SVG.append(SVG.annotationLayer, SVG.group([this.element]));
 		this.group.setAttribute("node_id", this.id);
 
 		this.element_array = [this.element];
@@ -5242,7 +5303,8 @@ class TextAreaVisual extends HtmlTwoPointer {
 			this.element_array[key].setAttribute("node_id", this.id);
 		}
 	}
-	doubleClick() {
+	doubleClick(event = null) {
+		if (event && routeAnnotationDoubleClick(event)) return;
 		this.dialog.show();
 	}
 	render() {
@@ -5897,7 +5959,7 @@ class LineVisual extends TwoPointer {
 		this.arrowHeadStart.setTemplatePoints(arrowPathPoints);
 		this.arrowHeadEnd.setTemplatePoints(arrowPathPoints);
 
-		this.group = SVG.append(SVG.svgElement,
+		this.group = SVG.append(SVG.annotationLayer,
 			SVG.group([this.line, this.arrowHeadStart, this.arrowHeadEnd, this.clickLine])
 		);
 		this.group.setAttribute("node_id", this.id);
@@ -5906,10 +5968,11 @@ class LineVisual extends TwoPointer {
 			this.element_array[key].setAttribute("node_id", this.id);
 		}
 		$(this.group).dblclick((event) => {
-			this.doubleClick();
+			this.doubleClick(event);
 		});
 	}
-	doubleClick() {
+	doubleClick(event = null) {
+		if (event && routeAnnotationDoubleClick(event)) return;
 		this.dialog.show();
 	}
 	updateGraphics() {
@@ -7146,13 +7209,82 @@ class FlowTool extends TwoPointerTool {
 		// Is to prevent error if rightdown happens before leftdown
 		// can be either "x" or "y"
 		this.direction = "";
+		// Shift can insert an elbow while an endpoint is being dragged. Keep
+		// gesture state so one held Shift key creates one elbow rather than one
+		// elbow for every mousemove event. Releasing and pressing Shift again can
+		// deliberately add another elbow during the same drag.
+		this.shiftElbowAnchorId = null;
+		this.shiftElbowWasDown = false;
+	}
+	static resetShiftElbowGesture(anchor_id = null) {
+		this.shiftElbowAnchorId = anchor_id;
+		this.shiftElbowWasDown = false;
+	}
+	static maybeCreateShiftElbow(parent, mainAnchor, shiftKey) {
+		if (this.shiftElbowAnchorId !== mainAnchor.id) {
+			this.resetShiftElbowGesture(mainAnchor.id);
+		}
+		if (!shiftKey) {
+			this.shiftElbowWasDown = false;
+			return false;
+		}
+		if (this.shiftElbowWasDown) return false;
+
+		let anchorType = mainAnchor.getAnchorType();
+		if (anchorType !== "start" && anchorType !== "end") {
+			this.shiftElbowWasDown = true;
+			return false;
+		}
+
+		let neighbour = anchorType === "start"
+			? parent.getNextAnchor(mainAnchor.id)
+			: parent.getPreviousAnchor(mainAnchor.id);
+		let anchorPos = mainAnchor.getPos();
+		// During the first pixels of a newly-created Flow the endpoints overlap.
+		// Do not consume the Shift gesture until there is enough pipe to bend.
+		if (!neighbour || distance(anchorPos, neighbour.getPos()) < 10) return false;
+
+		let insertIndex = anchorType === "start" ? 0 : parent.middleAnchors.length;
+		parent.createMiddleAnchorPoint(anchorPos[0], anchorPos[1], insertIndex);
+		this.shiftElbowWasDown = true;
+		return true;
+	}
+	static getDraggedEndpoint() {
+		if (!mouse.isLeftDown) return null;
+
+		// While a new Flow is being created the moving endpoint belongs to the
+		// temporary current connection.  For a completed Flow, MouseTool keeps the
+		// endpoint anchor selected while it is being dragged.
+		if (this.current_connection && this.current_connection.end_anchor) {
+			return { parent: this.current_connection, anchor: this.current_connection.end_anchor };
+		}
+
+		let selected = get_only_selected_anchor_id();
+		if (!selected) return null;
+		let parent = connection_array[selected.parent_id];
+		let anchor = object_array[selected.child_id];
+		if (!parent || !anchor || parent.getType() !== "flow") return null;
+		let anchorType = anchor.getAnchorType();
+		if (anchorType !== "start" && anchorType !== "end") return null;
+		return { parent, anchor };
+	}
+	static handleShiftKeyDown() {
+		let dragged = this.getDraggedEndpoint();
+		if (!dragged) return false;
+		return this.maybeCreateShiftElbow(dragged.parent, dragged.anchor, true);
+	}
+	static handleShiftKeyUp() {
+		// A physical Shift release re-arms elbow creation even when the mouse did
+		// not move between key presses.  Therefore every new Shift press during a
+		// single endpoint drag can create one more elbow, with no elbow-count limit.
+		this.shiftElbowWasDown = false;
 	}
 	static leftMouseDown(x, y) {
 	  isDrawingFlow = true;
 	}
-	static mouseMove(x, y) {
+	static mouseMove(x, y, shiftKey) {
 		if (this.current_connection) {
-			this.mouseMoveSingleAnchor(x, y, false, this.current_connection.end_anchor.id);
+			this.mouseMoveSingleAnchor(x, y, shiftKey, this.current_connection.end_anchor.id);
 		} else {
 			// First time moving mouse
 			this.firstLeftMouseMove(x, y);
@@ -7178,6 +7310,11 @@ class FlowTool extends TwoPointerTool {
 			parent.setEndAttach(null);
 		}
 
+		// Preserve the long-standing Shift-to-elbow workflow during creation and
+		// extend it to completed Flows: while dragging either endpoint, a Shift
+		// press inserts a new middle anchor at the endpoint's previous position.
+		// requestNewAnchorPos then keeps the resulting pipe orthogonal.
+		this.maybeCreateShiftElbow(parent, mainAnchor, shiftKey);
 		parent.requestNewAnchorPos([x, y], anchor_id);
 		parent.update();
 		// update connecting links
@@ -7238,6 +7375,7 @@ class FlowTool extends TwoPointerTool {
 	}
 	static mouseUpSingleAnchor(x, y, shiftKey, node_id) {
 		attach_anchor(object_array[node_id]);
+		this.resetShiftElbowGesture();
 	}
 	static getType() {
 		return "flow";
@@ -8780,6 +8918,12 @@ $(window).load(function () {
 		if (jqDialog.blockingDialogOpen) {
 			return;
 		}
+		// Each physical Shift press while a Flow endpoint is being dragged adds at
+		// most one elbow.  Key-up below re-arms the gesture, so users can press
+		// Shift repeatedly during the same drag to add as many elbows as needed.
+		if (event.key === "Shift" && mouse.isLeftDown) {
+			if (FlowTool.handleShiftKeyDown()) event.preventDefault();
+		}
 		if (event.key == "Delete" || event.key === "Backspace") {
 		  if(get_selected_ids().length > 0)
 				DeleteTool.enterTool();
@@ -8949,8 +9093,11 @@ $(window).load(function () {
 				} else if (toolShortcuts[key]) ToolBox.setTool(toolShortcuts[key]);
 				else if (key === "z") ToolBox.setTool(lastTool);
 			}
-		} else if (event.key === "Shift") FlowTool.rightMouseDown(currentMousePos[0], currentMousePos[1]);
+		}
 		environment.keyDown(event);
+	});
+	$(document).keyup(function (event) {
+		if (event.key === "Shift") FlowTool.handleShiftKeyUp();
 	});
 
 	$(SVG.svgElement).mousedown(mouseDownHandler);
@@ -13934,6 +14081,7 @@ class ConverterDialog extends jqDialog {
 				${[[0, 0], [1, 1], [2, 4], [3, 9]].map(e => `<span class="cm-x">${e[0]}</span>,<span class="cm-y">${e[1]}</span>`).join("; ")}
 				</span>
 			</p>
+			<p>Lookup points may be kept on one line or placed on separate lines after each semicolon. Two spreadsheet columns can be pasted directly into this field.</p>
 			<b>Key bindings:</b>
 			<ul style="margin: 0.5em 0;">
 				<li>${keyHtml("Esc")} &rarr; Cancels changes</li>
@@ -14238,7 +14386,7 @@ class GettingStartedDialog extends CloseDialog {
 				<li><b>Run or explore.</b> <b>Run/Pause</b> performs a normal simulation. <b>Advance</b> steps through the model and allows permitted parameter changes between advances.</li>
 				<li><b>Save the model.</b> Use Save or Save As. The red <b>Unsaved Changes</b> indicator is also clickable.</li>
 			</ol>
-			<p><b>Editing Flow pipes:</b> select a Flow by its valve, then drag either endpoint away from a Stock to detach it. Right-click a selected pipe to add an elbow handle, then drag that handle to reshape the pipe. Right-click an elbow handle, or select it and press Delete/Backspace, to remove the elbow.</p>
+			<p><b>Editing Flow pipes:</b> select a Flow by its valve, then drag either endpoint away from a Stock to detach it. While dragging the arrow or cloud endpoint, press <b>Shift</b> to insert an elbow; press and release <b>Shift</b> again to add another elbow, with no fixed limit. This works both while creating a new Flow and when reshaping an existing Flow. Right-click a selected pipe to add an elbow handle, then drag that handle to reshape the pipe. Right-click an elbow handle, or select it and press Delete/Backspace, to remove the elbow.</p>
 			<p>Press <b>Enter</b> to apply changes. Equations can span multiple lines; press <b>Shift+Enter</b> to insert a line break.</p>
 		</div>`);
 	}

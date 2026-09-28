@@ -9,7 +9,7 @@
  * also publishes the metadata used by desktop update checks.
  */
 (function (root) {
-  const DEFAULT_DOWNLOAD_URL = 'https://systemika.no/download/';
+  const DEFAULT_DOWNLOAD_URL = 'https://systemika.no/studio/downloads/';
   const CANONICAL_WEBAPP_ROOT = 'https://systemika.no/studio/app/';
   const CANONICAL_UPDATE_MANIFEST_URLS = [
     `${CANONICAL_WEBAPP_ROOT}systemika-update.json`,

@@ -8,7 +8,7 @@ The builder checks for Node.js automatically. If Node.js is missing and Windows 
 
 The finished installer is written to:
 
-`build\output\dist-electron\Systemika-Studio-Setup-1.1.4-x64.exe`
+`build\output\dist-electron\Systemika-Studio-Setup-1.1.5-x64.exe`
 
 Node.js 22.12 or newer is required only on the computer that builds the installer. Students and other users who install Systemika Studio from the resulting `.exe` do not need Node.js or npm.
 

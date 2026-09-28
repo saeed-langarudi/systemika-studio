@@ -2,15 +2,15 @@
 
 This guide is for a person who can use ordinary Mac applications but is **not a programmer**. You do not need to understand the Systemika source code. The source package contains an automated builder named `BUILD_MACOS_INSTALLER.command` that performs the technical build steps for you.
 
-These instructions correspond to **Systemika Studio 1.1**. The builder reads the version directly from `package.json`, so the generated installer filenames and macOS application metadata will also be `1.1.4`.
+These instructions correspond to **Systemika Studio 1.1**. The builder reads the version directly from `package.json`, so the generated installer filenames and macOS application metadata will also be `1.1.5`.
 
 ## What this procedure creates
 
 The builder creates:
 
 - `Systemika Studio.app` — the Mac application;
-- `Systemika-Studio-1.1.4-macOS-Universal.dmg` — the normal installer disk image to give to students;
-- `Systemika-Studio-1.1.4-macOS-Universal.zip` — a compressed copy of the app, useful as a backup distribution format;
+- `Systemika-Studio-1.1.5-macOS-Universal.dmg` — the normal installer disk image to give to students;
+- `Systemika-Studio-1.1.5-macOS-Universal.zip` — a compressed copy of the app, useful as a backup distribution format;
 - `SHA256SUMS.txt` — checksums that can be used to verify that the distributed files were not changed or corrupted.
 
 The application is **Universal**: the same build supports both modern Apple Silicon Macs (M1/M2/M3/M4 and later) and older Intel Macs.
@@ -29,7 +29,7 @@ You need:
 
 1. A Mac running macOS 11 or newer.
 2. An internet connection while installing the build tools.
-3. The complete **Systemika Studio 1.1 source package**, extracted to a folder such as `Systemika-Studio-1.1.4-Source`.
+3. The complete **Systemika Studio 1.1 source package**, extracted to a folder such as `Systemika-Studio-1.1.5-Source`.
 4. Apple Command Line Tools.
 5. The Go programming language.
 
@@ -41,7 +41,7 @@ Download or copy the Systemika Studio source ZIP to the Mac. Double-click the ZI
 
 Move the extracted folder somewhere easy to find, for example:
 
-`Downloads/Systemika-Studio-1.1.4-Source`
+`Downloads/Systemika-Studio-1.1.5-Source`
 
 Do not try to run the builder while the source is still inside the ZIP file.
 
@@ -131,8 +131,8 @@ You should see:
 
 ```text
 Systemika Studio.app
-Systemika-Studio-1.1.4-macOS-Universal.dmg
-Systemika-Studio-1.1.4-macOS-Universal.zip
+Systemika-Studio-1.1.5-macOS-Universal.dmg
+Systemika-Studio-1.1.5-macOS-Universal.zip
 SHA256SUMS.txt
 ```
 
@@ -144,7 +144,7 @@ Do not distribute a newly built installer without testing it at least once.
 
 ### Step 7: Install from the DMG exactly as a student would
 
-1. Double-click `Systemika-Studio-1.1.4-macOS-Universal.dmg`.
+1. Double-click `Systemika-Studio-1.1.5-macOS-Universal.dmg`.
 2. A Finder window opens showing **Systemika Studio.app** and an **Applications** shortcut.
 3. Drag **Systemika Studio.app** onto **Applications**.
 4. Eject the Systemika Studio disk image.
@@ -270,7 +270,7 @@ The order does not matter.
 
 For normal Mac installation, send students only:
 
-`Systemika-Studio-1.1.4-macOS-Universal.dmg`
+`Systemika-Studio-1.1.5-macOS-Universal.dmg`
 
 They do **not** need the source folder, Go, Xcode, Node.js, or npm.
 

@@ -72,8 +72,8 @@ terms of the Affero General Public License (http://www.gnu.org/licenses/agpl-3.0
 	<script type="text/javascript" src="systemika-units.js"></script>
 	<script type="text/javascript" src="systemika-plot-pages.js"></script>
 	<script type="text/javascript" src="systemika-documentation.js"></script>
-	<script type="text/javascript" src="editor.js?v=1.1.4"></script>
-	<script type="text/javascript" src="systemika-calibration-sandbox.js?v=1.1.4"></script>
+	<script type="text/javascript" src="editor.js?v=1.1.5"></script>
+	<script type="text/javascript" src="systemika-calibration-sandbox.js?v=1.1.5"></script>
 	<!-- endbuild -->
 
 	<!-- build:css opensystemdynamics.css  -->
@@ -81,7 +81,7 @@ terms of the Affero General Public License (http://www.gnu.org/licenses/agpl-3.0
 	<link rel="stylesheet" href="./codemirror/theme/stochsdtheme.css" />
 	<link rel="stylesheet" href="./codemirror/theme/oneline.css" />
 	<link rel="stylesheet" href="./codemirror/theme/resize.css" />
-	<link rel="stylesheet" type="text/css" href="style/editor.css?v=1.1.4">
+	<link rel="stylesheet" type="text/css" href="style/editor.css?v=1.1.5">
 	<link rel="stylesheet" type="text/css" href="style/systemika-runs.css" />
 	<link class="include" rel="stylesheet" type="text/css" href="jquery/jqplot-1.0.8/jquery.jqplot.min.css" />
 	<link rel="stylesheet" href="jquery/jquery-ui-1.12.1/jquery-ui.css" />
@@ -384,9 +384,12 @@ terms of the Affero General Public License (http://www.gnu.org/licenses/agpl-3.0
 				style="position: absolute; left: 0px; top: 0px; display: none; z-index: 110; width: 100%; height: 100%; background-color: red; opacity: 0;">
 			</div>
 			<svg draggable="false" id="svgplane" width="6000" height="2000" style="background-color: white;">
-				<!-- Links and their draggable handles paint first. All model entities therefore
-				     remain visually and interactively above a nearby/crossing link. -->
+				<!-- Links and their draggable handles paint first. Decorative annotations
+				     (text boxes and geometry shapes) paint above links but below every model
+				     entity, so a Stock/Auxiliary/Flow/etc. remains the click target where
+				     annotations overlap the model. -->
 				<g class="layer link"></g>
+				<g class="layer annotation"></g>
 				<g class="layer anchor"></g>
 				<g class="layer stock"></g>
 				<g class="layer variable"></g>
