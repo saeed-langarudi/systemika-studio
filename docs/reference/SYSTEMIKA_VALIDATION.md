@@ -9,7 +9,7 @@ Systemika Studio 1.1 retains the permanent regression baseline established durin
 
 ## Current release result
 
-Systemika Studio 1.1.2 has **19 permanent validation models** and **393/393 passing automated regression tests**. The milestone notes below are retained as a development history of how that baseline grew.
+Systemika Studio 1.1.3 has **19 permanent validation models** and **397/397 passing automated regression tests**. The milestone notes below are retained as a development history of how that baseline grew.
 
 ## Permanent validation models
 
@@ -128,6 +128,10 @@ Enter now applies the Time Unit dialog and opens the equation/properties editor 
 ## Version 1.1 Calibration Sandbox regression additions
 
 The 1.1 suite adds regression coverage for Calibration Sandbox launch and layout, plot variable selection, live constant controls, reset behavior, responsive transient reruns, `.sysrun` sandbox persistence, universal Reference/Simulated styling, and underscore-number naming for copied entities. Current release baseline: **348/348 automated tests passing** with **19/19 permanent validation models**.
+
+## Version 1.1.3 corrective regression coverage
+
+The 1.1.3 suite adds focused regression coverage for detached-window plot rendering, the jqPlot hidden-legend failure that broke single-run Histograms, preservation of the reliable one-series Histogram rendering path, and translation of persisted Link Bezier handles and Flow bend points during copy/paste. Current release baseline: **397/397 automated tests passing** with **19/19 permanent validation models**.
 
 ## Version 1.1.2 corrective regression coverage
 

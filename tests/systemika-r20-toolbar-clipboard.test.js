@@ -90,8 +90,15 @@ test('clipboard duplicate naming and formula remapping produce coherent copied s
   vm.runInContext(source, context);
   const reserved = new Set();
   assert.equal(context.Clipboard.freeCopyName('Capital', reserved), 'Capital_2');
-  const mapped = context.Clipboard.replaceFormulaNames('[Capital] * [Rate] + 1', new Map([['Capital', 'Capital_2'], ['Rate', 'Rate_1']]));
-  assert.equal(mapped, '[Capital_2] * [Rate_1] + 1');
+  const map = new Map([['Capital', 'Capital_2'], ['Rate', 'Rate_1']]);
+  const mapped = context.Clipboard.replaceFormulaNames('Capital * Rate + 1', map);
+  assert.equal(mapped, 'Capital_2 * Rate_1 + 1');
+  const legacyMapped = context.Clipboard.replaceFormulaNames('[Capital] * [Rate] + 1', map);
+  assert.equal(legacyMapped, '[Capital_2] * [Rate_1] + 1');
+  assert.equal(
+    context.Clipboard.replaceFormulaNames('CapitalGrowth + Max(Capital, Rate)', new Map([['Capital', 'Capital_2'], ['Max', 'Max_1']])),
+    'CapitalGrowth + Max(Capital_2, Rate)'
+  );
 });
 
 

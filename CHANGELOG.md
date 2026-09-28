@@ -1,3 +1,11 @@
+## 2026-09-28 — Systemika Studio 1.1.3 — Detached plots, Histogram, and copied connector geometry
+- Fixed blank Time/Compare/XY/Histogram output after detaching the live Output panel into an external window by rendering jqPlot in its owning editor document and adopting the finished live plot DOM into the detached panel.
+- Restored single-run Histogram rendering by avoiding jqPlot 1.0.8's invalid hidden-legend + `outsideGrid` combination; visible comparison legends remain below the plot.
+- Copy/paste now translates persisted Link Bezier handles with the pasted structure, preserving the original link curvature.
+- Copy/paste also translates Flow middle/bend points, preserving copied stock-flow geometry.
+- Copy/paste now rewrites copied Stock, Flow, Auxiliary, and Constant equations so references to copied inputs use the copied entity names (for example `Input * Rate` becomes `Input_1 * Rate_1` when those inputs are copied together); external references remain unchanged.
+- Added focused 1.1.3 regression coverage; release baseline is 398/398 automated tests with 19 permanent validation models retained.
+
 - Update checking no longer guesses WebApp deployment paths. Browser builds refetch the editor page already running; desktop builds use `https://systemika.no/download/systemika-update.json` and can fall back to discovering a semantic version from the public download tree. User-facing failures are concise while probe diagnostics stay in the console.
 - Model loading repairs legacy/malformed entity names stored literally as `[Name]` while preserving ordinary annotations.
 - Links and link handles now paint below model entities so nearby links cannot block entity selection/property access.

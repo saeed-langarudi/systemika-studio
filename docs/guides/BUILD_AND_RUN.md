@@ -1,4 +1,4 @@
-# Running and building Systemika Studio 1.1.2
+# Running and building Systemika Studio 1.1.3
 
 Systemika Studio requires Node.js 22.12 or newer for the supported source/build workflows.
 
@@ -43,12 +43,12 @@ chmod +x BUILD_WEBAPP_LINUX.sh
 Both wrappers invoke `build/build.js` and write the upload-ready release to:
 
 ```text
-build/output/web/1.1.2/
+build/output/web/1.1.3/
 ```
 
 Upload the **contents** of that folder to the server directory serving Systemika Studio. Replace the previous WebApp as one complete set rather than selectively merging old and new files.
 
-The WebApp builder uses only Node.js built-in modules; `npm install` is not required for a WebApp build. It fingerprints all local application assets, writes `.htaccess`, generates `systemika-update.json`/`update.json` in the WebApp root, and writes `WEB_BUILD_INFO.txt`. Upload the complete contents of `build/output/web/1.1.2/` to `https://systemika.no/studio/app/`. The desktop updater reads the manifest from that exact deployed WebApp root and can fall back to the analyser/editor HTML there, so there is no separate update-metadata publishing step.
+The WebApp builder uses only Node.js built-in modules; `npm install` is not required for a WebApp build. It fingerprints all local application assets, writes `.htaccess`, generates `systemika-update.json`/`update.json` in the WebApp root, and writes `WEB_BUILD_INFO.txt`. Upload the complete contents of `build/output/web/1.1.3/` to `https://systemika.no/studio/app/`. The desktop updater reads the manifest from that exact deployed WebApp root and can fall back to the analyser/editor HTML there, so there is no separate update-metadata publishing step.
 
 ## Run verification
 
@@ -108,4 +108,4 @@ Generated artifacts go under `build/output/` and are intentionally excluded from
 
 ## Version ownership
 
-The public version is currently **1.1.2**. Corrective source changes do not automatically increment the version. Change the release number only when the release owner explicitly requests a new version, and keep `package.json`, `build/package.json`, `OpenSystemDynamics/src/version.js`, and the release update metadata synchronized when that happens.
+The public version is currently **1.1.3**. Corrective source changes do not automatically increment the version. Change the release number only when the release owner explicitly requests a new version, and keep `package.json`, `build/package.json`, `OpenSystemDynamics/src/version.js`, and the release update metadata synchronized when that happens.

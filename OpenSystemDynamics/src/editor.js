@@ -3614,10 +3614,11 @@ function stylePlotLegendLineSamples(chartDiv, plot, seriesSettings, maxSeries) {
 		let width = Number(item.settings.lineWidth || (item.series && item.series.lineWidth) || 2);
 		let dash = normalizeLegendDashPattern(item.settings.linePattern || (item.series && item.series.linePattern));
 		cell.innerHTML = "";
-		let svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+		let hostDocument = cell.ownerDocument || document;
+		let svg = hostDocument.createElementNS("http://www.w3.org/2000/svg", "svg");
 		svg.setAttribute("width", "28"); svg.setAttribute("height", "10");
 		svg.setAttribute("viewBox", "0 0 28 10"); svg.style.display = "block";
-		let line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+		let line = hostDocument.createElementNS("http://www.w3.org/2000/svg", "line");
 		line.setAttribute("x1", "1"); line.setAttribute("x2", "27"); line.setAttribute("y1", "5"); line.setAttribute("y2", "5");
 		line.setAttribute("stroke", color); line.setAttribute("stroke-width", String(Math.max(1, width)));
 		if (dash) line.setAttribute("stroke-dasharray", dash);
@@ -3626,12 +3627,58 @@ function stylePlotLegendLineSamples(chartDiv, plot, seriesSettings, maxSeries) {
 }
 
 function plotBottomLegendOptions(show = true) {
-	return {
+	let options = {
 		show: Boolean(show),
-		location: "s",
-		placement: "outsideGrid",
-		marginTop: "8px"
+		location: "s"
 	};
+	// jqPlot 1.0.8 throws while drawing a hidden legend when outsideGrid is
+	// requested because there is no legend element to detach. Only visible
+	// legends should reserve space outside the plotting grid.
+	if (options.show) {
+		return { ...options, placement: "outsideGrid", marginTop: "8px" };
+	}
+	return options;
+}
+
+let systemikaDetachedPlotStageCounter = 0;
+function renderSystemikaJqPlot(chartDiv, series, options) {
+	if (!chartDiv || !chartDiv.id) throw new Error("No Systemika plot target specified");
+	// jqPlot 1.0.8 resolves string target IDs against the JavaScript realm's
+	// global document. Once the live Output panel has been adopted into the
+	// detached window, that lookup still points at the main editor document and
+	// jqPlot aborts with "No plot target specified". Render into an off-screen
+	// target in the main document, then adopt the finished live canvases into the
+	// detached chart. Event handlers are attached to those same DOM nodes and
+	// therefore remain interactive after adoption.
+	if (!chartDiv.ownerDocument || chartDiv.ownerDocument === document) {
+		return $.jqplot(chartDiv.id, series, options);
+	}
+
+	let stage = document.createElement("div");
+	stage.id = `${chartDiv.id}_systemika_stage_${++systemikaDetachedPlotStageCounter}`;
+	stage.style.position = "absolute";
+	stage.style.left = "-100000px";
+	stage.style.top = "0";
+	stage.style.visibility = "hidden";
+	stage.style.width = chartDiv.style.width || `${Math.max(1, chartDiv.clientWidth || 1)}px`;
+	stage.style.height = chartDiv.style.height || `${Math.max(1, chartDiv.clientHeight || 1)}px`;
+	document.body.appendChild(stage);
+
+	try {
+		let plot = $.jqplot(stage.id, series, options);
+		chartDiv.replaceChildren();
+		while (stage.firstChild) chartDiv.appendChild(stage.firstChild);
+		chartDiv.classList.add("jqplot-target");
+		chartDiv.style.position = "relative";
+		if (plot) {
+			plot.target = $(chartDiv);
+			plot.targetId = `#${chartDiv.id}`;
+			plot.target.data("jqplot", plot);
+		}
+		return plot;
+	} finally {
+		stage.remove();
+	}
 }
 
 function spacePlotLegendFromGrid(chartDiv, gapPixels = 8) {
@@ -3838,7 +3885,7 @@ function renderXyCurveNumbers(visual) {
 		let series = visual.plot.series[i];
 		let points = graphCurveNumberPlacements(series);
 		for (let point of points) {
-			let label = document.createElement("div");
+			let label = (visual.chartDiv.ownerDocument || document).createElement("div");
 			label.className = "systemika-xy-curve-number";
 			label.textContent = String(i + 1);
 			label.style.position = "absolute";
@@ -4552,7 +4599,7 @@ class TimePlotVisual extends PlotVisual {
 		let tickList = this.getTicks(min, max);
 
 		$.jqplot.config.enablePlugins = true;
-		this.plot = $.jqplot(this.chartId, this.serieArray, {
+		this.plot = renderSystemikaJqPlot(this.chartDiv, this.serieArray, {
 			title: this.primitive.getAttribute("TitleLabel"),
 			series: this.serieSettingsArray,
 			grid: {
@@ -4982,7 +5029,7 @@ class ComparePlotVisual extends PlotVisual {
 		let max = Number(axisLimits.timeaxis.auto ? (bounds ? bounds.max : fallbackEnd) : axisLimits.timeaxis.max);
 		let tickList = this.getTicks(min, max);
 
-		this.plot = $.jqplot(this.chartId, this.serieArray, {
+		this.plot = renderSystemikaJqPlot(this.chartDiv, this.serieArray, {
 			title: this.primitive.getAttribute("TitleLabel"),
 			series: this.serieSettingsArray,
 			grid: { background: "transparent", shadow: false },
@@ -5380,7 +5427,7 @@ class HistoPlotVisual extends PlotVisual {
 		let multipleRuns = this.serieArray.length > 1;
 
 		$.jqplot.config.enablePlugins = true;
-		this.plot = $.jqplot(this.chartId, this.serieArray, {
+		this.plot = renderSystemikaJqPlot(this.chartDiv, this.serieArray, {
 			series: this.serieSettingsArray,
 			title: `Histogram of ${targetPrimName}`,
 			sortData: false,
@@ -5453,19 +5500,22 @@ class HistoPlotVisual extends PlotVisual {
 		let outsideLimitInfoID = [`${getID(this.primitive)}_histoBelow`, `${getID(this.primitive)}_histoAbove`];
 		$(this.chartDiv).append(`<div id="${outsideLimitInfoID[0]}">${multipleRuns ? "Below bound<br/>" + belowLines.join("<br/>") : `${histogram.below_data.length} values &lt; ${Number(this.primitive.getAttribute("LowerBound")).toFixed(2)}`}</div>`);
 		$(this.chartDiv).append(`<div id="${outsideLimitInfoID[1]}">${multipleRuns ? "Above bound<br/>" + aboveLines.join("<br/>") : `${histogram.above_data.length} values &geq; ${Number(this.primitive.getAttribute("UpperBound")).toFixed(2)}`}</div>`);
-		$(`#${outsideLimitInfoID[0]}`).css("left", "8px");
-		$(`#${outsideLimitInfoID[1]}`).css("right", "8px");
+		let belowInfo = this.chartDiv.querySelector(`#${outsideLimitInfoID[0]}`);
+		let aboveInfo = this.chartDiv.querySelector(`#${outsideLimitInfoID[1]}`);
+		if (belowInfo) $(belowInfo).css("left", "8px");
+		if (aboveInfo) $(aboveInfo).css("right", "8px");
 		let legendNode = multipleRuns ? this.chartDiv.querySelector("table.jqplot-table-legend") : null;
 		let legendClearance = legendNode
 			? Math.max(0, Math.ceil(legendNode.getBoundingClientRect().height) + 8)
 			: 0;
-		for (let i in outsideLimitInfoID) {
-			$(`#${outsideLimitInfoID[i]}`).css("z-index", "9999");
-			$(`#${outsideLimitInfoID[i]}`).css("position", "absolute");
-			$(`#${outsideLimitInfoID[i]}`).css("padding", "4px 8px");
-			$(`#${outsideLimitInfoID[i]}`).css("bottom", `${legendClearance}px`);
-			$(`#${outsideLimitInfoID[i]}`).css("background", "rgba(240,240,240,0.88)");
-			$(`#${outsideLimitInfoID[i]}`).css("font-size", multipleRuns ? "11px" : "inherit");
+		for (let infoNode of [belowInfo, aboveInfo]) {
+			if (!infoNode) continue;
+			$(infoNode).css("z-index", "9999");
+			$(infoNode).css("position", "absolute");
+			$(infoNode).css("padding", "4px 8px");
+			$(infoNode).css("bottom", `${legendClearance}px`);
+			$(infoNode).css("background", "rgba(240,240,240,0.88)");
+			$(infoNode).css("font-size", multipleRuns ? "11px" : "inherit");
 		}
 	}
 	setEmptyPlot() {
@@ -5699,7 +5749,7 @@ class XyPlotVisual extends PlotVisual {
 		if (!this.singleRunMode || showNumbers) {
 			plotOptions.legend = plotBottomLegendOptions(this.mainRunSeriesCount > 1 || showNumbers);
 		}
-		this.plot = $.jqplot(this.chartId, this.serieArray, plotOptions);
+		this.plot = renderSystemikaJqPlot(this.chartDiv, this.serieArray, plotOptions);
 		stylePlotLegendLineSamples(this.chartDiv, this.plot, this.serieSettingsArray, this.mainRunSeriesCount);
 		spacePlotLegendFromGrid(this.chartDiv);
 		renderXyCurveNumbers(this);
@@ -8163,6 +8213,47 @@ class ToolBox {
 }
 ToolBox.init();
 
+function translateCopiedConnectorGeometry(primitive, delta) {
+	if (!primitive || !primitive.value || !Array.isArray(delta)) return;
+	let dx = Number(delta[0]);
+	let dy = Number(delta[1]);
+	if (!Number.isFinite(dx) || !Number.isFinite(dy) || (dx === 0 && dy === 0)) return;
+	let type = String(getType(primitive) || "").toLowerCase();
+
+	if (type === "link") {
+		// Link Bezier handles are persisted as absolute canvas coordinates. The
+		// connector endpoints move with setCenterPosition(), but these attributes
+		// otherwise stay at the source location, which changes the copied curve's
+		// shape and can make the handles appear randomly placed.
+		for (let [xAttr, yAttr] of [["b1x", "b1y"], ["b2x", "b2y"]]) {
+			let rawX = primitive.getAttribute(xAttr);
+			let rawY = primitive.getAttribute(yAttr);
+			if (rawX == null || rawY == null || String(rawX).trim() === "" || String(rawY).trim() === "") continue;
+			let x = Number(rawX);
+			let y = Number(rawY);
+			if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+			primitive.value.setAttribute(xAttr, x + dx);
+			primitive.value.setAttribute(yAttr, y + dy);
+		}
+	}
+
+	if (type === "flow") {
+		// Flow bend points use the same absolute-coordinate convention. Preserve
+		// their geometry as part of the copied structure as well.
+		let middlePoints = String(primitive.getAttribute("MiddlePoints") || "").trim();
+		if (middlePoints) {
+			let shifted = middlePoints.split(/\s+/).map(token => {
+				let parts = token.split(",");
+				if (parts.length !== 2) return token;
+				let x = Number(parts[0]);
+				let y = Number(parts[1]);
+				return Number.isFinite(x) && Number.isFinite(y) ? `${x + dx},${y + dy}` : token;
+			});
+			primitive.value.setAttribute("MiddlePoints", shifted.join(" "));
+		}
+	}
+}
+
 class Clipboard {
 	static init() {
 		this.items = [];
@@ -8265,18 +8356,59 @@ class Clipboard {
 		return candidate;
 	}
 	static replaceFormulaNames(value, nameMap) {
-		if (typeof value !== "string" || !value.includes("[")) return value;
-		let result = value;
+		if (typeof value !== "string" || !nameMap || nameMap.size === 0) return value;
+
+		// Systemika's canonical equation syntax uses bare identifier references
+		// (for example Population * BirthRate). Older .ssd models can still
+		// contain [Population] references, so support both forms. Build one
+		// case-insensitive lookup and replace identifier tokens in a single pass
+		// to avoid chained substitutions when several copied names overlap.
+		let replacements = new Map();
 		for (let [oldName, newName] of nameMap.entries()) {
-			if (!oldName || oldName === newName) continue;
-			let escaped = oldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-			let pattern = new RegExp(`\\[\\s*${escaped}\\s*\\]`, "gi");
-			result = result.replace(pattern, `[${newName}]`);
+			let oldKey = String(oldName || "").trim();
+			let newValue = String(newName || "").trim();
+			if (!oldKey || !newValue || oldKey.toLowerCase() === newValue.toLowerCase()) continue;
+			replacements.set(oldKey.toLowerCase(), newValue);
 		}
-		return result;
+		if (!replacements.size) return value;
+
+		let remapCode = code => code.replace(/\[\s*([A-Za-z_][A-Za-z0-9_]*)\s*\]|[A-Za-z_][A-Za-z0-9_]*/g,
+			(match, bracketName, offset, source) => {
+				let tokenName = bracketName == null ? match : bracketName;
+				let replacement = replacements.get(String(tokenName).toLowerCase());
+				if (!replacement) return match;
+
+				if (bracketName != null) return `[${replacement}]`;
+
+				// An identifier followed by '(' is a function name in Systemika's
+				// expression grammar, not a model-entity reference. Do not rename
+				// function calls even if an entity happens to share that spelling.
+				let next = offset + match.length;
+				while (next < source.length && /\s/.test(source[next])) next++;
+				if (source[next] === "(") return match;
+
+				return replacement;
+			});
+
+		// Keep equation comments exactly as written. remapFormulaAttributes() uses
+		// getValue() for model equations, so stored "\\n" sequences have already
+		// been decoded to real logical lines before this pass.
+		return value.split("\n").map(line => {
+			let hash = line.indexOf("#");
+			if (hash === -1) return remapCode(line);
+			return remapCode(line.slice(0, hash)) + line.slice(hash);
+		}).join("\n");
 	}
 	static remapFormulaAttributes(primitive, nameMap) {
-		const formulaAttributes = ["InitialValue", "FlowRate", "Equation", "Value", "Function", "Action", "Size"];
+		let type = String(getType(primitive) || "");
+		if (["Stock", "Flow", "Variable"].includes(type)) {
+			let value = getValue(primitive);
+			let remapped = this.replaceFormulaNames(String(value), nameMap);
+			if (remapped !== value) setValue(primitive, remapped);
+			return;
+		}
+
+		const formulaAttributes = ["Value", "Function", "Action", "Size"];
 		for (let attribute of formulaAttributes) {
 			let value = primitive.getAttribute(attribute);
 			if (value == null || value === "") continue;
@@ -8376,6 +8508,7 @@ class Clipboard {
 			if (entry.skip) continue;
 			let pos = entry.item.position;
 			setCenterPosition(entry.clone, [pos[0] + delta[0], pos[1] + delta[1]]);
+			translateCopiedConnectorGeometry(entry.clone, delta);
 		}
 
 		clearPrimitiveCache();

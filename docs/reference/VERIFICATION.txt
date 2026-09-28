@@ -1,9 +1,14 @@
-Systemika Studio 1.1.2 - Release verification
-Date: 2026-09-26
+Systemika Studio 1.1.3 - Release verification
+Date: 2026-09-28
 
 Automated regression verification:
-- 393/393 tests passing with: npm test
+- 397/397 tests passing with: npm test
 - 19 permanent validation models under validation-models/
+
+Verified 1.1.3 corrective fixes:
+- Detached Time/Compare/XY/Histogram plots use the document-safe jqPlot renderer and no longer go blank after detaching the live Output panel.
+- Single-run Histogram avoids jqPlot hidden outside-grid legends and retains the reliable light-gray one-series rendering path.
+- Copy/paste translates Link Bezier handles and Flow middle points with the pasted structure, preserving connector geometry.
 
 Verified output workspace:
 - Systemika opens with the Output workspace closed so the modeling canvas uses the full window; the startup Set Time Unit prompt is centered against that full modeling canvas. Output toolbar commands/shortcuts reopen the requested view in the right pane.
@@ -59,7 +64,7 @@ Desktop packaging:
 
 WebApp packaging:
 - build/build.js rebuilds the WebApp from current source rather than using a stale prebuilt editor bundle.
-- Generated launcher/editor JS, CSS, SVG, PNG, favicon, and other local asset references carry ?v=1.1.2 plus a content-derived &b=<build-id> cache key.
+- Generated launcher/editor JS, CSS, SVG, PNG, favicon, and other local asset references carry ?v=1.1.3 plus a content-derived &b=<build-id> cache key.
 - The WebApp build emits non-cached `update.json` metadata used by startup/manual update checks.
 - The upload-ready WebApp includes .htaccess no-store rules for application assets and WEB_BUILD_INFO.txt with the generated build ID.
 
