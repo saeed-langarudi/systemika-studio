@@ -7,7 +7,7 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
 const root = path.resolve(__dirname, '..');
-const version = '1.1.5';
+const version = '1.1.6';
 
 test('web release is rebuilt from current UI source with versioned assets and cache controls', () => {
   const result = spawnSync(process.execPath, ['build/build.js'], {
@@ -20,7 +20,7 @@ test('web release is rebuilt from current UI source with versioned assets and ca
   const read = (rel) => fs.readFileSync(path.join(web, rel), 'utf8');
 
   assert.ok(fs.existsSync(path.join(web, '.htaccess')));
-  assert.match(read('WEB_BUILD_INFO.txt'), /Systemika Studio WebApp 1\.1\.5/);
+  assert.match(read('WEB_BUILD_INFO.txt'), /Systemika Studio WebApp 1\.1\.6/);
   assert.ok(fs.existsSync(path.join(web, 'systemika-update.json')));
   const webManifest = JSON.parse(read('systemika-update.json'));
   assert.equal(webManifest.version, version);
@@ -32,24 +32,24 @@ test('web release is rebuilt from current UI source with versioned assets and ca
   assert.equal(desktopBuildInfo.version, version);
   assert.equal(desktopBuildInfo.buildId, webManifest.buildId);
   const launcherIndex = read('index.html');
-  assert.match(launcherIndex, /MultiSimulationAnalyser\/index\.html\?v=1\.1\.5&b=[a-f0-9]{12}/);
-  assert.match(launcherIndex, /<meta name="systemika-version" content="1\.1\.5">/);
+  assert.match(launcherIndex, /MultiSimulationAnalyser\/index\.html\?v=1\.1\.6&b=[a-f0-9]{12}/);
+  assert.match(launcherIndex, /<meta name="systemika-version" content="1\.1\.6">/);
   assert.match(launcherIndex, /<meta name="systemika-build" content="[a-f0-9]{12}">/);
 
   const msaIndex = read('MultiSimulationAnalyser/index.html');
-  assert.match(msaIndex, /multisimulationanalyser\.min\.css\?v=1\.1\.5&b=[a-f0-9]{12}/);
-  assert.match(msaIndex, /multisimulationanalyser\.min\.js\?v=1\.1\.5&b=[a-f0-9]{12}/);
+  assert.match(msaIndex, /multisimulationanalyser\.min\.css\?v=1\.1\.6&b=[a-f0-9]{12}/);
+  assert.match(msaIndex, /multisimulationanalyser\.min\.js\?v=1\.1\.6&b=[a-f0-9]{12}/);
   assert.match(
     read('MultiSimulationAnalyser/multisimulationanalyser.min.js'),
-    /OpenSystemDynamics\/src\/index\.html\?v=1\.1\.5&b=[a-f0-9]{12}/
+    /OpenSystemDynamics\/src\/index\.html\?v=1\.1\.6&b=[a-f0-9]{12}/
   );
 
   const editorIndex = read('OpenSystemDynamics/src/index.html');
-  assert.match(editorIndex, /opensystemdynamics\.min\.js\?v=1\.1\.5&b=[a-f0-9]{12}/);
-  assert.match(editorIndex, /opensystemdynamics\.css\?v=1\.1\.5&b=[a-f0-9]{12}/);
-  assert.match(editorIndex, /graphics\/link\.svg\?v=1\.1\.5&b=[a-f0-9]{12}/);
-  assert.match(editorIndex, /graphics\/find\.svg\?v=1\.1\.5&b=[a-f0-9]{12}/);
-  assert.match(editorIndex, /<meta name="systemika-version" content="1\.1\.5">/);
+  assert.match(editorIndex, /opensystemdynamics\.min\.js\?v=1\.1\.6&b=[a-f0-9]{12}/);
+  assert.match(editorIndex, /opensystemdynamics\.css\?v=1\.1\.6&b=[a-f0-9]{12}/);
+  assert.match(editorIndex, /graphics\/link\.svg\?v=1\.1\.6&b=[a-f0-9]{12}/);
+  assert.match(editorIndex, /graphics\/find\.svg\?v=1\.1\.6&b=[a-f0-9]{12}/);
+  assert.match(editorIndex, /<meta name="systemika-version" content="1\.1\.6">/);
   assert.match(editorIndex, /<meta name="systemika-build" content="[a-f0-9]{12}">/);
 
   // The generated WebApp must include the current Output-panel implementation,

@@ -1,3 +1,10 @@
+## 2026-09-29 — Systemika Studio 1.1.6 — Calibration alert visibility
+- Fixed alerts and simulation errors being hidden behind the separate Calibration Sandbox window. XAlertDialog now routes to a dedicated modal alert overlay in the sandbox whenever it is open.
+- The sandbox alert overlay uses top-level stacking, focuses the sandbox window, supports OK/Enter/Escape dismissal, preserves existing close callbacks, and queues multiple alerts.
+- Normal editor dialogs remain unchanged when the Calibration Sandbox is closed.
+- Added regression coverage for topmost sandbox alerts and the XAlertDialog routing path.
+- Release verification baseline: 414/414 automated tests passing; 19/19 permanent numerical validation models retained.
+
 ## 2026-09-28 — Systemika Studio 1.1.5 — Update download URL correction
 - Corrected the update destination from `https://systemika.no/download/` to the public Systemika Studio downloads directory at `https://systemika.no/studio/downloads/` in the browser update checker, Electron desktop update flow, release manifests, and build generator.
 - Added regression checks so the obsolete download URL cannot silently return in the update runtime.

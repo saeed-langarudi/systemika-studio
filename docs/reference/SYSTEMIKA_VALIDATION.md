@@ -9,7 +9,7 @@ Systemika Studio 1.1 retains the permanent regression baseline established durin
 
 ## Current release result
 
-Systemika Studio 1.1.5 has **19 permanent validation models** and **410/410 passing automated regression tests**. The milestone notes below are retained as a development history of how that baseline grew.
+Systemika Studio 1.1.6 has **19 permanent validation models** and **414/414 passing automated regression tests**. The milestone notes below are retained as a development history of how that baseline grew.
 
 ## Permanent validation models
 
@@ -154,3 +154,8 @@ The 1.1.2 suite adds focused coverage for startup/manual update checking and gen
 ### 1.1.2 update-check resilience
 
 The 1.1.2 maintenance suite verifies that WebApp update checks refetch the editor page that is actually running instead of guessing a server directory, and that desktop builds use the confirmed canonical WebApp root `https://systemika.no/studio/app/`. The desktop checker starts with the generated root manifest and can fall back to the exact deployed analyser/editor HTML. Detailed failed probes are retained only in diagnostics; the visible alert remains concise. Generated WebApp HTML and packaged desktop staging share the same content-derived build ID so a corrected 1.1.2 build can be distinguished without changing the semantic version.
+
+
+## Version 1.1.6 calibration alert visibility regression coverage
+
+The 1.1.6 suite verifies that Systemika alert dialogs are routed into a dedicated modal overlay inside the Calibration Sandbox whenever that separate window is open. The overlay uses the highest practical CSS stacking level, focuses the sandbox window, supports OK/Enter/Escape dismissal, preserves alert close callbacks, and queues multiple alerts instead of replacing them. This ensures simulation errors such as Division by zero remain visible above the calibration interface rather than being hidden between the editor and sandbox windows. Current release baseline: **414/414 automated tests passing** with **19/19 permanent validation models**.

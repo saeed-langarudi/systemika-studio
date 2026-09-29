@@ -57,6 +57,30 @@ test('Calibration Sandbox uses universal teal and purple legend and plot colors'
   assert.match(js, /#009E73/);
 });
 
+
+test('Calibration Sandbox renders queued alerts above all sandbox controls and focuses the popup', () => {
+  assert.match(js, /id="systemika-alert-host"/);
+  assert.match(js, /systemika-alert-overlay\{[^}]*z-index:2147483647/);
+  assert.match(js, /function showTopAlert\(message, closeHandler = null, title = 'Alert'\)/);
+  assert.match(js, /state\.alertQueue\.push\(/);
+  assert.match(js, /showNextTopAlert\(\)/);
+  assert.match(js, /state\.win\.focus\(\); button\.focus\(\)/);
+  assert.match(js, /event\.key === 'Escape' \|\| event\.key === 'Enter'/);
+});
+
+test('Systemika alert dialogs route into the Calibration Sandbox while it is open', () => {
+  const editor = fs.readFileSync(path.join(root, 'OpenSystemDynamics/src/editor.js'), 'utf8');
+  const start = editor.indexOf('class XAlertDialog extends jqDialog');
+  const end = editor.indexOf('class GhostSourceDialog', start);
+  const alertDialog = editor.slice(start, end);
+  assert.match(alertDialog, /SystemikaCalibrationSandbox\.showTopAlert/);
+  assert.match(alertDialog, /this\.getHtml\(\)/);
+  assert.match(alertDialog, /this\.getTitle\(\)/);
+  assert.match(alertDialog, /this\.visible = false; this\.afterClose\(\)/);
+  assert.match(alertDialog, /super\.show\(\)/);
+  assert.match(editor, /Simulation error:<br\/><br\/>\$\{htmlEscape\(res\.error\)\}/);
+});
+
 test('copied model entities use underscore suffixes', () => {
   const editor = fs.readFileSync(path.join(root, 'OpenSystemDynamics/src/editor.js'), 'utf8');
   assert.match(editor, /candidate = `\$\{base\}_\$\{counter\}`/);

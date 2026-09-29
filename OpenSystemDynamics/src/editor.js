@@ -10959,6 +10959,20 @@ class XAlertDialog extends jqDialog {
 		this.setHtml(message);
 		this.closeHandler = closeHandler;
 	}
+	show() {
+		// The Calibration Sandbox is a separate browser/Electron window. A normal
+		// jQuery UI alert belongs to the editor document and can therefore be hidden
+		// behind that window. When the sandbox is open, render the alert as a modal
+		// overlay in the sandbox itself and focus that window so simulation errors
+		// and warnings are always visible to the user.
+		if (window.SystemikaCalibrationSandbox &&
+			typeof window.SystemikaCalibrationSandbox.showTopAlert === "function" &&
+			window.SystemikaCalibrationSandbox.showTopAlert(this.getHtml(), () => { this.visible = false; this.afterClose(); }, this.getTitle())) {
+			this.visible = true;
+			return;
+		}
+		super.show();
+	}
 	afterClose() {
 		if (this.closeHandler) {
 			this.closeHandler();

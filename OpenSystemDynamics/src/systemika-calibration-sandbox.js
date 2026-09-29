@@ -6,7 +6,8 @@
   const state = {
     win: null, decision: null, running: false, rerunPending: false,
     defaults: new Map(), ranges: new Map(), plots: Array.from({length: 6}, () => ({reference: null, simulated: null})),
-    timer: null, persistTimer: null, feedbackTimer: null, runToken: 0, initialRunStarted: false, panelWidth: 408
+    timer: null, persistTimer: null, feedbackTimer: null, runToken: 0, initialRunStarted: false, panelWidth: 408,
+    alertQueue: [], activeAlert: null
   };
 
   const esc = value => String(value == null ? '' : value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -38,8 +39,39 @@
       table{border-collapse:collapse;width:100%;font-size:12px}th,td{border:1px solid #aaa;padding:5px;text-align:center}th{font-size:10px;background:#fafafa}td.name{text-align:left;font-weight:600;max-width:85px;overflow:hidden;text-overflow:ellipsis}
       input[type=number]{width:58px;padding:4px}input[type=range]{width:105px}.slider-cell{min-width:115px}.current{font-variant-numeric:tabular-nums;font-size:11px;display:block;margin-top:2px}.reset{font-size:10px;padding:4px}
       .empty{color:#666;font-size:12px;text-align:center;padding:15px}.picker{position:fixed;inset:0;background:rgba(0,0,0,.22);display:flex;align-items:center;justify-content:center;z-index:10}.picker-card{background:#fff;border:1px solid #777;box-shadow:0 8px 28px #0003;width:360px;max-height:70vh;padding:14px;display:flex;flex-direction:column;gap:9px}.picker-card input{padding:7px}.picker-list{overflow:auto;border:1px solid #ccc}.picker-list button{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid #eee;background:#fff;padding:7px}.picker-list button:hover{background:#eee}.picker-actions{text-align:right}
+      .systemika-alert-overlay{position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.28);display:flex;align-items:center;justify-content:center;padding:24px}.systemika-alert-card{width:min(520px,calc(100vw - 48px));max-height:calc(100vh - 48px);overflow:auto;background:#fff;border:1px solid #777;box-shadow:0 12px 42px rgba(0,0,0,.42);font-size:13px}.systemika-alert-title{font-weight:600;padding:10px 12px;border-bottom:1px solid #ccc;background:#f4f4f4}.systemika-alert-message{padding:18px 16px;line-height:1.4}.systemika-alert-actions{padding:9px 12px;border-top:1px solid #ddd;text-align:right}.systemika-alert-actions button{min-width:72px;padding:6px 14px}
       @media(max-width:1000px){.plots{grid-template-columns:repeat(2,minmax(200px,1fr))}}
-    </style></head><body><div class="shell"><main class="main"><h1>Calibration Sandbox</h1><div class="universal-legend"><span class="legend-item"><span class="legend-line legend-reference"></span>Reference</span><span class="legend-item"><span class="legend-line legend-simulated"></span>Simulated</span></div><div id="plots" class="plots"></div></main><div id="panel-splitter" class="splitter" title="Drag to resize parameter panel"></div><aside><h2>Parameter Sliders</h2><div class="top-actions"><button id="reset-all">Reset All</button><button id="save-default" disabled>Save as Default</button></div><div id="save-default-status" class="save-status" role="status" aria-live="polite"></div><button id="add-constant" class="add">Select Constant</button><div id="parameters"></div></aside></div><div id="picker-host"></div></body></html>`;
+    </style></head><body><div class="shell"><main class="main"><h1>Calibration Sandbox</h1><div class="universal-legend"><span class="legend-item"><span class="legend-line legend-reference"></span>Reference</span><span class="legend-item"><span class="legend-line legend-simulated"></span>Simulated</span></div><div id="plots" class="plots"></div></main><div id="panel-splitter" class="splitter" title="Drag to resize parameter panel"></div><aside><h2>Parameter Sliders</h2><div class="top-actions"><button id="reset-all">Reset All</button><button id="save-default" disabled>Save as Default</button></div><div id="save-default-status" class="save-status" role="status" aria-live="polite"></div><button id="add-constant" class="add">Select Constant</button><div id="parameters"></div></aside></div><div id="picker-host"></div><div id="systemika-alert-host"></div></body></html>`;
+  }
+
+  function showNextTopAlert() {
+    if (!state.win || state.win.closed || state.activeAlert || !state.alertQueue.length) return;
+    const alert = state.alertQueue.shift();
+    state.activeAlert = alert;
+    const d = state.win.document, host = d.getElementById('systemika-alert-host');
+    if (!host) { state.activeAlert = null; return; }
+    host.innerHTML = `<div class="systemika-alert-overlay" role="alertdialog" aria-modal="true" aria-labelledby="systemika-alert-title"><div class="systemika-alert-card"><div id="systemika-alert-title" class="systemika-alert-title">${esc(alert.title || 'Alert')}</div><div class="systemika-alert-message">${alert.message}</div><div class="systemika-alert-actions"><button type="button">OK</button></div></div></div>`;
+    const overlay = host.querySelector('.systemika-alert-overlay'), button = host.querySelector('button');
+    const close = () => {
+      if (!state.activeAlert) return;
+      const finished = state.activeAlert;
+      state.activeAlert = null;
+      host.innerHTML = '';
+      if (typeof finished.closeHandler === 'function') {
+        try { finished.closeHandler(); } catch (error) { console.error(error); }
+      }
+      showNextTopAlert();
+    };
+    button.onclick = close;
+    overlay.addEventListener('keydown', event => { if (event.key === 'Escape' || event.key === 'Enter') { event.preventDefault(); close(); } });
+    try { state.win.focus(); button.focus(); } catch (_error) {}
+  }
+
+  function showTopAlert(message, closeHandler = null, title = 'Alert') {
+    if (!state.win || state.win.closed) return false;
+    state.alertQueue.push({ message: String(message == null ? '' : message), closeHandler, title: String(title || 'Alert') });
+    showNextTopAlert();
+    return true;
   }
 
   function openWindow() {
@@ -47,7 +79,7 @@
     state.win = root.open('', 'systemika-calibration-sandbox', 'width=1380,height=850,resizable=yes,scrollbars=yes');
     if (!state.win) { root.alert('Systemika could not open the Calibration Sandbox. Please allow pop-up windows and try again.'); return null; }
     state.win.document.open(); state.win.document.write(popupHtml()); state.win.document.close();
-    state.win.addEventListener('beforeunload', () => { persistSandboxState(); state.win = null; });
+    state.win.addEventListener('beforeunload', () => { persistSandboxState(); state.alertQueue.length = 0; state.activeAlert = null; state.win = null; });
     state.win.document.getElementById('reset-all').onclick = resetAll;
     state.win.document.getElementById('save-default').onclick = saveAsDefault;
     state.win.document.getElementById('add-constant').onclick = chooseConstant;
@@ -166,6 +198,6 @@
   }
 
   function init(){const b=document.getElementById('btn_calibration_sandbox');if(b)b.addEventListener('click',e=>{e.preventDefault();launch();});}
-  root.SystemikaCalibrationSandbox={launch,state};
+  root.SystemikaCalibrationSandbox={launch,state,showTopAlert};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })(window);
