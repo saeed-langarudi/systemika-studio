@@ -9,7 +9,7 @@ Systemika Studio 1.1 retains the permanent regression baseline established durin
 
 ## Current release result
 
-Systemika Studio 1.1.6 has **19 permanent validation models** and **414/414 passing automated regression tests**. The milestone notes below are retained as a development history of how that baseline grew.
+Systemika Studio 1.1.7 has **19 permanent validation models** and **415/415 passing automated regression tests**. The milestone notes below are retained as a development history of how that baseline grew.
 
 ## Permanent validation models
 
@@ -159,3 +159,7 @@ The 1.1.2 maintenance suite verifies that WebApp update checks refetch the edito
 ## Version 1.1.6 calibration alert visibility regression coverage
 
 The 1.1.6 suite verifies that Systemika alert dialogs are routed into a dedicated modal overlay inside the Calibration Sandbox whenever that separate window is open. The overlay uses the highest practical CSS stacking level, focuses the sandbox window, supports OK/Enter/Escape dismissal, preserves alert close callbacks, and queues multiple alerts instead of replacing them. This ensures simulation errors such as Division by zero remain visible above the calibration interface rather than being hidden between the editor and sandbox windows. Current release baseline: **414/414 automated tests passing** with **19/19 permanent validation models**.
+
+## Version 1.1.7 Text Box interaction regression coverage
+
+The 1.1.7 suite verifies that annotation double-click routing uses the browser's painted hit-test before any coarse geometry fallback, so a Text Box opens normally unless a real Stock, Auxiliary, Constant, Lookup, or Flow is actually under the pointer. It also verifies that pressing Enter with exactly one Text Box selected opens the Text properties dialog. Current release baseline: **415/415 automated tests passing** with **19/19 permanent validation models**.

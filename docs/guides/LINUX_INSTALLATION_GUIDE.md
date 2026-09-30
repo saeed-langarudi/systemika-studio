@@ -52,7 +52,7 @@ The easiest method is to open your file manager, open the Systemika Studio sourc
 Alternatively, use `cd` in a terminal. For example:
 
 ```bash
-cd ~/Downloads/Systemika-Studio-1.1.6-Source
+cd ~/Downloads/Systemika-Studio-1.1.7-Source
 ```
 
 Replace that path with the actual location of your source folder.
@@ -100,7 +100,7 @@ The build script will:
 3. Stage Systemika with a dependency-free Node build script.
 4. Build the Linux AppImage with Electron 44.3.0 using Electron Builder's static AppImage runtime toolset (`1.0.3`).
 
-The 1.1.6 source no longer uses Gulp or the older electron-builder 26.0.x toolchain that produced the earlier `tar@6.2.1`, Git `node-gyp`, and high/critical audit warnings. npm can still display upstream deprecation notices from electron-builder's own build-only transitive packages. Those packages are not Systemika runtime application dependencies. The AppImage is also built with the modern static runtime, so students should not need the legacy `libfuse.so.2`/FUSE2 package merely to launch Systemika. Do not run `npm audit fix --force` on the release source. See `docs/guides/BUILD_TOOLCHAIN_SECURITY.md` for details.
+The 1.1.7 source no longer uses Gulp or the older electron-builder 26.0.x toolchain that produced the earlier `tar@6.2.1`, Git `node-gyp`, and high/critical audit warnings. npm can still display upstream deprecation notices from electron-builder's own build-only transitive packages. Those packages are not Systemika runtime application dependencies. The AppImage is also built with the modern static runtime, so students should not need the legacy `libfuse.so.2`/FUSE2 package merely to launch Systemika. Do not run `npm audit fix --force` on the release source. See `docs/guides/BUILD_TOOLCHAIN_SECURITY.md` for details.
 
 When the build succeeds, the script prints the location of the generated `.AppImage` file. It is normally located in:
 
@@ -267,7 +267,7 @@ Search for **Systemika Studio** in the Applications menu. The Applications-menu 
 
 ### The AppImage reports a FUSE-related error
 
-The Systemika Studio 1.1 builder uses Electron Builder's static AppImage runtime (`toolsets.appimage = 1.0.3`), so the finished AppImage should **not** require the legacy FUSE2 library (`libfuse.so.2`) merely to start. If a newly built Systemika AppImage still reports a FUSE2/libfuse2 error, first confirm that you are building from the 1.1.6 source package and rebuild it with `./BUILD_LINUX_APPIMAGE.sh`. Do not install an obsolete FUSE2 package solely as a workaround for an AppImage produced by an older Systemika build configuration.
+The Systemika Studio 1.1 builder uses Electron Builder's static AppImage runtime (`toolsets.appimage = 1.0.3`), so the finished AppImage should **not** require the legacy FUSE2 library (`libfuse.so.2`) merely to start. If a newly built Systemika AppImage still reports a FUSE2/libfuse2 error, first confirm that you are building from the 1.1.7 source package and rebuild it with `./BUILD_LINUX_APPIMAGE.sh`. Do not install an obsolete FUSE2 package solely as a workaround for an AppImage produced by an older Systemika build configuration.
 
 ## 10. Quick installation summary
 

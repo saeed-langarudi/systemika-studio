@@ -4,7 +4,7 @@ Systemika Studio is educational System Dynamics software designed for learning a
 
 ## Release status
 
-Version **1.1** (package version **1.1.6**) is the current Systemika Studio release. It introduces the manual Calibration Sandbox while retaining the existing Systemika simulation engine. The source package includes the desktop/web interfaces, platform build helpers, 19 permanent validation models, and an automated regression suite.
+Version **1.1** (package version **1.1.7**) is the current Systemika Studio release. It introduces the manual Calibration Sandbox while retaining the existing Systemika simulation engine. The source package includes the desktop/web interfaces, platform build helpers, 19 permanent validation models, and an automated regression suite.
 
 The 1.0.0 release includes the finalized comparative Histogram implementation. Histogram output is always count-based (the obsolete PDF/scaling selector has been removed). A single-run Histogram uses light gray bars with black borders and no point markers; multiple selected runs use common bins and translucent overlays with an external run legend. It also includes the **Hide/Unhide Question Marks (Q)** display toggle for missing-definition markers.
 
@@ -62,9 +62,9 @@ Convenience launchers are included for Windows, macOS, and Linux. See `docs/guid
 
 For source-tree WebApp testing, use `npm run web` or the corresponding `RUN_SYSTEMIKA_WEB_*` launcher rather than opening `start.html` directly with `file://`.
 
-For public web deployment, run `BUILD_WEBAPP_WINDOWS.bat` on Windows or `./BUILD_WEBAPP_LINUX.sh` on Linux and upload the **contents** of `build/output/web/1.1.6/`. The web build gives every local WebApp resource—including SVG/PNG toolbar assets—a content-derived build fingerprint in addition to the release version. It embeds `systemika-version` and `systemika-build` metadata in every generated HTML entry point, generates WebApp metadata, and includes `.htaccess` no-store rules plus `WEB_BUILD_INFO.txt`.
+For public web deployment, run `BUILD_WEBAPP_WINDOWS.bat` on Windows or `./BUILD_WEBAPP_LINUX.sh` on Linux and upload the **contents** of `build/output/web/1.1.7/`. The web build gives every local WebApp resource—including SVG/PNG toolbar assets—a content-derived build fingerprint in addition to the release version. It embeds `systemika-version` and `systemika-build` metadata in every generated HTML entry point, generates WebApp metadata, and includes `.htaccess` no-store rules plus `WEB_BUILD_INFO.txt`.
 
-The deployed WebApp root is `https://systemika.no/studio/app/`. The build places `systemika-update.json` and `update.json` directly in the generated WebApp root, so uploading the complete contents of `build/output/web/1.1.6/` publishes the update metadata automatically. Desktop update checks use `https://systemika.no/studio/app/systemika-update.json` and fall back to the exact deployed analyser/editor HTML if the manifest is unavailable. No separate metadata upload to `/download/` is required. Detailed probe failures are logged for diagnostics but are not repeated in the user-facing alert.
+The deployed WebApp root is `https://systemika.no/studio/app/`. The build places `systemika-update.json` and `update.json` directly in the generated WebApp root, so uploading the complete contents of `build/output/web/1.1.7/` publishes the update metadata automatically. Desktop update checks use `https://systemika.no/studio/app/systemika-update.json` and fall back to the exact deployed analyser/editor HTML if the manifest is unavailable. No separate metadata upload to `/download/` is required. Detailed probe failures are logged for diagnostics but are not repeated in the user-facing alert.
 
 ## Building installers
 
@@ -104,4 +104,4 @@ Windows and Linux use the same canonical builder and the same output directory:
 - Windows: `BUILD_WEBAPP_WINDOWS.bat`
 - Linux: `./BUILD_WEBAPP_LINUX.sh`
 
-Both invoke `build/build.js` and write the upload-ready WebApp to `build/output/web/1.1.6/`. No `npm install` is required for the WebApp build.
+Both invoke `build/build.js` and write the upload-ready WebApp to `build/output/web/1.1.7/`. No `npm install` is required for the WebApp build.

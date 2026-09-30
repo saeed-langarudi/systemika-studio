@@ -70,7 +70,7 @@ test('web/desktop build emits canonical WebApp-root release metadata from the ce
   assert.match(build, /JSON\.stringify\(\{ version, buildId, downloadUrl: UPDATE_DOWNLOAD_URL \}/);
   assert.match(read('.htaccess'), /svg\|png/);
   const manifest = JSON.parse(read('update.json'));
-  assert.equal(manifest.version, '1.1.6');
+  assert.equal(manifest.version, '1.1.7');
 });
 
 test('Calibration Save as Default gives visible saved state and becomes dirty on slider edits', () => {
@@ -196,7 +196,7 @@ test('WebApp update check derives its root from the running page and does not gu
         return {
           ok: true,
           status: 200,
-          text: async () => '<html><head><meta name="systemika-version" content="1.1.6"><meta name="systemika-build" content="abcdef123456"></head></html>'
+          text: async () => '<html><head><meta name="systemika-version" content="1.1.7"><meta name="systemika-build" content="abcdef123456"></head></html>'
         };
       },
     },
@@ -208,7 +208,7 @@ test('WebApp update check derives its root from the running page and does not gu
   assert.equal(context.window.SystemikaUpdate.currentDeploymentRoot(), 'https://systemika.no/anything/nested/');
   const result = await context.window.SystemikaUpdate.checkForUpdates({ manual: false });
   assert.equal(result.updateAvailable, true);
-  assert.equal(result.latest, '1.1.6');
+  assert.equal(result.latest, '1.1.7');
   assert.equal(requests.length, 1);
   assert.match(requests[0], /\/anything\/nested\/OpenSystemDynamics\/src\/index\.html\?_/);
   assert.doesNotMatch(requests.join('\n'), /\/studio\/webapp\//);

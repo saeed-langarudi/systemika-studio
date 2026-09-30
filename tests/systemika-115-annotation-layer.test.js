@@ -51,9 +51,9 @@ test('text boxes and geometry shapes render in annotation layer instead of model
   assert.match(ellipse, /SVG\.append\(SVG\.annotationLayer, SVG\.group\(\[this\.element, this\.clickEllipse, this\.selector\]\)\)/);
   assert.doesNotMatch(ellipse, /SVG\.plotLayer/);
 
-  assert.match(textArea, /this\.element = SVG\.append\(SVG\.annotationLayer,/);
+  assert.match(textArea, /this\.element = SVG\.rect\(/);
   assert.match(textArea, /this\.htmlElement = SVG\.append\(SVG\.annotationLayer,/);
-  assert.match(textArea, /this\.group = SVG\.append\(SVG\.annotationLayer,/);
+  assert.match(textArea, /this\.group = SVG\.append\(SVG\.annotationLayer, SVG\.group\(\[this\.element, this\.clickRect\]\)\)/);
   assert.doesNotMatch(textArea, /SVG\.plotLayer/);
 
   assert.match(line, /this\.group = SVG\.append\(SVG\.annotationLayer,/);

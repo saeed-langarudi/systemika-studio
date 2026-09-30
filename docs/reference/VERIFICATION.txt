@@ -1,11 +1,17 @@
-Systemika Studio 1.1.6 - Release verification
-Date: 2026-09-29
+Systemika Studio 1.1.7 - Release verification
+Date: 2026-09-30
 
 Automated regression verification:
-- 414/414 tests passing with: npm test
+- 415/415 tests passing with: npm test
 - 19 permanent validation models under validation-models/
 
-Verified 1.1.6 Calibration Sandbox alert visibility:
+Verified 1.1.7 Text Box interaction repair:
+- Double-clicking a Text Box opens the Text properties dialog again when no model entity is actually painted under the pointer.
+- Annotation priority now uses document.elementsFromPoint() for the browser's real painted hit test; the older geometry/bounding-box path remains only as a compatibility fallback.
+- Genuine overlapping Stocks, Auxiliaries, Constants, Lookups, and Flows still receive double-click priority over background annotations.
+- Pressing Enter with exactly one Text Box selected opens its Text properties dialog.
+
+Retained 1.1.6 Calibration Sandbox alert visibility:
 - XAlertDialog routes alerts into a dedicated modal overlay inside the Calibration Sandbox whenever that separate window is open.
 - The overlay uses z-index 2147483647 and focuses the sandbox window so simulation errors such as Division by zero cannot remain hidden behind it.
 - OK, Enter, and Escape dismiss the alert; existing close callbacks are preserved.
@@ -84,7 +90,7 @@ Desktop packaging:
 
 WebApp packaging:
 - build/build.js rebuilds the WebApp from current source rather than using a stale prebuilt editor bundle.
-- Generated launcher/editor JS, CSS, SVG, PNG, favicon, and other local asset references carry ?v=1.1.6 plus a content-derived &b=<build-id> cache key.
+- Generated launcher/editor JS, CSS, SVG, PNG, favicon, and other local asset references carry ?v=1.1.7 plus a content-derived &b=<build-id> cache key.
 - The WebApp build emits non-cached `update.json` metadata used by startup/manual update checks.
 - The upload-ready WebApp includes .htaccess no-store rules for application assets and WEB_BUILD_INFO.txt with the generated build ID.
 

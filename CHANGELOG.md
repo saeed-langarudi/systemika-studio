@@ -1,3 +1,11 @@
+## 2026-09-30 — Systemika Studio 1.1.7 — Text Box interaction repair
+- Replaced the previous Text Box double-click workarounds with a structural fix. The actual failure point was the HTML `foreignObject` interaction surface: after the first click changed canvas selection state, Chromium/Electron could retarget the second press so no reliable `dblclick` reached the embedded HTML element.
+- Text Box HTML is now presentation-only. A transparent SVG hit rectangle, in the same background annotation layer as the Text Box frame, owns selection, double-click, and context-menu interaction. This gives both clicks a stable SVG target and removes the jQuery/native click-count heuristics entirely.
+- Because the SVG hit rectangle remains below Stocks, Auxiliaries, Constants, Lookups, and Flows, an overlapping model entity still receives pointer priority. The annotation hit-test router remains as a defensive fallback.
+- The Text Box hit rectangle is kept synchronized with resize/move operations, and pressing Enter with exactly one Text Box selected continues to open its Text properties dialog.
+- Regression coverage now explicitly requires the stable SVG Text Box hit target and forbids reintroducing `mousedown`/`dblclick` listeners on the `foreignObject` HTML surface.
+- Release verification baseline: 417/417 automated tests passing; 19/19 permanent numerical validation models retained.
+
 ## 2026-09-29 — Systemika Studio 1.1.6 — Calibration alert visibility
 - Fixed alerts and simulation errors being hidden behind the separate Calibration Sandbox window. XAlertDialog now routes to a dedicated modal alert overlay in the sandbox whenever it is open.
 - The sandbox alert overlay uses top-level stacking, focuses the sandbox window, supports OK/Enter/Escape dismissal, preserves existing close callbacks, and queues multiple alerts.

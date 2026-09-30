@@ -2703,15 +2703,48 @@ class FlowVisual extends BaseConnection {
 // When an annotation receives a double-click, explicitly check the model geometry
 // at that canvas position and route the action to the top-most model entity first.
 function modelEntityUnderAnnotationEvent(event) {
-	if (!event || typeof mousePosition !== "function" || typeof find_elements_under !== "function") return null;
-	let point = mousePosition(event);
-	let candidates = find_elements_under(point.x, point.y).filter(candidate => {
-		return candidate && ["stock", "variable", "constant", "converter", "flow"].includes(String(candidate.type || "").toLowerCase());
-	});
-	if (!candidates.length) return null;
+	if (!event) return null;
+	const modelTypes = ["stock", "variable", "constant", "converter", "flow"];
+	const isModelVisual = visual => visual && modelTypes.includes(String(visual.type || "").toLowerCase());
 
-	// Match the model-layer paint order in index.html.  If two model entities
-	// overlap, the entity in the visually higher layer receives precedence.
+	// Ask the browser for the single top-most painted element *under* the
+	// annotation layer.  Scanning document.elementsFromPoint() is too broad here:
+	// it can find a model element deeper in the hit-test stack even when another
+	// painted object is actually at the pointer.  That was especially disruptive
+	// for HTML Text Boxes embedded through foreignObject.  Temporarily disabling
+	// pointer events for all annotations gives us the exact interaction priority we
+	// want: model entities win only when one is genuinely painted at this point.
+	if (typeof document !== "undefined" && typeof document.elementFromPoint === "function" &&
+		Number.isFinite(event.clientX) && Number.isFinite(event.clientY) &&
+		typeof SVG !== "undefined" && SVG.annotationLayer) {
+		let annotationLayer = SVG.annotationLayer;
+		let previousPointerEvents = annotationLayer.style.pointerEvents;
+		annotationLayer.style.pointerEvents = "none";
+		let painted = null;
+		try {
+			painted = document.elementFromPoint(event.clientX, event.clientY);
+		} finally {
+			annotationLayer.style.pointerEvents = previousPointerEvents;
+		}
+
+		let current = painted;
+		while (current && current !== document && current !== SVG.svgElement) {
+			let nodeId = current.getAttribute ? current.getAttribute("node_id") : null;
+			if (nodeId != null && typeof get_object === "function") {
+				let visual = get_object(String(nodeId));
+				if (isModelVisual(visual)) return visual;
+			}
+			current = current.parentNode;
+		}
+		return null;
+	}
+
+	// Compatibility fallback for older embedded browsers that do not expose
+	// elementFromPoint. Keep the previous geometry-based behavior there only.
+	if (typeof mousePosition !== "function" || typeof find_elements_under !== "function") return null;
+	let point = mousePosition(event);
+	let candidates = find_elements_under(point.x, point.y).filter(isModelVisual);
+	if (!candidates.length) return null;
 	const layerPriority = { stock: 1, variable: 2, constant: 3, converter: 4, flow: 5 };
 	candidates.sort((a, b) => (layerPriority[String(b.type || "").toLowerCase()] || 0) -
 		(layerPriority[String(a.type || "").toLowerCase()] || 0));
@@ -5258,7 +5291,10 @@ class TextAreaVisual extends HtmlTwoPointer {
 		this.render();
 	}
 	updateGraphics() {
-		// code for svg foreign
+		// Keep the HTML renderer and the SVG interaction surface in exactly the
+		// same rectangle.  The SVG hit target is intentional: Chromium/Electron
+		// can change or suppress mouse-event delivery across an SVG foreignObject
+		// after the first click changes the canvas selection state.
 		this.htmlElement.setX(this.getMinX());
 		this.htmlElement.setY(this.getMinY());
 		this.htmlElement.setWidth(this.getWidth());
@@ -5269,36 +5305,50 @@ class TextAreaVisual extends HtmlTwoPointer {
 		this.coordRect.x2 = this.endX;
 		this.coordRect.y2 = this.endY;
 		this.coordRect.update();
+
+		this.clickCoordRect.x1 = this.startX;
+		this.clickCoordRect.y1 = this.startY;
+		this.clickCoordRect.x2 = this.endX;
+		this.clickCoordRect.y2 = this.endY;
+		this.clickCoordRect.update();
 	}
 	makeGraphics() {
-		this.element = SVG.append(SVG.annotationLayer, SVG.rect(this.getMinX(), this.getMinY(), this.getWidth(), this.getHeight(), defaultStroke, "none", "element", ""));
+		this.element = SVG.rect(this.getMinX(), this.getMinY(), this.getWidth(), this.getHeight(), defaultStroke, "none", "element", "");
 
 		this.coordRect = new CoordRect();
 		this.coordRect.element = this.element;
 
+		// foreignObject is now presentation-only.  Earlier 1.1.7 attempts listened
+		// for dblclick/mousedown on its HTML cutDiv.  That is the unstable boundary:
+		// after the first press selects the Text Box, Chromium can retarget the next
+		// press and no dblclick reaches cutDiv at all.  A stable SVG rectangle in the
+		// annotation layer owns pointer interaction instead.
 		this.htmlElement = SVG.append(SVG.annotationLayer, SVG.foreign(this.getMinX(), this.getMinY(), this.getWidth(), this.getHeight(), "Text not renderd yet", "white"));
+		this.htmlElement.style.pointerEvents = "none";
+		this.htmlElement.cutDiv.style.pointerEvents = "none";
+		this.htmlElement.contentDiv.style.pointerEvents = "none";
 
-		$(this.htmlElement.cutDiv).mousedown((event) => {
-			// This is an alternative to having the htmlElement in the group
-			primitive_mousedown(this.id, event)
-			mouseDownHandler(event);
-			event.stopPropagation();
-		});
+		this.clickRect = SVG.rect(this.getMinX(), this.getMinY(), this.getWidth(), this.getHeight(), "transparent", "transparent", "text-box-hit-target", { "pointer-events": "all" });
+		this.clickCoordRect = new CoordRect();
+		this.clickCoordRect.element = this.clickRect;
 
-		// Emergency solution since double clicking a ComparePlot or XyPlot does not always work.
-		$(this.htmlElement.cutDiv).bind("contextmenu", () => {
-			this.doubleClick();
-		});
+		this.group = SVG.append(SVG.annotationLayer, SVG.group([this.element, this.clickRect]));
+		this.group.setAttribute("node_id", this.id);
 
-		$(this.htmlElement.cutDiv).dblclick((event) => {
+		// TwoPointer's constructor binds the ordinary mousedown/selection handler to
+		// this SVG group immediately after makeGraphics() returns.  Because the group
+		// is a normal SVG descendant, mouseDownHandler also receives the bubbled event;
+		// no manual duplicate mousedown dispatch is needed.
+		$(this.group).bind("contextmenu", (event) => {
+			event.preventDefault();
 			this.doubleClick(event);
 		});
 
-		this.group = SVG.append(SVG.annotationLayer, SVG.group([this.element]));
-		this.group.setAttribute("node_id", this.id);
+		$(this.group).dblclick((event) => {
+			this.doubleClick(event);
+		});
 
-		this.element_array = [this.element];
-		this.element_array = [this.htmlElement.contentDiv, this.element];
+		this.element_array = [this.htmlElement.contentDiv, this.element, this.clickRect];
 		for (let key in this.element_array) {
 			this.element_array[key].setAttribute("node_id", this.id);
 		}
@@ -9050,6 +9100,13 @@ $(window).load(function () {
 						if (primitive && ["Stock", "Flow", "Variable", "Converter"].includes(getType(primitive))) {
 							event.preventDefault();
 							openPrimitiveDialog(selected.id, "value");
+							return;
+						}
+						// Text Boxes are annotations rather than equation primitives, but Enter
+						// should still open the properties dialog for the single selected object.
+						if (primitive && getType(primitive) === "TextArea" && selected.dialog && typeof selected.dialog.show === "function") {
+							event.preventDefault();
+							selected.dialog.show();
 							return;
 						}
 					}
