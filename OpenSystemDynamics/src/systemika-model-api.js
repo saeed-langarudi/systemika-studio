@@ -286,11 +286,16 @@ function getConverterInput(lookup) {
     return systemikaApply(lookup, item => {
         if (!item) return null;
         const source = item.getAttribute("Source");
-        return !source || source === "Time" ? null : findID(source);
+        if (!source || source === "Time") return null;
+        const sourceItem = findID(source);
+        return sourceItem ? (orig(sourceItem) || sourceItem) : null;
     });
 }
 function setConverterInput(lookup, input) {
-    for (const item of arrify(lookup)) setAttributeUndoable(item, "Source", input ? input.id : "Time");
+    for (const item of arrify(lookup)) {
+        const source = input ? (orig(input) || input) : null;
+        setAttributeUndoable(item, "Source", source && source.id != null ? source.id : "Time");
+    }
 }
 function getInterpolation(lookup) { return systemikaApply(lookup, item => item ? (item.getAttribute("Interpolation") || "Linear") : "Linear"); }
 function setInterpolation(lookup, interpolation) {
@@ -331,7 +336,7 @@ function systemikaGeometry(primitive, withPoints) {
 }
 
 function getPositionType(primitive) {
-    return ["Flow", "Link", "TextArea", "Rectangle", "Ellipse", "Line", "Table", "TimePlot", "ComparePlot", "XyPlot", "HistoPlot"].includes(getType(primitive)) ? 2 : 1;
+    return ["Flow", "Link", "TextArea", "Rectangle", "Ellipse", "Line", "FeedbackLoop", "Table", "TimePlot", "ComparePlot", "XyPlot", "HistoPlot"].includes(getType(primitive)) ? 2 : 1;
 }
 
 function getSize(primitive) {

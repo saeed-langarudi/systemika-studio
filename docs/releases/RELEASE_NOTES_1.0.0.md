@@ -2,9 +2,9 @@
 
 **Release date:** 15 September 2026
 
-Systemika Studio 1.0.0 is the first public release of Systemika Studio, an educational System Dynamics modelling and simulation environment designed for teaching and learning stock-and-flow modelling.
+Systemika Studio 1.0.0 is the first public release of Systemika Studio, an educational System Dynamics modeling and simulation environment designed for teaching and learning stock-and-flow modeling.
 
-## Main modelling and simulation capabilities
+## Main modeling and simulation capabilities
 
 - Canonical classroom entities: **Stock, Flow, Link, Auxiliary, Constant, Lookup, and Ghost**.
 - **Flow rates are signed and unrestricted**: negative Flow values are valid and reverse the effective transfer direction; Systemika does not impose positive-only Flow bounds.
@@ -13,7 +13,7 @@ Systemika Studio 1.0.0 is the first public release of Systemika Studio, an educa
 - Fixed-time `Lag`, exponential `Smooth` and `Delay`, and supported random distributions with optional per-function seeds.
 - Strict, report-only dimensional consistency checking: inconsistencies are reported without silently converting, repairing, or reinterpreting units.
 - Link polarity annotations and duplicate directed-Link protection.
-- Undo/Redo, cut/copy/paste, colour tools, name rotation, canvas navigation, and classroom-oriented keyboard shortcuts.
+- Undo/Redo, cut/copy/paste, color tools, name rotation, canvas navigation, and classroom-oriented keyboard shortcuts.
 
 ## Run management and outputs
 

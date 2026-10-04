@@ -49,6 +49,24 @@
     return n;
   }
 
+  function numericTolerance(...values) {
+    let scale = 1;
+    values.forEach(value => {
+      if (typeof value === "number" && Number.isFinite(value)) scale = Math.max(scale, Math.abs(value));
+    });
+    // Stay close to IEEE-754 machine precision. This is large enough to absorb
+    // ordinary binary representation noise (for example 0.1 + 0.2) without
+    // turning materially different model values into equal values.
+    return 32 * Number.EPSILON * scale;
+  }
+
+  function valuesEqual(left, right) {
+    if (typeof left === "number" && typeof right === "number" && Number.isFinite(left) && Number.isFinite(right)) {
+      return Math.abs(left - right) <= numericTolerance(left, right);
+    }
+    return left === right;
+  }
+
   function normalizeKey(value) {
     return String(value == null ? "" : value).trim().toLowerCase();
   }
@@ -496,8 +514,8 @@
             if (right === 0) throw new SystemikaEngineError("Modulo by zero.");
             return left % right;
           case "^": return Math.pow(left, right);
-          case "=": case "==": return left === right;
-          case "!=": case "<>": return left !== right;
+          case "=": case "==": return valuesEqual(left, right);
+          case "!=": case "<>": return !valuesEqual(left, right);
           case "<": return left < right;
           case "<=": return left <= right;
           case ">": return left > right;
@@ -1026,7 +1044,28 @@
       return next;
     }
 
-    integrateStep(h) {
+    nextIntegrationStep() {
+      const nextIndex = this.stepIndex + 1;
+      const nominalTarget = this.model.timeStart + nextIndex * this.model.dt;
+      const epsilon = numericTolerance(this.model.timeStart, this.model.timeEnd, nominalTarget);
+
+      // A normal integration step always uses the model DT. Only the final step
+      // may be shorter when Time Length is not an integer multiple of DT. The
+      // target time comes from the step index, not repeated T = T + DT addition,
+      // so round-off cannot accumulate and drift the simulation clock.
+      if (nominalTarget <= this.model.timeEnd + epsilon) {
+        return {
+          h: this.model.dt,
+          targetTime: nominalTarget >= this.model.timeEnd - epsilon ? this.model.timeEnd : nominalTarget
+        };
+      }
+      return {
+        h: this.model.timeEnd - this.time,
+        targetTime: this.model.timeEnd
+      };
+    }
+
+    integrateStep(h, targetTime) {
       const t = this.time;
       const s = this.state;
       let next = Object.create(null);
@@ -1054,9 +1093,19 @@
         if (stock.nonNegative && next[stock.id] < 0) next[stock.id] = 0;
       });
       this.state = next;
-      this.time = Math.min(this.model.timeEnd, t + h);
       this.stepIndex += 1;
+      this.time = targetTime == null ? Math.min(this.model.timeEnd, t + h) : targetTime;
       this.commitLagSamples();
+    }
+
+    integrateNextStep() {
+      const step = this.nextIntegrationStep();
+      if (!(step.h > 0)) {
+        this.time = this.model.timeEnd;
+        return false;
+      }
+      this.integrateStep(step.h, step.targetTime);
+      return true;
     }
 
     setValue(primitiveOrId, expression) {
@@ -1180,9 +1229,9 @@
     const runtime = new Runtime(model);
     const results = new ResultBuilder(model);
     results.record(runtime);
-    const epsilon = Math.max(1, Math.abs(model.timeEnd)) * 1e-12;
+    const epsilon = numericTolerance(model.timeStart, model.timeEnd);
     while (runtime.time < model.timeEnd - epsilon) {
-      runtime.integrateStep(Math.min(model.dt, model.timeEnd - runtime.time));
+      if (!runtime.integrateNextStep()) break;
       results.record(runtime);
     }
     return results.snapshot(runtime, null);
@@ -1204,7 +1253,7 @@
     }
 
     completed() {
-      return this.terminated || this.runtime.time >= this.model.timeEnd - 1e-12;
+      return this.terminated || this.runtime.time >= this.model.timeEnd - numericTolerance(this.model.timeStart, this.model.timeEnd);
     }
 
     terminate() {
@@ -1292,10 +1341,13 @@
       const callback = this.config && this.config[name];
       if (typeof callback !== "function") return;
       if (this.config.asyncCallbacks && typeof setTimeout === "function") {
-        setTimeout(() => {
+        const invoke = () => {
           if (name === "onPause" && this.terminated) return;
           callback(payload);
-        }, 0);
+        };
+        const scheduler = this.config && this.config.callbackScheduler;
+        if (typeof scheduler === "function") scheduler(invoke, 0);
+        else setTimeout(invoke, 0);
       } else {
         callback(payload);
       }
@@ -1322,18 +1374,21 @@
     }
 
     runChunk() {
-      const epsilon = Math.max(1, Math.abs(this.model.timeEnd)) * 1e-12;
+      const epsilon = numericTolerance(this.model.timeStart, this.model.timeEnd);
       while (!this.terminated && this.runtime.time < this.model.timeEnd - epsilon) {
-        let h = Math.min(this.model.dt, this.model.timeEnd - this.runtime.time);
-        if (this.nextPause != null && this.nextPause > this.runtime.time + epsilon) {
-          h = Math.min(h, this.nextPause - this.runtime.time);
-        }
-        this.runtime.integrateStep(h);
+        // UI/progress pause checkpoints are observational only. They must never
+        // shorten a numerical integration step or create off-grid sample times.
+        if (!this.runtime.integrateNextStep()) break;
         this.resultsBuilder.record(this.runtime);
         if (this.nextPause != null && this.runtime.time >= this.nextPause - epsilon && this.runtime.time < this.model.timeEnd - epsilon) {
           this.running = false;
           const result = this.currentResults();
-          this.nextPause += this.pauseInterval;
+          // If DT is larger than the pause interval, several UI checkpoints may
+          // have been crossed in one legitimate solver step. Skip those stale
+          // checkpoints so the next resume always advances the simulation.
+          do {
+            this.nextPause += this.pauseInterval;
+          } while (this.nextPause <= this.runtime.time + epsilon);
           this.emitCallback("onPause", result);
           return;
         }
@@ -1364,6 +1419,22 @@
     const setting = getSetting();
     if (!setting) throw new SystemikaEngineError("The model is missing simulation settings. Reopen or resave the model to repair it.");
     const safeOrig = (cell) => (typeof orig === "function" ? orig(cell) : cell);
+    const canonicalModelEntityId = (id) => {
+      if (id == null || id === "") return null;
+      const rawId = String(id);
+      if (normalizeKey(rawId) === "time") return "Time";
+      // Lookup inputs may be connected visually to Ghosts. Ghosts are aliases
+      // for their source model entity and are deliberately not compiled as
+      // separate numerical entities, so resolve them before building the
+      // native-engine specification. Keep the raw id as a fallback so a truly
+      // missing source still produces the normal, useful compile error.
+      if (typeof findID === "function") {
+        const cell = findID(rawId);
+        const original = cell ? safeOrig(cell) : null;
+        if (original && original.id != null) return String(original.id);
+      }
+      return rawId;
+    };
     const itemName = (cell) => {
       if (typeof getName === "function") return getName(cell);
       return cell.getAttribute("name");
@@ -1399,7 +1470,7 @@
         converters.push({
           id: String(cell.id), name: itemName(cell), data: cell.getAttribute("Data") || "",
           interpolation: cell.getAttribute("Interpolation") || "Linear",
-          sourceId: cell.getAttribute("Source") || "Time"
+          sourceId: canonicalModelEntityId(cell.getAttribute("Source") || "Time")
         });
       }
     });
@@ -1429,7 +1500,11 @@
     } catch (error) {
       const payload = { error: error && error.message ? error.message : String(error), errorPrimitive: null };
       if (typeof config.onError === "function") {
-        if (config.asyncCallbacks !== false && typeof setTimeout === "function") setTimeout(() => config.onError(payload), 0);
+        if (config.asyncCallbacks !== false && typeof setTimeout === "function") {
+          const scheduler = config && config.callbackScheduler;
+          if (typeof scheduler === "function") scheduler(() => config.onError(payload), 0);
+          else setTimeout(() => config.onError(payload), 0);
+        }
         else config.onError(payload);
         return null;
       }

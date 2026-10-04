@@ -4,7 +4,7 @@
 - Opening the sandbox closes the ordinary Output workspace, prepares a named simulation run using the existing overwrite safeguards, and opens a separate calibration window alongside the model canvas.
 - Provides six fixed-format time plots. Each plot independently selects a dashed **Reference Mode** series and a solid **Simulated Variable** series.
 - Adds a **Parameter Sliders** panel for model constants with editable minimum, maximum and increment values, per-parameter Reset, Reset All, and Save as Default.
-- Slider changes are applied to the existing model constants and immediately re-run the existing Systemika simulation engine; all six plots refresh from the resulting trajectory. No optimiser, fitting algorithm, objective function, or other new computational calibration routine is introduced.
+- Slider changes are applied to the existing model constants and immediately re-run the existing Systemika simulation engine; all six plots refresh from the resulting trajectory. No optimizer, fitting algorithm, objective function, or other new computational calibration routine is introduced.
 
 ## Calibration Sandbox refinement
 - Parameter panel starts 20% wider (408 px instead of 340 px) and can be resized by dragging its divider.

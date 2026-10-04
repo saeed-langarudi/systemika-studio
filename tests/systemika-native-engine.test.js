@@ -61,6 +61,62 @@ test('connected stock-to-stock flow conserves total material', () => {
   for (let i = 0; i < a.length; i++) assert.ok(Math.abs(a[i] + b[i] - 100) < 1e-10);
 });
 
+test('numeric equality absorbs only machine-scale floating-point noise', () => {
+  const ast = engine.parseExpression('IfThenElse([X] = 0.3, 1, 0)');
+  const evaluate = value => engine.evaluateAst(ast, {
+    time: 0, dt: 1, timeStart: 0, timeLength: 1, timeEnd: 1,
+    resolve(name) { return name === 'X' ? value : NaN; }
+  });
+  assert.equal(evaluate(0.1 + 0.2), 1);
+  assert.equal(evaluate(0.300000000001), 0);
+});
+
+test('T equality works for auxiliaries and flows when the requested time is on the DT grid', () => {
+  const results = engine.simulate({
+    timeStart: 0, timeLength: 10, dt: 0.1, method: 'Euler',
+    variables: [{ id: 'pulse', name: 'Pulse', equation: 'IfThenElse(T=5, 100, 0)' }],
+    flows: [{ id: 'pulseFlow', name: 'PulseFlow', equation: 'IfThenElse(T=5, 100, 0)' }]
+  });
+  const index = results.times.findIndex(time => time === 5);
+  assert.notEqual(index, -1);
+  assert.equal(results.value('pulse')[index], 100);
+  assert.equal(results.value('pulseFlow')[index], 100);
+});
+
+test('UI pause checkpoints never alter the Euler DT grid', () => {
+  const pauses = [];
+  let finalResults = null;
+  const controller = engine.createController({
+    timeStart: 0, timeLength: 24, dt: 0.25, method: 'Euler', pauseInterval: 2.4,
+    variables: [{ id: 'pulse', name: 'Pulse', equation: 'IfThenElse(T=5, 100, 0)' }],
+    flows: [{ id: 'pulseFlow', name: 'PulseFlow', equation: 'IfThenElse(T=5, 100, 0)' }]
+  }, {
+    asyncCallbacks: false,
+    onPause(result) { pauses.push(result.times.at(-1)); },
+    onSuccess(result) { finalResults = result; }
+  });
+
+  controller.start();
+  while (!controller.completed()) controller.resume();
+
+  assert.ok(finalResults);
+  assert.deepEqual(finalResults.times, Array.from({ length: 97 }, (_, index) => index * 0.25));
+  assert.deepEqual(pauses, [2.5, 5, 7.25, 9.75, 12, 14.5, 17, 19.25, 21.75]);
+  assert.equal(finalResults.times.includes(2.4), false);
+  const five = finalResults.times.indexOf(5);
+  assert.equal(finalResults.value('pulse')[five], 100);
+  assert.equal(finalResults.value('pulseFlow')[five], 100);
+});
+
+test('simulation time is derived from the step index and the final partial step still lands on Time End', () => {
+  const results = engine.simulate({
+    timeStart: 0, timeLength: 0.95, dt: 0.1, method: 'Euler',
+    variables: [{ id: 'timeCopy', name: 'TimeCopy', equation: 'T' }]
+  });
+  assert.deepEqual(results.times, [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95]);
+  assert.equal(results.times.at(-1), 0.95);
+});
+
 test('variables and IfThenElse are recalculated during integration', () => {
   const results = engine.simulate({
     timeStart: 0, timeLength: 2, dt: 0.1, method: 'RK4',
@@ -77,6 +133,41 @@ test('linear lookup interpolates and clamps to endpoint values', () => {
     converters: [{ id: 'c', name: 'Lookup', data: '0,0; 1,10; 2,20', sourceId: 'Time', interpolation: 'Linear' }]
   });
   assert.deepEqual(results.value('c'), [0, 0, 10, 20, 20]);
+});
+
+
+test('compileCurrentModel resolves a Lookup input connected through a Ghost to the original entity', () => {
+  const makeCell = (id, nodeName, attributes = {}) => ({
+    id: String(id),
+    value: { nodeName },
+    getAttribute(name) { return Object.prototype.hasOwnProperty.call(attributes, name) ? attributes[name] : null; }
+  });
+  const input = makeCell('10', 'Variable', { name: 'Input', Equation: 'T', isConstant: 'false' });
+  const ghost = makeCell('146', 'Ghost', { name: 'Input', Source: '10' });
+  const lookup = makeCell('20', 'Converter', { name: 'Lookup1', Data: '0,0;1,10;2,20', Source: '146', Interpolation: 'Linear' });
+  const setting = makeCell('2', 'Setting', { TimeStart: '0', TimeLength: '2', TimeStep: '1', SolutionAlgorithm: 'RK1', TimePause: '' });
+  const cells = [input, ghost, lookup];
+  const previous = {
+    primitives: global.primitives, getSetting: global.getSetting, getName: global.getName,
+    findID: global.findID, orig: global.orig
+  };
+  try {
+    global.primitives = () => cells.slice();
+    global.getSetting = () => setting;
+    global.getName = cell => cell.getAttribute('name');
+    global.findID = id => cells.find(cell => String(cell.id) === String(id)) || null;
+    global.orig = cell => cell && cell.value && cell.value.nodeName === 'Ghost' ? global.findID(cell.getAttribute('Source')) : cell;
+
+    const compiled = engine.compileCurrentModel();
+    assert.equal(compiled.converters[0].sourceId, '10');
+    const results = engine.simulate(compiled);
+    assert.deepEqual(results.value('Lookup1'), [0, 10, 20]);
+  } finally {
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) delete global[key];
+      else global[key] = value;
+    }
+  }
 });
 
 test('unknown references fail during model compilation', () => {
@@ -117,6 +208,29 @@ test('pause/resume controller exposes compatible results and state-independent s
   controller.resume();
   assert.ok(finalResults);
   assert.deepEqual(finalResults.value('s'), [0, 1, 3, 5]);
+});
+
+test('asynchronous engine callbacks can use a caller-provided scheduler', () => {
+  const scheduled = [];
+  const pauses = [];
+  const controller = engine.createController({
+    timeStart: 0, timeLength: 2, dt: 1, method: 'Euler', pauseInterval: 1,
+    stocks: [{ id: 's', name: 'S', initial: '0' }],
+    flows: [{ id: 'f', name: 'F', equation: '1', targetId: 's' }]
+  }, {
+    asyncCallbacks: true,
+    callbackScheduler(callback, delay) {
+      assert.equal(delay, 0);
+      scheduled.push(callback);
+    },
+    onPause(res) { pauses.push(res.times.at(-1)); }
+  });
+
+  controller.start();
+  assert.equal(pauses.length, 0);
+  assert.equal(scheduled.length, 1);
+  scheduled.shift()();
+  assert.deepEqual(pauses, [1]);
 });
 
 test('Lag implements a fixed time shift and uses its initial value before history exists', () => {

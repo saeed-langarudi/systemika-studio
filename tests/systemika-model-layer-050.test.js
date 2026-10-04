@@ -118,6 +118,26 @@ test('model API creates and connects links without allowing storage/API terminol
   assert.equal(link.value.children[0].getAttribute('target'), null);
 });
 
+
+test('Lookup input API treats a Ghost as an alias of its source entity', () => {
+  const {ctx, container} = makeContext();
+  const source = ctx.createPrimitive('Driver','Auxiliary',[0,0],[20,20]);
+  const lookup = ctx.createPrimitive('Response','Lookup',[100,0],[20,20]);
+  const ghostElement = ctx.document.createElement('Ghost');
+  ghostElement.setAttribute('id','146');
+  ghostElement.setAttribute('name','Driver');
+  ghostElement.setAttribute('Source', source.id);
+  const ghost = new ctx.SimpleNode(ghostElement, container);
+  ghost.id = '146';
+  container.children.push(ghost);
+  ctx.clearPrimitiveCache();
+
+  lookup.setAttribute('Source', ghost.id);
+  assert.equal(ctx.getConverterInput(lookup), source);
+  ctx.setConverterInput(lookup, ghost);
+  assert.equal(lookup.getAttribute('Source'), source.id);
+});
+
 test('simulation settings are owned by the Systemika model API', () => {
   const {ctx}=makeContext();
   assert.equal(ctx.getTimeStep(),0.25);

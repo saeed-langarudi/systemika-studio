@@ -22,6 +22,7 @@ const inflateRaw = promisify(zlib.inflateRaw);
 
 const RUNS_DIR_NAME = 'Runs';
 const RUN_EXTENSION = '.sysrun';
+const METADATA_SIDECAR_SUFFIX = `${RUN_EXTENSION}.metadata.json`;
 const FORMAT_VERSION = 1;
 const MAX_RUN_FILENAME_LENGTH = 120;
 const WINDOWS_RESERVED = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i;
@@ -59,6 +60,11 @@ function runsDirectoryForModel(modelPath) {
 function runPathForModel(modelPath, runLabel) {
   const { filename } = sanitizeRunLabel(runLabel);
   return path.join(runsDirectoryForModel(modelPath), `${filename}${RUN_EXTENSION}`);
+}
+
+function metadataSidecarPathForModel(modelPath, runLabel) {
+  const { filename } = sanitizeRunLabel(runLabel);
+  return path.join(runsDirectoryForModel(modelPath), `${filename}${METADATA_SIDECAR_SUFFIX}`);
 }
 
 async function ensureRunsDirectory(modelPath) {
@@ -267,6 +273,46 @@ async function atomicReplace(targetPath, data, overwrite) {
   }
 }
 
+async function readMetadataPatch(modelPath, runLabel) {
+  const sidecarPath = metadataSidecarPathForModel(modelPath, runLabel);
+  try {
+    const parsed = JSON.parse(await fsp.readFile(sidecarPath, 'utf8'));
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch (error) {
+    if (error && error.code === 'ENOENT') return {};
+    if (error instanceof SyntaxError) {
+      throw new Error(`Invalid run metadata sidecar for "${runLabel}": ${error.message}`);
+    }
+    throw error;
+  }
+}
+
+async function removeMetadataPatch(modelPath, runLabel) {
+  const sidecarPath = metadataSidecarPathForModel(modelPath, runLabel);
+  try {
+    await fsp.unlink(sidecarPath);
+    return true;
+  } catch (error) {
+    if (error && error.code === 'ENOENT') return false;
+    throw error;
+  }
+}
+
+async function updateRunMetadata({ modelPath, runLabel = 'Base', patch = {} }) {
+  const { label } = sanitizeRunLabel(runLabel);
+  if (!await runExists(modelPath, label)) {
+    const error = new Error(`Simulation run "${label}" was not found.`);
+    error.code = 'ENOENT';
+    throw error;
+  }
+  await ensureRunsDirectory(modelPath);
+  const previous = await readMetadataPatch(modelPath, label);
+  const merged = { ...previous, ...(patch || {}), runName: label };
+  const sidecarPath = metadataSidecarPathForModel(modelPath, label);
+  await atomicReplace(sidecarPath, Buffer.from(`${JSON.stringify(merged, null, 2)}\n`, 'utf8'), true);
+  return { runName: label, path: sidecarPath, metadata: merged, bytes: Buffer.byteLength(JSON.stringify(merged)) };
+}
+
 async function writeRunPackage({ modelPath, runLabel = 'Base', csv, metadata = {}, overwrite = false }) {
   if (typeof csv !== 'string') throw new TypeError('csv must be a string.');
 
@@ -289,6 +335,10 @@ async function writeRunPackage({ modelPath, runLabel = 'Base', csv, metadata = {
   ]);
 
   await atomicReplace(targetPath, archive, overwrite);
+  // A newly written run is authoritative. Remove any stale lightweight metadata
+  // patch left by an earlier Calibration Sandbox session; the sandbox will write
+  // a fresh sidecar only when its state is committed.
+  await removeMetadataPatch(modelPath, label);
 
   return {
     runName: label,
@@ -316,10 +366,12 @@ async function readRunPackage({ modelPath, runLabel }) {
   }
 
   const requested = sanitizeRunLabel(runLabel);
-  const storedName = metadata && metadata.runName ? String(metadata.runName) : requested.label;
+  const metadataPatch = await readMetadataPatch(modelPath, requested.label);
+  const mergedMetadata = { ...metadata, ...metadataPatch };
+  const storedName = mergedMetadata && mergedMetadata.runName ? String(mergedMetadata.runName) : requested.label;
   const storedFilename = sanitizeRunLabel(storedName).filename;
   const effectiveRunName = storedFilename === requested.filename ? storedName : requested.label;
-  const effectiveMetadata = { ...metadata, runName: effectiveRunName };
+  const effectiveMetadata = { ...mergedMetadata, runName: effectiveRunName };
   if (effectiveRunName !== storedName) effectiveMetadata.originalRunName = storedName;
 
   return { path: filePath, csv: csvBuffer.toString('utf8'), metadata: effectiveMetadata };
@@ -386,6 +438,7 @@ async function renameRun(modelPath, sourceLabel, targetLabel) {
     overwrite: false,
   });
   await fsp.unlink(sourcePath);
+  await removeMetadataPatch(modelPath, sourceLabel);
   return { runName: target.label, filename: path.basename(targetPath), path: targetPath };
 }
 
@@ -393,6 +446,7 @@ async function deleteRun(modelPath, runLabel) {
   const filePath = runPathForModel(modelPath, runLabel);
   try {
     await fsp.unlink(filePath);
+    await removeMetadataPatch(modelPath, runLabel);
     return { deleted: true, runName: String(runLabel || ''), path: filePath };
   } catch (error) {
     if (error && error.code === 'ENOENT') return { deleted: false, runName: String(runLabel || ''), path: filePath };
@@ -403,15 +457,18 @@ async function deleteRun(modelPath, runLabel) {
 module.exports = {
   RUNS_DIR_NAME,
   RUN_EXTENSION,
+  METADATA_SIDECAR_SUFFIX,
   FORMAT_VERSION,
   sanitizeRunLabel,
   assertSavedModelPath,
   runsDirectoryForModel,
   runPathForModel,
+  metadataSidecarPathForModel,
   ensureRunsDirectory,
   runExists,
   writeRunPackage,
   readRunPackage,
+  updateRunMetadata,
   listRuns,
   duplicateRun,
   renameRun,

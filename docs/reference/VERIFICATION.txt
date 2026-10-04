@@ -1,11 +1,21 @@
-Systemika Studio 1.1.7 - Release verification
-Date: 2026-09-30
+Systemika Studio 1.1.8 - Release verification
+Date: 2026-10-01
 
 Automated regression verification:
-- 415/415 tests passing with: npm test
+- 427/427 tests passing with: npm test
 - 19 permanent validation models under validation-models/
 
-Verified 1.1.7 Text Box interaction repair:
+Verified 1.1.8 Feedback Loop annotation tool:
+- Feedback Loop is a graphical-only canvas annotation placed immediately above Text on the vertical toolbar.
+- Its picker offers clockwise/counterclockwise reinforcing (+) and balancing (−) loops using clean scalable SVG artwork; tooltip direction and arrow direction match.
+- A selected loop is placed with one click on blank canvas, persists in .ssd models, and remains outside the computational entity set.
+- New loops default to 50 points; all resizing remains square/circular automatically; new captions start with bold, italic, and underline enabled.
+- Double-clicking a loop opens Feedback Loop Properties with one Size (points) field and an optional text label; the label is rendered below the loop rather than through its center.
+- Feedback Loop Properties provides Size, caption, font family, font size, bold, italic, and underline, with no alignment or separate color control.
+- The toolbar Color tool changes the arc, arrowhead, polarity mark, and caption together through the loop primitive's single Color attribute. New reinforcing loops use the Color-tool `red` value and balancing loops use the Color-tool `blue` value; picker/toolbar artwork uses those same colors, and caption color matches the loop by default.
+- Feedback loops live in the annotation layer below model entities, preserving model-variable interaction priority.
+
+Retained 1.1.7 Text Box interaction repair:
 - Double-clicking a Text Box opens the Text properties dialog again when no model entity is actually painted under the pointer.
 - Annotation priority now uses document.elementsFromPoint() for the browser's real painted hit test; the older geometry/bounding-box path remains only as a compatibility fallback.
 - Genuine overlapping Stocks, Auxiliaries, Constants, Lookups, and Flows still receive double-click priority over background annotations.
@@ -90,7 +100,7 @@ Desktop packaging:
 
 WebApp packaging:
 - build/build.js rebuilds the WebApp from current source rather than using a stale prebuilt editor bundle.
-- Generated launcher/editor JS, CSS, SVG, PNG, favicon, and other local asset references carry ?v=1.1.7 plus a content-derived &b=<build-id> cache key.
+- Generated launcher/editor JS, CSS, SVG, PNG, favicon, and other local asset references carry ?v=1.1.8 plus a content-derived &b=<build-id> cache key.
 - The WebApp build emits non-cached `update.json` metadata used by startup/manual update checks.
 - The upload-ready WebApp includes .htaccess no-store rules for application assets and WEB_BUILD_INFO.txt with the generated build ID.
 
@@ -112,8 +122,10 @@ Run management refinement:
 
 
 Systemika Studio 1.1 Calibration Sandbox verification:
+- Calibration Sandbox popup sizing uses the available display area; Electron opens the sandbox maximized. The six-plot grid consumes the remaining viewport height directly, with a 3×2 layout on normal widths and 2×3 on narrow widths, so plot bottoms no longer require routine page scrolling.
+- Parameter rows use a fixed fluid table layout with shrinkable inputs and no horizontal overflow; side-panel resizing is clamped so the plot workspace retains usable width.
 - Calibration Sandbox toolbar action, six plot slots, Reference/Simulated selectors, universal line-style legend, resizable parameter panel, constant sliders, reset controls, and Save as Default are covered by regression tests; Save as Default now shows explicit saved/dirty feedback.
-- Slider-driven reruns use the existing Systemika engine and avoid run-file persistence after the initial named run for responsive manual calibration.
+- Slider-driven reruns use the existing Systemika engine, use a 40 ms live-rerun coalescing interval, and avoid run-file persistence after the initial named run for responsive manual calibration. Slider input cancels pending metadata writes; sandbox metadata is committed on slider change/release rather than repeatedly during manipulation.
 - Reset and Reset All refresh plots and preserve subsequent live interaction.
-- Calibration state persists in associated .sysrun metadata and restores plot/parameter configuration.
-- Copied model entities use underscore-number suffixes.
+- Calibration state restores plot/parameter configuration through lightweight `<Run Name>.sysrun.metadata.json` companion metadata that is merged over the associated `.sysrun` metadata without recompressing the run dataset.
+- Same-model copies and cross-model destination name collisions use underscore-number suffixes; cross-window paste preserves original names when those names are free in the destination model.

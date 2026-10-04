@@ -304,6 +304,17 @@ primitiveBank.textarea = addValueAttributes(createTemplate("TextArea", {
 	TextAlign: "left"
 }));
 
+primitiveBank.feedbackloop = createTemplate("FeedbackLoop", {
+	LoopType: "reinforcing-clockwise",
+	Label: "",
+	Color: "red",
+	FontFamily: "Arial, Helvetica, sans-serif",
+	FontSize: "12",
+	FontWeight: "bold",
+	FontStyle: "italic",
+	TextDecoration: "underline"
+});
+
 primitiveBank.rectangle = addValueAttributes(createTemplate("Rectangle", {
 	StrokeWidth: "1",
 	StrokeDashArray: "",
@@ -356,7 +367,7 @@ primitiveBank.display = createTemplate("Display", {
 // reference. The historical misspelled name remains as a compatibility alias
 // until makexml/editor are migrated in a later independence pass.
 const savablePrimitiveTypes = [
-	"TextArea", "Rectangle", "Ellipse", "Line", "Setting",
+	"TextArea", "FeedbackLoop", "Rectangle", "Ellipse", "Line", "Setting",
 	"Stock", "Variable", "Converter", "Ghost", "Flow", "Link", "Text",
 	"Numberbox", "Table", "TimePlot", "ComparePlot", "XyPlot", "HistoPlot"
 ];

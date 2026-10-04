@@ -38,7 +38,7 @@ class BaseFileManager {
     this.updateTitle();
   }
   newModel() {
-    localStorage.removeItem("reloadPending");
+    (typeof sessionStorage !== "undefined" ? sessionStorage : localStorage).removeItem("reloadPending");
     this._fileName = "";
     this.storedModelName = null;
     this.updateTitle();
@@ -405,6 +405,16 @@ class WebFileManagerModern extends BaseFileManager {
     this.softwareName = webAppName;
     this.fileHandle = undefined;
     this.projectDirectoryHandle = undefined;
+    const storage = typeof sessionStorage !== "undefined" ? sessionStorage : localStorage;
+    let sessionId = storage.getItem("systemika.windowSessionId");
+    if (!sessionId) {
+      sessionId = (typeof crypto !== "undefined" && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      storage.setItem("systemika.windowSessionId", sessionId);
+    }
+    this.fileHandleStorageKey = `fileHandle:${sessionId}`;
+    this.projectDirectoryStorageKey = `systemikaProjectDirectoryHandle:${sessionId}`;
   }
 
   // Keep the web browser tab concise. File/storage state is shown inside the UI.
@@ -414,13 +424,13 @@ class WebFileManagerModern extends BaseFileManager {
   }
 
   async init() {
-    this.fileHandle = await idbKeyval.get('fileHandle');
-    this.projectDirectoryHandle = await idbKeyval.get('systemikaProjectDirectoryHandle');
+    this.fileHandle = await idbKeyval.get(this.fileHandleStorageKey);
+    this.projectDirectoryHandle = await idbKeyval.get(this.projectDirectoryStorageKey);
   }
 
   async clean() {
-    await idbKeyval.del('fileHandle');
-    await idbKeyval.del('systemikaProjectDirectoryHandle');
+    await idbKeyval.del(this.fileHandleStorageKey);
+    await idbKeyval.del(this.projectDirectoryStorageKey);
     this.fileHandle = undefined;
     this.projectDirectoryHandle = undefined;
   }
@@ -444,13 +454,13 @@ class WebFileManagerModern extends BaseFileManager {
 
   async clearProjectDirectoryHandle() {
     this.projectDirectoryHandle = undefined;
-    await idbKeyval.del('systemikaProjectDirectoryHandle');
+    await idbKeyval.del(this.projectDirectoryStorageKey);
   }
 
   async setFileHandle(fileHandle) {
     const sameFile = await this.sameEntry(this.fileHandle, fileHandle);
     this.fileHandle = fileHandle;
-    await idbKeyval.set('fileHandle', this.fileHandle);
+    await idbKeyval.set(this.fileHandleStorageKey, this.fileHandle);
     if (!sameFile) await this.clearProjectDirectoryHandle();
   }
 
@@ -515,7 +525,7 @@ class WebFileManagerModern extends BaseFileManager {
     }
 
     this.projectDirectoryHandle = directoryHandle;
-    await idbKeyval.set('systemikaProjectDirectoryHandle', directoryHandle);
+    await idbKeyval.set(this.projectDirectoryStorageKey, directoryHandle);
     return directoryHandle;
   }
 
@@ -644,7 +654,7 @@ class WebFileManagerModern extends BaseFileManager {
     const chosenHandle = existingHandle || await directoryHandle.getFileHandle(chosenName, { create: true });
     await this.setFileHandle(chosenHandle);
     this.projectDirectoryHandle = directoryHandle;
-    await idbKeyval.set('systemikaProjectDirectoryHandle', directoryHandle);
+    await idbKeyval.set(this.projectDirectoryStorageKey, directoryHandle);
     this.fileName = this.fileHandle.name;
     return true;
   }
@@ -661,6 +671,52 @@ class WebFileManagerModern extends BaseFileManager {
     if (this.finishedSaveHandler) {
       this.finishedSaveHandler();
     }
+  }
+
+  // Export auxiliary files (equations, tables, graphs, etc.) without changing
+  // the model's current .ssd file handle.  The modern Web file manager used to
+  // omit this method entirely, so calls such as Export Equations silently fell
+  // back to an undefined function in the WebApp.
+  async exportFile(dataToSave, fileExtension, onSuccess) {
+    if (onSuccess == undefined) onSuccess = () => { };
+    const extension = String(fileExtension || "").startsWith(".")
+      ? String(fileExtension)
+      : `.${String(fileExtension || "txt")}`;
+    const suggestedName = this.appendFileExtension(this.defaultExportBaseName(), extension);
+    const ext = extension.replace(/^\./, "");
+    try {
+      if (typeof window.showSaveFilePicker === "function") {
+        const handle = await window.showSaveFilePicker({
+          suggestedName,
+          types: [{
+            description: `${ext.toUpperCase()} file`,
+            accept: { "application/octet-stream": [extension] }
+          }]
+        });
+        const writable = await handle.createWritable();
+        await writable.write(dataToSave);
+        await writable.close();
+        onSuccess(handle.name || suggestedName);
+        return handle.name || suggestedName;
+      }
+    } catch (error) {
+      if (error && error.name === "AbortError") return null;
+      console.error("Unable to export file with the browser file picker", error);
+    }
+
+    // Defensive fallback for Chromium variants where a File System Access
+    // method is exposed but not usable in the current embedding context.
+    const blob = new Blob([dataToSave], { type: "application/octet-stream" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.style.display = "none";
+    a.href = url;
+    a.download = suggestedName;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { window.URL.revokeObjectURL(url); a.remove(); }, 100);
+    onSuccess(suggestedName);
+    return suggestedName;
   }
 
   async saveModelAs() {
@@ -895,6 +951,9 @@ class BaseEnvironment {
     // Default: false
     return false;
   }
+  openNewWindow() {
+    return false;
+  }
 }
 
 class WebEnvironment extends BaseEnvironment {
@@ -975,6 +1034,29 @@ class WebEnvironment extends BaseEnvironment {
     };
     */
   }
+  openNewWindow() {
+    try {
+      const host = window.top || window;
+      const url = host.location.href;
+      // window.open() normally clones the opener's sessionStorage into the new
+      // browsing context.  Open about:blank first so we can deliberately clear
+      // that copied model/history state before loading another Systemika editor.
+      const opened = host.open("about:blank", "_blank");
+      if (opened) {
+        try { opened.sessionStorage.clear(); } catch (_) {}
+        opened.location.replace(url);
+        try { opened.focus(); } catch (_) {}
+        return true;
+      }
+    } catch (error) {
+      console.error(error);
+    }
+    if (typeof xAlert === "function") {
+      xAlert("Systemika could not open another model window. Allow pop-up windows for this site and try again.");
+    }
+    return false;
+  }
+
   getFileManager() {
     const status = this.getProjectFileAccessStatus();
     if (status.available) {
@@ -1002,6 +1084,14 @@ class ElectronEnvironment extends BaseEnvironment {
   }
   getFileManager() {
     return new ElectronFileManager();
+  }
+  openNewWindow() {
+    const api = getElectronAPI();
+    if (api && typeof api.openNewWindow === "function") {
+      api.openNewWindow();
+      return true;
+    }
+    return false;
   }
   closeWindow() {
     // Tells main.js it's safe to actually close the window now — see the

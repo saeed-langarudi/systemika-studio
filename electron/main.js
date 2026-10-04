@@ -139,8 +139,9 @@ async function currentSystemikaBuildId() {
 }
 
 let mainWindow;
+const modelWindows = new Set();
 // A file path the app was launched with (double-clicked, "Open with…", or a
-// CLI argument), captured before the window exists so it isn't lost.
+// CLI argument), captured before the first window exists so it isn't lost.
 let pendingOpenFilePath = readFilePathFromArgv(process.argv);
 
 // Only one window: a second launch (e.g. double-clicking another .ssd file)
@@ -151,33 +152,26 @@ if (!gotSingleInstanceLock) {
 } else {
 	app.on("second-instance", (event, argv) => {
 		let filePath = readFilePathFromArgv(argv);
-		if (filePath) {
-			sendOpenFile(filePath);
-		}
-		if (mainWindow) {
-			if (mainWindow.isMinimized()) {
-				mainWindow.restore();
-			}
-			mainWindow.focus();
-		}
+		// Each model gets its own top-level window.  A second launch therefore
+		// opens another model instead of replacing the document already in use.
+		let win = createWindow(filePath || null);
+		if (!filePath && win) win.focus();
 	});
 
 	// macOS delivers a file-association launch as this event, separately from
 	// argv, and can fire before the app is ready.
 	app.on("open-file", (event, filePath) => {
 		event.preventDefault();
-		if (mainWindow) {
-			sendOpenFile(filePath);
-		} else {
-			pendingOpenFilePath = filePath;
-		}
+		if (app.isReady()) createWindow(filePath);
+		else pendingOpenFilePath = filePath;
 	});
 
 	app.whenReady().then(() => {
 		// The app has its own in-page menu bar (the "File"/"View"/… buttons in
 		// index.html); Electron's default native menu would just duplicate it.
 		Menu.setApplicationMenu(null);
-		createWindow();
+		createWindow(pendingOpenFilePath || null);
+		pendingOpenFilePath = null;
 	});
 
 	app.on("window-all-closed", () => {
@@ -201,14 +195,14 @@ function readFilePathFromArgv(argv) {
 	return filePath || null;
 }
 
-function sendOpenFile(filePath) {
-	mainWindow.webContents.send("app:open-file", filePath);
+function sendOpenFile(filePath, targetWindow = mainWindow) {
+	if (targetWindow && !targetWindow.isDestroyed()) targetWindow.webContents.send("app:open-file", filePath);
 }
 
-function createWindow() {
+function createWindow(fileToOpen = null) {
 	let readyToClose = false;
 
-	mainWindow = new BrowserWindow({
+	const win = new BrowserWindow({
 		width: 1280,
 		height: 800,
 		icon: iconPath,
@@ -217,6 +211,11 @@ function createWindow() {
 			contextIsolation: true,
 			nodeIntegration: false,
 			sandbox: true,
+			// The Calibration Sandbox is a separate window but its model engine
+			// executes in the editor renderer. Windows/Chromium can otherwise
+			// throttle that covered renderer after an Alt+Tab cycle, making live
+			// calibration noticeably sluggish even after focus returns.
+			backgroundThrottling: false,
 			// The actual editor (environment.js, editor.js) runs inside
 			// MultiSimulationAnalyser's #SimulationIFrame, not the top-level page —
 			// without this the preload script only reaches the outer frame, so
@@ -226,18 +225,26 @@ function createWindow() {
 		},
 	});
 
-	mainWindow.maximize();
-	mainWindow.setMenuBarVisibility(false);
-	mainWindow.setTitle(`Systemika Studio ${app.getVersion()}`);
-	mainWindow.on("page-title-updated", (event) => {
+	modelWindows.add(win);
+	mainWindow = win;
+	win.on("focus", () => { mainWindow = win; });
+	win.on("closed", () => {
+		modelWindows.delete(win);
+		if (mainWindow === win) mainWindow = Array.from(modelWindows).pop() || null;
+	});
+
+	win.maximize();
+	win.setMenuBarVisibility(false);
+	win.setTitle(`Systemika Studio ${app.getVersion()}`);
+	win.on("page-title-updated", (event) => {
 		event.preventDefault();
-		mainWindow.setTitle(`Systemika Studio ${app.getVersion()}`);
+		win.setTitle(`Systemika Studio ${app.getVersion()}`);
 	});
 	// The Output panel uses window.open() when detached. Electron maps that to a
 	// real BrowserWindow, so the detached panel can be moved to another monitor.
 	// Keep that popup independent of the main window rather than constraining it
 	// as an in-window overlay or modal child.
-	mainWindow.webContents.setWindowOpenHandler(({ frameName }) => {
+	win.webContents.setWindowOpenHandler(({ frameName }) => {
 		if (frameName === "SystemikaOutputWindow") {
 			return {
 				action: "allow",
@@ -251,15 +258,34 @@ function createWindow() {
 				}
 			};
 		}
+		if (frameName === "systemika-calibration-sandbox") {
+			return {
+				action: "allow",
+				overrideBrowserWindowOptions: {
+					width: 1500,
+					height: 900,
+					minWidth: 760,
+					minHeight: 560,
+					resizable: true,
+					parent: null,
+					autoHideMenuBar: true,
+				}
+			};
+		}
 		return { action: "allow" };
 	});
-	mainWindow.loadFile(entryPoint);
+	win.webContents.on("did-create-window", (childWindow, details) => {
+		if (details.frameName !== "systemika-calibration-sandbox") return;
+		childWindow.setMenuBarVisibility(false);
+		// Calibration is a dense six-plot workspace. Open it maximized so the
+		// complete plot grid and parameter panel fit immediately instead of
+		// requiring the user to resize the popup on every session.
+		childWindow.maximize();
+	});
+	win.loadFile(entryPoint);
 
-	mainWindow.webContents.on("did-finish-load", () => {
-		if (pendingOpenFilePath) {
-			sendOpenFile(pendingOpenFilePath);
-			pendingOpenFilePath = null;
-		}
+	win.webContents.on("did-finish-load", () => {
+		if (fileToOpen) sendOpenFile(fileToOpen, win);
 	});
 
 	// Unsaved changes are checked in the renderer (History.unsavedChanges), so
@@ -269,12 +295,12 @@ function createWindow() {
 	// this has to be targeted at that sub-frame explicitly. webContents.send()
 	// only reaches the main frame and the message would otherwise be dropped,
 	// leaving the window unable to close.
-	mainWindow.on("close", (event) => {
+	win.on("close", (event) => {
 		if (readyToClose) {
 			return;
 		}
 		event.preventDefault();
-		let targetFrame = mainWindow.webContents.mainFrame.framesInSubtree.find(
+		let targetFrame = win.webContents.mainFrame.framesInSubtree.find(
 			(frame) => frame.url.includes("OpenSystemDynamics")
 		);
 		if (targetFrame) {
@@ -282,32 +308,38 @@ function createWindow() {
 		} else {
 			// Sub-frame not loaded yet, so nothing is tracking unsaved changes.
 			readyToClose = true;
-			mainWindow.close();
+			win.close();
 		}
 	});
 
-	mainWindow.confirmClose = () => {
+	win.confirmClose = () => {
 		readyToClose = true;
 		// Renderer consent has already been obtained. destroy() bypasses the
 		// intercepted close event entirely, so "No" (discard changes) cannot
 		// fall back into another close round-trip or get stranded on Linux.
-		if (!mainWindow.isDestroyed()) mainWindow.destroy();
+		if (!win.isDestroyed()) win.destroy();
 	};
+	return win;
 }
 
 // Registered once at module scope (not inside createWindow) so a second
 // window — e.g. after all windows closed and the dock icon reopened one on
 // macOS — doesn't add a duplicate listener.
-ipcMain.handle("window:confirm-close", async () => {
-	if (mainWindow && !mainWindow.isDestroyed()) {
-		mainWindow.confirmClose();
-	}
+ipcMain.handle("window:confirm-close", async (event) => {
+	const owner = BrowserWindow.fromWebContents(event.sender) || mainWindow;
+	if (owner && !owner.isDestroyed() && typeof owner.confirmClose === "function") owner.confirmClose();
+	return true;
+});
+
+ipcMain.handle("window:new", async () => {
+	createWindow();
 	return true;
 });
 
 ipcMain.handle("dialog:save", async (event, defaultPath, extension) => {
 	let ext = (extension || fileExtension).replace(/^\./, "");
-	let result = await dialog.showSaveDialog(mainWindow, {
+	const owner = BrowserWindow.fromWebContents(event.sender) || mainWindow;
+	let result = await dialog.showSaveDialog(owner, {
 		defaultPath,
 		filters: [
 			{ name: ext === "ssd" ? "Systemika Models" : ext.toUpperCase() + " Files", extensions: [ext] },
@@ -318,7 +350,8 @@ ipcMain.handle("dialog:save", async (event, defaultPath, extension) => {
 });
 
 ipcMain.handle("dialog:open", async (event, extension) => {
-	let result = await dialog.showOpenDialog(mainWindow, {
+	const owner = BrowserWindow.fromWebContents(event.sender) || mainWindow;
+	let result = await dialog.showOpenDialog(owner, {
 		properties: ["openFile"],
 		filters: [
 			{ name: "Systemika Models", extensions: [(extension || fileExtension).replace(/^\./, "")] },
@@ -402,6 +435,10 @@ ipcMain.handle("systemika:runs:save", async (event, modelPath, payload) => {
 		metadata,
 		overwrite: Boolean(payload.overwrite),
 	});
+});
+
+ipcMain.handle("systemika:runs:update-metadata", async (event, modelPath, runLabel, patch) => {
+	return systemikaRunStore.updateRunMetadata({ modelPath, runLabel, patch });
 });
 
 ipcMain.handle("systemika:runs:load", async (event, modelPath, runLabel) => {

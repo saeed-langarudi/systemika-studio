@@ -233,7 +233,49 @@ text.name_element {
     outline-offset: -3px;
 }
 
-/* Clipboard and colour controls are top-toolbar actions. */
+.feedback-loop-tool-control {
+    position: relative;
+    width: var(--button-size);
+    height: var(--button-size);
+}
+.feedback-loop-picker {
+    position: absolute;
+    left: calc(100% + 0.35rem);
+    top: 0;
+    display: grid;
+    grid-template-columns: repeat(2, 3.1rem);
+    gap: 0.3rem;
+    padding: 0.45rem;
+    background: var(--color-white);
+    border: 1px solid var(--color-border);
+    border-radius: 0.3rem;
+    box-shadow: var(--shadow-menu);
+    z-index: 1200;
+}
+.feedback-loop-picker[hidden] {
+    display: none;
+}
+.feedback-loop-picker button.feedback-loop-option {
+    width: 3.1rem;
+    height: 3.1rem;
+    min-width: 0;
+    padding: 0.2rem;
+    border: 1px solid var(--color-border);
+    border-radius: 0.25rem;
+    background: var(--color-white);
+    cursor: pointer;
+}
+.feedback-loop-picker button.feedback-loop-option:hover {
+    border-color: black;
+    background: var(--color-highlight-neutral);
+}
+.feedback-loop-picker button.feedback-loop-option img {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+/* Clipboard and color controls are top-toolbar actions. */
 .tool-panel button.toolbar-action-button {
     border: 1px solid var(--color-border);
     background-color: var(--color-highlight-neutral);
@@ -256,12 +298,12 @@ text.name_element {
 .tool-panel button.toolbar-action-button:disabled > svg {
     opacity: 0.5;
 }
-.toolbar-colour-control {
+.toolbar-color-control {
     position: relative;
     width: var(--button-size);
     height: var(--button-size);
 }
-.toolbar-colour-picker {
+.toolbar-color-picker {
     position: absolute;
     left: 0;
     top: calc(100% + 0.35rem);
@@ -275,10 +317,10 @@ text.name_element {
     box-shadow: var(--shadow-menu);
     z-index: 1000;
 }
-.toolbar-colour-picker[hidden] {
+.toolbar-color-picker[hidden] {
     display: none;
 }
-.toolbar-colour-picker button.toolbar-colour-swatch {
+.toolbar-color-picker button.toolbar-color-swatch {
     width: 1.6rem;
     height: 1.6rem;
     min-width: 0;
@@ -288,7 +330,7 @@ text.name_element {
     background: var(--color-white);
     cursor: pointer;
 }
-.toolbar-colour-picker button.toolbar-colour-swatch::before {
+.toolbar-color-picker button.toolbar-color-swatch::before {
     content: "";
     display: block;
     width: 100%;
@@ -296,7 +338,7 @@ text.name_element {
     border-radius: 0.1rem;
     background: var(--swatch);
 }
-.toolbar-colour-picker button.toolbar-colour-swatch:hover {
+.toolbar-color-picker button.toolbar-color-swatch:hover {
     border-color: black;
 }
 #svgplanebackground {
@@ -676,7 +718,7 @@ button.primitive-add-button {
     font-family: monospace !important;
 }
 button.primitive-add-button[disabled]{
-    color: grey !important;
+    color: gray !important;
 }
 button.primitive-remove-button {
     color: #aa0000 !important; 

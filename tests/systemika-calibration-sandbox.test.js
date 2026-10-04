@@ -23,10 +23,39 @@ test('Calibration Sandbox is manual UI over the existing simulation engine', () 
 });
 
 
-test('Calibration Sandbox panel is wider and user-resizable', () => {
-  assert.match(js, /grid-template-columns:minmax\(650px,1fr\) 6px 408px/);
+test('Calibration Sandbox panel is user-resizable without forcing horizontal overflow', () => {
+  assert.match(js, /grid-template-columns:minmax\(0,1fr\) 6px 408px/);
   assert.match(js, /panel-splitter/);
+  assert.match(js, /function panelWidthBounds\(\)/);
   assert.match(js, /pointermove/);
+  assert.match(js, /table-layout:fixed/);
+  assert.match(js, /overflow-y:auto;overflow-x:hidden/);
+});
+
+test('Calibration Sandbox opens to the available screen and keeps all six plots inside the viewport', () => {
+  const electron = fs.readFileSync(path.join(root, 'electron/main.js'), 'utf8');
+  assert.match(js, /function calibrationWindowRect\(\)/);
+  assert.match(js, /screenInfo\.availWidth/);
+  assert.match(js, /screenInfo\.availHeight/);
+  assert.match(js, /resizeTo\(rect\.width, rect\.height\)/);
+  assert.match(js, /grid-template-rows:auto auto minmax\(0,1fr\)/);
+  assert.match(js, /grid-template-rows:repeat\(2,minmax\(0,1fr\)\)/);
+  assert.match(js, /@media\(max-width:1100px\)[\s\S]{0,180}grid-template-rows:repeat\(3,minmax\(0,1fr\)\)/);
+  assert.match(electron, /frameName === "systemika-calibration-sandbox"/);
+  assert.match(electron, /details\.frameName !== "systemika-calibration-sandbox"/);
+  assert.match(electron, /childWindow\.maximize\(\)/);
+});
+
+
+test('Calibration Sandbox variable picker search visibly filters its result list', () => {
+  const filterBlock = js.slice(js.indexOf('function applyPickerFilter'), js.indexOf('function chooseConstant'));
+  assert.match(js, /\.picker-list button\[hidden\]\{display:none\}/);
+  assert.match(filterBlock, /addEventListener\('input',filter\)/);
+  assert.match(filterBlock, /addEventListener\('search',filter\)/);
+  assert.match(filterBlock, /button\.hidden=!matches/);
+  assert.match(filterBlock, /button\.style\.display=matches\?'':'none'/);
+  assert.match(filterBlock, /picker-no-match/);
+  assert.match(filterBlock, /applyPickerFilter\(host,''\)/);
 });
 
 test('Calibration live reruns avoid persistence and reset schedules a refresh', () => {
@@ -79,6 +108,90 @@ test('Systemika alert dialogs route into the Calibration Sandbox while it is ope
   assert.match(alertDialog, /this\.visible = false; this\.afterClose\(\)/);
   assert.match(alertDialog, /super\.show\(\)/);
   assert.match(editor, /Simulation error:<br\/><br\/>\$\{htmlEscape\(res\.error\)\}/);
+});
+
+test('Calibration live rerun debounce is 40 ms and slider metadata saves only after commit', () => {
+  const scheduleBlock = js.slice(js.indexOf('function scheduleRerun'), js.indexOf('async function launch'));
+  assert.match(scheduleBlock, /\},40\);/);
+  const inputLine = js.match(/slider\.oninput=.*;/)?.[0] || '';
+  assert.match(inputLine, /clearTimeout\(state\.persistTimer\)/);
+  assert.match(inputLine, /state\.persistTimer=null/);
+  assert.match(inputLine, /scheduleRerun\(\)/);
+  assert.doesNotMatch(inputLine, /schedulePersist/);
+  assert.match(js, /slider\.onchange=.*setNumericValue\(p,v\).*schedulePersist\(0\)/);
+  assert.match(js, /beforeunload[\s\S]{0,180}persistSandboxState\(\)/);
+});
+
+
+test('Calibration slider live input stays lightweight and failed runs release the rerun gate', () => {
+  assert.match(js, /setNumericValue\(p,v,\{live:true\}\)/);
+  assert.match(js, /live && p && p\.value[\s\S]{0,220}p\.value\.setAttribute\('Equation', text\)/);
+  assert.match(js, /slider\.onchange=.*setNumericValue\(p,v\).*schedulePersist\(0\)/);
+  const finishBlock = js.slice(js.indexOf('function finishRunIfStopped'), js.indexOf('function reconcileLiveRunState'));
+  assert.match(finishBlock, /completed&&state\.rerunPending\)queuePendingRerunAfterPaint\(\)/);
+  assert.match(finishBlock, /else if\(!completed\)state\.rerunPending=false/);
+  const waitBlock = js.slice(js.indexOf('function waitForRun'), js.indexOf('function runCalibration'));
+  assert.match(waitBlock, /liveSetTimeout\(poll,10\)/);
+});
+
+test('Calibration reruns are coalesced during continuous dragging instead of trailing-debounced', () => {
+  const scheduleBlock = js.slice(js.indexOf('function scheduleRerun'), js.indexOf('async function launch'));
+  assert.match(scheduleBlock, /if\(state\.running\)\{state\.rerunPending=true;return;\}/);
+  assert.match(scheduleBlock, /if\(state\.timer!=null\)return/);
+  assert.match(scheduleBlock, /state\.timer=null/);
+  assert.match(scheduleBlock, /\},40\);/);
+  assert.doesNotMatch(scheduleBlock, /clearTimeout\(state\.timer\)/);
+});
+
+test('Calibration pending reruns yield one paint but do not wait another 40 ms', () => {
+  const queueBlock = js.slice(js.indexOf('function queuePendingRerunAfterPaint'), js.indexOf('function waitForRun'));
+  assert.match(queueBlock, /requestAnimationFrame/);
+  assert.match(queueBlock, /liveSetTimeout\(launch,0\)/);
+  assert.match(queueBlock, /runCalibration\(false\)/);
+  assert.doesNotMatch(queueBlock, /40/);
+});
+
+test('Calibration rerun timing survives Alt+Tab/background throttling', () => {
+  const editor = fs.readFileSync(path.join(root, 'OpenSystemDynamics/src/editor.js'), 'utf8');
+  const engine = fs.readFileSync(path.join(root, 'OpenSystemDynamics/src/systemika-engine.js'), 'utf8');
+  const electron = fs.readFileSync(path.join(root, 'electron/main.js'), 'utf8');
+  const timerBlock = js.slice(js.indexOf('function liveTimerWindow'), js.indexOf('function closeOutputs'));
+  const queueBlock = js.slice(js.indexOf('function queuePendingRerunAfterPaint'), js.indexOf('function runCalibration'));
+  const scheduleBlock = js.slice(js.indexOf('function scheduleRerun'), js.indexOf('async function launch'));
+
+  assert.match(timerBlock, /state\.win && !state\.win\.closed \? state\.win : root/);
+  assert.match(js, /RunResults\.systemikaCallbackScheduler=scheduleEngineCallback/);
+  assert.match(js, /addEventListener\('focus', reconcileLiveRunState\)/);
+  assert.match(js, /visibilitychange[\s\S]{0,160}reconcileLiveRunState\(\)/);
+  assert.match(queueBlock, /liveSetTimeout\(poll,10\)/);
+  assert.doesNotMatch(queueBlock, /root\.setTimeout/);
+  assert.match(scheduleBlock, /liveSetTimeout\(/);
+  assert.doesNotMatch(scheduleBlock, /root\.setTimeout/);
+  assert.match(editor, /callbackScheduler:[^\n]*systemikaCallbackScheduler/);
+  assert.match(engine, /config\.callbackScheduler/);
+  assert.match(electron, /backgroundThrottling:\s*false/);
+});
+
+test('Calibration live plot refresh updates chart bodies without rebuilding plot controls', () => {
+  const refreshBlock = js.slice(js.indexOf('function refreshPlotCharts'), js.indexOf('function queuePendingRerunAfterPaint'));
+  assert.match(refreshBlock, /querySelectorAll\('\.plot'\)/);
+  assert.match(refreshBlock, /querySelector\('\.chart'\)/);
+  assert.match(refreshBlock, /chart\.innerHTML=svgPlot\(i\)/);
+  assert.doesNotMatch(refreshBlock, /plot-controls button/);
+});
+
+test('Calibration metadata uses a lightweight sidecar instead of recompressing the sysrun dataset', () => {
+  const manager = fs.readFileSync(path.join(root, 'OpenSystemDynamics/src/systemika-run-data-manager.js'), 'utf8');
+  const preload = fs.readFileSync(path.join(root, 'electron/preload.js'), 'utf8');
+  const main = fs.readFileSync(path.join(root, 'electron/main.js'), 'utf8');
+  const packageStore = fs.readFileSync(path.join(root, 'electron/systemika-run-package.js'), 'utf8');
+  const browserStore = fs.readFileSync(path.join(root, 'OpenSystemDynamics/src/systemika-run-browser-store.js'), 'utf8');
+  assert.match(manager, /typeof api\.updateMetadata === 'function'/);
+  assert.match(preload, /systemika:runs:update-metadata/);
+  assert.match(main, /systemika:runs:update-metadata/);
+  assert.match(packageStore, /METADATA_SIDECAR_SUFFIX/);
+  assert.match(packageStore, /async function updateRunMetadata/);
+  assert.match(browserStore, /updateMetadata: updateRunMetadata/);
 });
 
 test('copied model entities use underscore suffixes', () => {

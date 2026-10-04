@@ -228,6 +228,17 @@ function systemikaNormalizeLoadedModel() {
             lookup.value.setAttribute("Data", pairs.join(";"));
         }
         if (lookup.getAttribute("Source") == null) lookup.value.setAttribute("Source", "Time");
+        // Older/current files can store the id of a Ghost when a Lookup was
+        // connected through that Ghost. A Ghost is a visual alias, not a
+        // numerical entity, so normalize the Lookup input to the Ghost's source.
+        const lookupSourceId = lookup.getAttribute("Source");
+        if (lookupSourceId && lookupSourceId !== "Time" && typeof findID === "function") {
+            const lookupSource = findID(lookupSourceId);
+            if (lookupSource && lookupSource.value && lookupSource.value.nodeName === "Ghost") {
+                const originalId = lookupSource.getAttribute("Source");
+                if (originalId) lookup.value.setAttribute("Source", String(originalId));
+            }
+        }
         if (lookup.getAttribute("Interpolation") == null) lookup.value.setAttribute("Interpolation", "Linear");
     }
 

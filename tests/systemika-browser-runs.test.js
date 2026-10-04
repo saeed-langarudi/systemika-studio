@@ -211,3 +211,35 @@ test('browser run store can load a desktop-created compressed package from Runs'
   assert.match(loaded.csv, /0,42/);
   assert.equal(loaded.metadata.runName, 'Desktop');
 });
+
+test('browser metadata updates use a sidecar and leave the sysrun archive unchanged', async () => {
+  const { context, projectDirectory } = loadBrowserStore();
+  const api = context.systemikaBrowserRuns;
+  await api.save('Model.ssd', {
+    runLabel: 'Calibration',
+    csv: 'Time,X\r\n0,1\r\n',
+    metadata: {},
+    overwrite: false,
+  });
+  const runsDir = projectDirectory.children.get('Runs');
+  const runHandle = runsDir.children.get('Calibration.sysrun');
+  const before = new Uint8Array(runHandle.bytes);
+
+  const saved = await api.updateMetadata('Model.ssd', 'Calibration', {
+    calibrationSandbox: { version: 1, panelWidth: 512 },
+  });
+  assert.equal(saved.path, 'Runs/Calibration.sysrun.metadata.json');
+  assert.deepEqual(runHandle.bytes, before);
+  assert.ok(runsDir.children.has('Calibration.sysrun.metadata.json'));
+
+  const loaded = await api.load('Model.ssd', 'Calibration');
+  assert.equal(loaded.metadata.calibrationSandbox.panelWidth, 512);
+
+  await api.save('Model.ssd', {
+    runLabel: 'Calibration',
+    csv: 'Time,X\r\n0,2\r\n',
+    metadata: {},
+    overwrite: true,
+  });
+  assert.equal(runsDir.children.has('Calibration.sysrun.metadata.json'), false);
+});

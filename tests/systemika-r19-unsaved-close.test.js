@@ -66,9 +66,10 @@ test('Undoing back to the saved XML clears Unsaved Changes and redo marks it dir
   assert.equal(ui.hidden, false);
 });
 
-test('History persists the saved snapshot across editor restart/reload', () => {
-  assert.match(editor, /localStorage\.setItem\("history_saved_state", this\.savedState\)/);
-  assert.match(editor, /this\.savedState = localStorage\.getItem\("history_saved_state"\)/);
+test('History persists the saved snapshot across editor restart/reload in window-isolated session storage', () => {
+  assert.match(editor, /let storage = modelSessionStorage\(\)/);
+  assert.match(editor, /storage\.setItem\("history_saved_state", this\.savedState\)/);
+  assert.match(editor, /this\.savedState = storage\.getItem\("history_saved_state"\)/);
   assert.match(editor, /static markSaved\(savedState = null\)/);
 });
 
@@ -76,7 +77,8 @@ test('Discarding unsaved changes closes through an acknowledged IPC path', () =>
   assert.match(editor, /case "no":\s*continueHandler\(\);/);
   assert.match(preload, /confirmClose:\s*\(\) => ipcRenderer\.invoke\("window:confirm-close"\)/);
   assert.match(main, /ipcMain\.handle\("window:confirm-close"/);
-  assert.match(main, /if \(!mainWindow\.isDestroyed\(\)\) mainWindow\.destroy\(\);/);
+  assert.match(main, /const owner = BrowserWindow\.fromWebContents\(event\.sender\) \|\| mainWindow/);
+  assert.match(main, /if \(!win\.isDestroyed\(\)\) win\.destroy\(\);/);
   assert.doesNotMatch(preload, /confirmClose:\s*\(\) => ipcRenderer\.send\("window:confirm-close"\)/);
 });
 

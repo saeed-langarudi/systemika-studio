@@ -211,6 +211,6 @@ function replaceAll(text, search, replacement) {
 function cmd(key) {
     const isMac = typeof mxClient !== "undefined" && mxClient.IS_MAC;
     return isMac
-        ? "<span style='color:grey'>(&#8984;" + key + ")</span>"
-        : "<span style='color:grey'>(Ctrl-" + key + ")</span>";
+        ? "<span style='color:gray'>(&#8984;" + key + ")</span>"
+        : "<span style='color:gray'>(Ctrl-" + key + ")</span>";
 }

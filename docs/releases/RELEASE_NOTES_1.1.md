@@ -1,6 +1,6 @@
 # Systemika Studio 1.1 — Release Notes
 
-Systemika Studio 1.1 (internal package version **1.1.0**) introduces the **Calibration Sandbox**, a manual calibration workspace designed for interactive teaching and model exploration. It adds an interface layer around the existing Systemika simulation engine; it does **not** introduce an optimiser, fitting algorithm, objective function, or automatic calibration routine.
+Systemika Studio 1.1 (internal package version **1.1.0**) introduces the **Calibration Sandbox**, a manual calibration workspace designed for interactive teaching and model exploration. It adds an interface layer around the existing Systemika simulation engine; it does **not** introduce an optimizer, fitting algorithm, objective function, or automatic calibration routine.
 
 ## Calibration Sandbox
 
@@ -16,7 +16,7 @@ Systemika Studio 1.1 (internal package version **1.1.0**) introduces the **Calib
 - Adds a resizable **Parameter Sliders** panel. Its initial width is 408 px and the divider can be dragged to resize it.
 - Model constants can be added as calibration parameters with editable **Minimum**, **Maximum**, and **Increment** values.
 - Slider changes are applied directly to the selected model constants and rerun the existing Systemika simulation engine so all sandbox plots refresh from the new trajectory.
-- Live slider reruns remain in memory after the initial named run, avoiding run-file disk I/O in the feedback path and using a short 25 ms rerun debounce for responsive interaction.
+- Live slider reruns remain in memory after the initial named run, avoiding run-file disk I/O in the feedback path. The original 1.1 implementation used a 25 ms rerun debounce; the maintained 1.1.8 build uses a 40 ms coalescing interval with sandbox-owned timers to keep slider feedback responsive.
 - Each parameter has **Reset**; the panel also provides **Reset All** and **Save as Default**.
 - Reset operations refresh every plot and preserve subsequent live slider operation.
 - **Save as Default** writes the current selected parameter values back to the model as their new defaults.

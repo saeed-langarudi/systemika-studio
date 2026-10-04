@@ -1,6 +1,6 @@
 # Systemika Studio 1.1 Validation Baseline
 
-Date: 2026-09-28
+Date: 2026-10-01
 
 ## Purpose
 
@@ -9,7 +9,7 @@ Systemika Studio 1.1 retains the permanent regression baseline established durin
 
 ## Current release result
 
-Systemika Studio 1.1.7 has **19 permanent validation models** and **415/415 passing automated regression tests**. The milestone notes below are retained as a development history of how that baseline grew.
+Systemika Studio 1.1.8 has **19 permanent validation models** and **427/427 passing automated regression tests**. The milestone notes below are retained as a development history of how that baseline grew.
 
 ## Permanent validation models
 
@@ -153,7 +153,7 @@ The 1.1.2 suite adds focused coverage for startup/manual update checking and gen
 
 ### 1.1.2 update-check resilience
 
-The 1.1.2 maintenance suite verifies that WebApp update checks refetch the editor page that is actually running instead of guessing a server directory, and that desktop builds use the confirmed canonical WebApp root `https://systemika.no/studio/app/`. The desktop checker starts with the generated root manifest and can fall back to the exact deployed analyser/editor HTML. Detailed failed probes are retained only in diagnostics; the visible alert remains concise. Generated WebApp HTML and packaged desktop staging share the same content-derived build ID so a corrected 1.1.2 build can be distinguished without changing the semantic version.
+The 1.1.2 maintenance suite verifies that WebApp update checks refetch the editor page that is actually running instead of guessing a server directory, and that desktop builds use the confirmed canonical WebApp root `https://systemika.no/studio/app/`. The desktop checker starts with the generated root manifest and can fall back to the exact deployed analysis/editor HTML. Detailed failed probes are retained only in diagnostics; the visible alert remains concise. Generated WebApp HTML and packaged desktop staging share the same content-derived build ID so a corrected 1.1.2 build can be distinguished without changing the semantic version.
 
 
 ## Version 1.1.6 calibration alert visibility regression coverage
@@ -162,4 +162,11 @@ The 1.1.6 suite verifies that Systemika alert dialogs are routed into a dedicate
 
 ## Version 1.1.7 Text Box interaction regression coverage
 
-The 1.1.7 suite verifies that annotation double-click routing uses the browser's painted hit-test before any coarse geometry fallback, so a Text Box opens normally unless a real Stock, Auxiliary, Constant, Lookup, or Flow is actually under the pointer. It also verifies that pressing Enter with exactly one Text Box selected opens the Text properties dialog. Current release baseline: **415/415 automated tests passing** with **19/19 permanent validation models**.
+The 1.1.7 suite verifies that annotation double-click routing uses the browser's painted hit-test before any coarse geometry fallback, so a Text Box opens normally unless a real Stock, Auxiliary, Constant, Lookup, or Flow is actually under the pointer. It also verifies that pressing Enter with exactly one Text Box selected opens the Text properties dialog. Historical 1.1.7 baseline: **417/417 automated tests passing** with **19/19 permanent validation models**.
+## Version 1.1.8 Feedback Loop annotation regression coverage
+
+The 1.1.8 suite verifies that the Feedback Loop tool is positioned immediately above Text, presents all four reinforcing/balancing direction choices with correctly matched clockwise/counterclockwise artwork and tooltips, creates a persisted graphical `FeedbackLoop` annotation without entering the computational entity set, defaults to 50 points, remains square/circular during resizing and when older non-square geometry is loaded, uses exact Color-tool red for reinforcing loops and exact Color-tool blue for balancing loops, exposes one exact Size field plus label/font family/font size/bold/italic/underline controls on double-click with no alignment or duplicate color control, defaults new captions to bold/italic/underline, renders the caption below the loop, and applies the toolbar Color selection to the complete loop annotation through one shared Color attribute. The current suite also verifies the 40 ms Calibration Sandbox rerun coalescing interval, release/commit-only slider metadata persistence, cancellation of pending persistence during slider manipulation, and lightweight `.sysrun.metadata.json` metadata updates that leave the `.sysrun` archive bytes unchanged. Current release baseline: **439/439 automated tests passing** with **19/19 permanent validation models**.
+## Version 1.1.8 Calibration Sandbox fit-to-window regression coverage
+
+The corrective 1.1.8 suite verifies screen-aware Calibration Sandbox popup sizing, automatic desktop maximization, a viewport-contained six-plot grid, responsive 3×2 / 2×3 plot layouts, fluid parameter-table columns that do not force horizontal scrolling, and panel-width clamping that preserves usable plot space. Current release baseline: **448/448 automated tests passing** with **19/19 permanent validation models**.
+

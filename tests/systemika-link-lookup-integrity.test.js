@@ -32,7 +32,8 @@ test('Lookup accepts only one incoming Link and ignores outgoing Links for that 
 test('Lookup source follows only incoming Links and falls back to Time', () => {
   const converter = between(editor, 'class ConverterVisual extends BasePrimitive', 'class TwoPointer extends BaseObject');
   assert.match(converter, /findLinkedInPrimitives\(this\.id\)/);
-  assert.match(converter, /incoming\.length > 0 \? incoming\[0\]\.id : "Time"/);
+  assert.match(converter, /let source = incoming\.length > 0 \? \(orig\(incoming\[0\]\) \|\| incoming\[0\]\) : null/);
+  assert.match(converter, /setAttribute\("Source", source && source\.id != null \? source\.id : "Time"\)/);
   assert.doesNotMatch(converter, /getLinkedPrimitives\(this\.primitive\)/);
 });
 

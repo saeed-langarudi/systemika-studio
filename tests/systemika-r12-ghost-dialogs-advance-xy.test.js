@@ -49,6 +49,13 @@ test('ordinary application alerts are routed through in-app dialogs in editor an
   assert.doesNotMatch(analyserMain, /var new_model_name=prompt\(/);
 });
 
+
+test('Lookup visual stores the original entity id when its input Link comes from a Ghost', () => {
+  const converterVisual = between(editor, 'class ConverterVisual extends BasePrimitive', 'class TwoPointer extends BaseObject');
+  assert.match(converterVisual, /let source = incoming\.length > 0 \? \(orig\(incoming\[0\]\) \|\| incoming\[0\]\) : null/);
+  assert.match(converterVisual, /setAttribute\("Source", source && source\.id != null \? source\.id : "Time"\)/);
+});
+
 test('Advance By stays editable during Advance while compiled simulation settings stay locked', () => {
   const settings = between(editor, 'class SimulationSettings extends jqDialog', 'class TimeUnitDialog extends jqDialog');
   assert.match(settings, /this\.advanceMode = Boolean/);

@@ -20,6 +20,7 @@
 (function attachSystemikaBrowserRunStore(root) {
   const RUNS_DIR_NAME = 'Runs';
   const RUN_EXTENSION = '.sysrun';
+  const METADATA_SIDECAR_SUFFIX = `${RUN_EXTENSION}.metadata.json`;
   const FORMAT_VERSION = 1;
   const MAX_RUN_FILENAME_LENGTH = 120;
   const WINDOWS_RESERVED = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i;
@@ -338,6 +339,67 @@
     return `${sanitizeRunLabel(runLabel).filename}${RUN_EXTENSION}`;
   }
 
+  function metadataFilename(runLabel) {
+    return `${sanitizeRunLabel(runLabel).filename}${METADATA_SIDECAR_SUFFIX}`;
+  }
+
+  async function getMetadataFileHandle(runLabel, create = false) {
+    const dir = await runsDirectory(create);
+    if (!dir) return null;
+    try {
+      return await dir.getFileHandle(metadataFilename(runLabel), { create });
+    } catch (error) {
+      if (!create && notFound(error)) return null;
+      throw error;
+    }
+  }
+
+  async function readMetadataPatch(runLabel) {
+    const handle = await getMetadataFileHandle(runLabel, false);
+    if (!handle) return {};
+    try {
+      const file = await handle.getFile();
+      const parsed = JSON.parse(await file.text());
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+    } catch (error) {
+      if (error instanceof SyntaxError) throw new Error(`Invalid run metadata sidecar for "${runLabel}": ${error.message}`);
+      throw error;
+    }
+  }
+
+  async function removeMetadataPatch(runLabel) {
+    const dir = await runsDirectory(false);
+    if (!dir) return false;
+    try {
+      await dir.removeEntry(metadataFilename(runLabel));
+      return true;
+    } catch (error) {
+      if (notFound(error)) return false;
+      throw error;
+    }
+  }
+
+  async function updateRunMetadata(modelPath, runLabel, patch) {
+    const label = sanitizeRunLabel(runLabel || 'Base').label;
+    if (!await runExists(modelPath, label)) {
+      const error = new Error(`Simulation run "${label}" was not found.`);
+      error.code = 'ENOENT';
+      throw error;
+    }
+    const previous = await readMetadataPatch(label);
+    const merged = { ...previous, ...(patch || {}), runName: label };
+    const handle = await getMetadataFileHandle(label, true);
+    const writable = await handle.createWritable();
+    try {
+      await writable.write(`${JSON.stringify(merged, null, 2)}\n`);
+      await writable.close();
+    } catch (error) {
+      try { await writable.abort(); } catch (_) {}
+      throw error;
+    }
+    return { runName: label, filename: metadataFilename(label), path: `${RUNS_DIR_NAME}/${metadataFilename(label)}`, metadata: merged };
+  }
+
   async function getRunFileHandle(runLabel, create = false) {
     const dir = await runsDirectory(create);
     if (!dir) return null;
@@ -383,6 +445,10 @@
       throw error;
     }
 
+    // A newly written run is authoritative; discard any older sandbox metadata
+    // patch. Calibration will write a fresh lightweight sidecar on commit.
+    await removeMetadataPatch(label);
+
     return {
       runName: label,
       filename: name,
@@ -415,10 +481,12 @@
     }
 
     const requested = sanitizeRunLabel(runLabel);
-    const storedName = metadata && metadata.runName ? String(metadata.runName) : requested.label;
+    const metadataPatch = await readMetadataPatch(requested.label);
+    const mergedMetadata = { ...metadata, ...metadataPatch };
+    const storedName = mergedMetadata && mergedMetadata.runName ? String(mergedMetadata.runName) : requested.label;
     const storedFilename = sanitizeRunLabel(storedName).filename;
     const effectiveRunName = storedFilename === requested.filename ? storedName : requested.label;
-    const effectiveMetadata = { ...metadata, runName: effectiveRunName };
+    const effectiveMetadata = { ...mergedMetadata, runName: effectiveRunName };
     if (effectiveRunName !== storedName) effectiveMetadata.originalRunName = storedName;
 
     return {
@@ -482,6 +550,7 @@
     });
     const dir = await runsDirectory(false);
     await dir.removeEntry(sourceName);
+    await removeMetadataPatch(sourceLabel);
     return { runName: target.label, filename: targetName, path: `${RUNS_DIR_NAME}/${targetName}` };
   }
 
@@ -491,6 +560,7 @@
     if (!dir) return { deleted: false, runName: String(runLabel || ''), path: `${RUNS_DIR_NAME}/${name}` };
     try {
       await dir.removeEntry(name);
+      await removeMetadataPatch(runLabel);
       return { deleted: true, runName: String(runLabel || ''), path: `${RUNS_DIR_NAME}/${name}` };
     } catch (error) {
       if (notFound(error)) return { deleted: false, runName: String(runLabel || ''), path: `${RUNS_DIR_NAME}/${name}` };
@@ -511,6 +581,7 @@
     ensureAccess,
     exists: runExists,
     save: writeRunPackage,
+    updateMetadata: updateRunMetadata,
     load: readRunPackage,
     list: listRuns,
     rename: renameRun,
@@ -528,5 +599,6 @@
     makeZip,
     readZip,
     normalizeMetadata,
+    metadataFilename,
   };
 })(window);

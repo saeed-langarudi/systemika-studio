@@ -15,7 +15,7 @@ test('creation tools use one left column while editing, output, and run tools st
   const workspaceStart = html.indexOf('class="workspace-row"');
   const top = html.slice(topStart, workspaceStart);
   const vertical = html.slice(workspaceStart);
-  for (const id of ['btn_mouse','btn_delete','btn_undo','btn_redo','btn_cut','btn_copy','btn_paste','btn_colour','btn_table','btn_compareplot','btn_xyplot']) {
+  for (const id of ['btn_mouse','btn_delete','btn_undo','btn_redo','btn_cut','btn_copy','btn_paste','btn_color','btn_table','btn_compareplot','btn_xyplot']) {
     assert.ok(top.includes(`id="${id}"`), `${id} should be in the top toolbar`);
     assert.ok(!vertical.includes(`id="${id}"`), `${id} should not remain in the vertical toolbar`);
   }
@@ -28,12 +28,12 @@ test('creation tools use one left column while editing, output, and run tools st
   assert.match(css, /\.model-tool-panel \[data-title\]:hover::after\s*\{[\s\S]*z-index:\s*1000/);
 });
 
-test('Colour is a toolbar palette rather than a top menu', () => {
+test('Color is a toolbar palette rather than a top menu', () => {
   assert.doesNotMatch(html, /class="eMenu colorMenu"/);
-  assert.doesNotMatch(html, /class="menuButton">Colour</);
-  assert.match(html, /id="btn_colour"/);
-  assert.match(html, /id="toolbar-colour-picker"/);
-  assert.match(editor, /#btn_colour/);
+  assert.doesNotMatch(html, /class="menuButton">Color</);
+  assert.match(html, /id="btn_color"/);
+  assert.match(html, /id="toolbar-color-picker"/);
+  assert.match(editor, /#btn_color/);
 });
 
 test('copy cut paste are exposed in the toolbar and keyboard shortcuts are active', () => {
@@ -60,14 +60,14 @@ test('output displays precede run controls and removed macro UI does not remain 
   assert.equal(html.includes('id="btn_macro"'), false);
 });
 
-test('custom cut and colour assets and green Run play icon are installed', () => {
+test('custom cut and color assets and green Run play icon are installed', () => {
   assert.match(html, /id="btn_cut"[\s\S]{0,240}graphics\/cut\.svg/);
-  assert.match(html, /id="btn_colour"[\s\S]{0,260}graphics\/colour-pallet\.svg/);
+  assert.match(html, /id="btn_color"[\s\S]{0,260}graphics\/color-palette\.svg/);
   const cut = fs.readFileSync(path.join(root, 'OpenSystemDynamics', 'src', 'graphics', 'cut.svg'), 'utf8');
-  const colour = fs.readFileSync(path.join(root, 'OpenSystemDynamics', 'src', 'graphics', 'colour-pallet.svg'), 'utf8');
+  const color = fs.readFileSync(path.join(root, 'OpenSystemDynamics', 'src', 'graphics', 'color-palette.svg'), 'utf8');
   const run = fs.readFileSync(path.join(root, 'OpenSystemDynamics', 'src', 'graphics', 'run.svg'), 'utf8');
   assert.match(cut, /id="scissor"/);
-  assert.match(colour, /id="colour-pallet"/);
+  assert.match(color, /id="color-palette"/);
   assert.match(run, /fill="#2e9d46"/);
 });
 
@@ -90,6 +90,10 @@ test('clipboard duplicate naming and formula remapping produce coherent copied s
   vm.runInContext(source, context);
   const reserved = new Set();
   assert.equal(context.Clipboard.freeCopyName('Capital', reserved), 'Capital_2');
+  const destinationReserved = new Set();
+  assert.equal(context.Clipboard.destinationPasteName('Rate', destinationReserved), 'Rate');
+  assert.equal(context.Clipboard.destinationPasteName('Capital', destinationReserved), 'Capital_2');
+  assert.equal(context.Clipboard.destinationPasteName('Rate', destinationReserved), 'Rate_1');
   const map = new Map([['Capital', 'Capital_2'], ['Rate', 'Rate_1']]);
   const mapped = context.Clipboard.replaceFormulaNames('Capital * Rate + 1', map);
   assert.equal(mapped, 'Capital_2 * Rate_1 + 1');

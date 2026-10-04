@@ -331,15 +331,26 @@
       const name = String(runName || 'Base');
       const run = await this.loadRun(name, false);
       if (!run) throw new Error(`Run '${name}' could not be loaded.`);
-      run.metadata = { ...(run.metadata || {}), ...(patch || {}), runName: name };
+      const normalizedPatch = { ...(patch || {}), runName: name };
+      run.metadata = { ...(run.metadata || {}), ...normalizedPatch };
       const api = getRunsAPI();
       if (!api) throw new Error('Run persistence is unavailable in this environment.');
-      const saved = await api.save(this.modelPath(), {
-        runLabel: name,
-        csv: this.toCsv(run),
-        metadata: { ...run.metadata, data: { ...((run.metadata && run.metadata.data) || {}), columns: run.columns.slice(), columnIds: run.ids.slice() } },
-        overwrite: true,
-      });
+
+      // Modern stores persist small metadata changes in a lightweight sidecar.
+      // This avoids reading, recompressing, and rewriting the potentially large
+      // .sysrun archive merely to remember Calibration Sandbox interface state.
+      let saved;
+      if (typeof api.updateMetadata === 'function') {
+        saved = await api.updateMetadata(this.modelPath(), name, normalizedPatch);
+      } else {
+        // Compatibility fallback for older storage bridges.
+        saved = await api.save(this.modelPath(), {
+          runLabel: name,
+          csv: this.toCsv(run),
+          metadata: { ...run.metadata, data: { ...((run.metadata && run.metadata.data) || {}), columns: run.columns.slice(), columnIds: run.ids.slice() } },
+          overwrite: true,
+        });
+      }
       this.runCache.set(name, run);
       return saved;
     }

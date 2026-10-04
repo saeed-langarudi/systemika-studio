@@ -26,6 +26,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
 	copyPngToClipboard: (base64Contents) => ipcRenderer.invoke("clipboard:write-png", base64Contents),
 	openExternal: (url) => ipcRenderer.invoke("shell:open-external", url),
 	checkForUpdates: () => ipcRenderer.invoke("systemika:update:check"),
+	openNewWindow: () => ipcRenderer.invoke("window:new"),
 
 	// Persistent simulation-run storage is exposed through the same bridge as
 	// ordinary model file operations. The editor already relies on electronAPI
@@ -34,6 +35,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
 	runs: {
 		exists: (modelPath, runLabel) => ipcRenderer.invoke("systemika:runs:exists", modelPath, runLabel),
 		save: (modelPath, payload) => ipcRenderer.invoke("systemika:runs:save", modelPath, payload),
+		updateMetadata: (modelPath, runLabel, patch) => ipcRenderer.invoke("systemika:runs:update-metadata", modelPath, runLabel, patch),
 		load: (modelPath, runLabel) => ipcRenderer.invoke("systemika:runs:load", modelPath, runLabel),
 		list: (modelPath) => ipcRenderer.invoke("systemika:runs:list", modelPath),
 		rename: (modelPath, sourceLabel, targetLabel) => ipcRenderer.invoke("systemika:runs:rename", modelPath, sourceLabel, targetLabel),
@@ -60,6 +62,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
 contextBridge.exposeInMainWorld("systemikaRuns", {
 	exists: (modelPath, runLabel) => ipcRenderer.invoke("systemika:runs:exists", modelPath, runLabel),
 	save: (modelPath, payload) => ipcRenderer.invoke("systemika:runs:save", modelPath, payload),
+	updateMetadata: (modelPath, runLabel, patch) => ipcRenderer.invoke("systemika:runs:update-metadata", modelPath, runLabel, patch),
 	load: (modelPath, runLabel) => ipcRenderer.invoke("systemika:runs:load", modelPath, runLabel),
 	list: (modelPath) => ipcRenderer.invoke("systemika:runs:list", modelPath),
 	rename: (modelPath, sourceLabel, targetLabel) => ipcRenderer.invoke("systemika:runs:rename", modelPath, sourceLabel, targetLabel),

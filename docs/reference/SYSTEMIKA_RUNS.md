@@ -49,6 +49,18 @@ A `.sysrun` is a standard ZIP-compatible archive containing:
 
 CSV is compressed inside the package, reducing disk usage while retaining an open, portable underlying representation. The format is versioned through `metadata.json -> formatVersion`.
 
+### Lightweight metadata companion
+
+Calibration Sandbox settings can change frequently without changing the simulation dataset. To avoid reading, recompressing, and rewriting a potentially large `.sysrun` simply to remember those settings, Systemika may also create a small companion file named `<Run Name>.sysrun.metadata.json` in the same `Runs` directory.
+
+- The companion contains metadata overrides only; it contains no simulation dataset.
+- Loading a run merges the companion metadata over `metadata.json` transparently.
+- Writing/overwriting a full run makes the new archive authoritative and removes any stale companion file.
+- Rename and duplicate operations preserve the effective merged metadata in the resulting run; delete removes both the `.sysrun` and its companion metadata.
+- Calibration slider movement does not write this file for every live `input` event. Systemika commits the sandbox snapshot when a slider change is completed/released and requests a final save when the sandbox closes.
+
+This keeps the `.sysrun` data package stable during interactive calibration and removes the former whole-archive recompression cost from sandbox-state persistence.
+
 ## Architecture
 
 - `electron/systemika-run-package.js` implements package creation, loading, filename sanitation, overwrite protection and atomic replacement.

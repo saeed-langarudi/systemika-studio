@@ -31,8 +31,8 @@
 ## Stock label visibility
 
 - Stock names now render above the model graphics so flows, valves, links, and overlapping variable entities cannot hide any part of a Stock name.
-- Stock names now use a compact rounded translucent background that follows the rendered text bounds. The background automatically switches between light and dark according to the label colour to preserve contrast without fully hiding the model underneath.
-- The background updates after renaming, recolouring, or rotating the Stock name and also applies to Stock Ghost labels.
+- Stock names now use a compact rounded translucent background that follows the rendered text bounds. The background automatically switches between light and dark according to the label color to preserve contrast without fully hiding the model underneath.
+- The background updates after renaming, recoloring, or rotating the Stock name and also applies to Stock Ghost labels.
 - The background padding now clears the visible Stock outline itself (not just the rectangle geometry), including the stroke thickness and a small anti-aliasing margin, so the border remains crisp even when the label sits directly against it.
 - Stock label placement, rotation, editing, and model semantics are otherwise unchanged.
 - The Find Ghosts toolbar tool now uses the newly supplied SVG icon.

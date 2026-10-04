@@ -1,3 +1,57 @@
+## 2026-09-30 — Systemika Studio 1.1.8 — Feedback Loop annotation tool
+
+- Corrective 1.1.8 build: Calibration Sandbox now opens against the available screen area and is maximized automatically in the Electron desktop app so the full workspace is visible immediately.
+- Reworked the sandbox layout to fit its six plots inside the viewport instead of giving the plot grid a viewport-sized minimum height. Three-column/two-row and narrower two-column/three-row layouts now divide the available height directly, eliminating the routine bottom-of-plot vertical scroll.
+- The parameter table now uses a fixed, fluid column layout with shrinkable number/range controls and hidden horizontal overflow, so the full parameter row remains visible inside the resizable side panel. The panel width is clamped to preserve usable plot space when the window becomes narrow.
+- Added regression coverage for screen-aware popup sizing, Electron maximization, viewport-contained plot rows, responsive narrow layouts, and horizontal-overflow-safe parameter controls.
+- Release verification baseline: 448/448 automated tests passing; 19/19 permanent numerical validation models retained.
+
+- Corrective 1.1.8 build: fixed Calibration Sandbox variable-picker search. Typing in the finder now immediately hides nonmatching variables in both Electron and the WebApp, including Chromium builds where the picker's `display:block` rule could override the browser's default `[hidden]` rendering.
+- The picker now also shows a live no-matches message and handles the native search-field clear action.
+- Added regression coverage for visible Calibration Sandbox picker filtering.
+- Release verification baseline: 447/447 automated tests passing; 19/19 permanent numerical validation models retained.
+
+- Corrective 1.1.8 build: Lookups now accept Ghost variables as inputs. A Lookup connected to a Ghost resolves that Ghost to its original Stock, Flow, Auxiliary, Constant, or Lookup before native-engine compilation, so the visual alias is no longer mistaken for a missing numerical entity.
+- New Lookup connections through Ghosts now store the original source entity id, and model loading/API access normalize previously stored Ghost ids while preserving the visible Ghost-to-Lookup Link.
+- Added regression coverage for native-engine compilation/simulation through a Ghost-driven Lookup, model-API Ghost alias handling, and Lookup visual source normalization.
+- Release verification baseline: 446/446 automated tests passing; 19/19 permanent numerical validation models retained.
+
+- Corrective 1.1.8 build: fixed the native engine simulation clock so UI/progress pause checkpoints can no longer shorten a numerical integration step or create off-grid sample times. With Euler and `DT = 0.25`, the trajectory now remains `0, 0.25, 0.50, ...` even when the UI refresh interval is `2.4`; the former `2.25, 2.40, 2.65, ...` drift is eliminated.
+- Full integration-step times are now derived from `TimeStart + stepIndex * DT` rather than repeated `T = T + DT` accumulation. Only the final step may be shorter when Time Length is not an integer multiple of DT.
+- Expressions such as `IfThenElse(T=5, 100, 0)` now fire at `T=5` whenever 5 actually lies on the requested DT grid. UI refresh scheduling no longer shifts that grid away from the requested time.
+- Numeric `=` / `==` and `!=` / `<>` retain a defensive floating-point tolerance, tightened to machine scale (`32 × Number.EPSILON × magnitude`) rather than the earlier broad `1e-12` relative tolerance; nonnumeric equality remains exact.
+- Added regression coverage for UI pause/grid independence, exact time-trigger behavior in both Auxiliary and Flow equations, machine-scale equality, and a final partial integration step.
+- Release verification baseline: 443/443 automated tests passing; 19/19 permanent numerical validation models retained.
+
+- Corrective 1.1.8 build: fixed Equations export in the WebApp by adding browser-native save/export support with a download fallback.
+- Added **File → New Window...** so desktop and modern WebApp users can keep multiple independent models open simultaneously. Per-window editor history, reload state, and browser file handles are isolated so model sessions do not overwrite one another.
+- Extended copy/paste with a shared Systemika structure clipboard so model structure can be copied from one open model window and pasted into another. Cross-window paste now preserves a copied entity's original name when that name is free in the destination model; only real destination-name collisions receive a numbered suffix. IDs, equation references, links, and connector geometry continue to be remapped safely.
+- Removed the experimental direct **Import Model Structure** command; cross-window copy/paste is the supported transfer workflow in 1.1.8.
+- Removed the experimental model page/tab implementation from 1.1.8.
+- Added regression coverage for WebApp export, multiple-window plumbing, per-window browser state/file-handle isolation, cross-window clipboard transfer, collision-aware cross-model naming, and the absence of the deferred page/import UI.
+- Release verification baseline at that corrective checkpoint: 439/439 automated tests passing; 19/19 permanent numerical validation models retained.
+
+- Corrective 1.1.8 build: fixed Calibration Sandbox reruns becoming sluggish after Alt+Tab/window switching. Latency-sensitive 10/40 ms rerun timers and native-engine async callbacks now use the Calibration Sandbox window's timer queue instead of the covered editor window, avoiding Chromium background-timer throttling.
+- Calibration now reconciles run state when the sandbox regains focus/visibility, and the Electron editor renderer disables background throttling so Windows cannot leave the simulation engine on a reduced timer cadence after window switching.
+- Corrective 1.1.8 build: Calibration Sandbox live slider writes now use a lightweight numeric-constant path while the thumb is moving, avoiding repeated definition checks, primitive-cache invalidation, and duplicate canvas refresh work on every input event.
+- Pending calibration reruns are coalesced to the newest slider value; after a completed run, the next pending rerun yields one sandbox paint and starts without another 40 ms wait. Failed calibration runs release the rerun gate so the next corrected slider movement can recover without Reset All.
+- Reduced the live calibration rerun debounce to **40 ms**.
+- Changed the main Feedback Loop toolbar icon to neutral black; the four loop-type picker icons retain their red reinforcing and blue balancing colors.
+
+- Added a Feedback Loop tool to the vertical modeling toolbar immediately above Text.
+- Added a compact four-choice picker for clockwise/counterclockwise reinforcing (+) and balancing (−) loop symbols.
+- Corrected the clockwise/counterclockwise picker artwork so the displayed arrow direction now matches each tooltip and selected loop type.
+- Refined the toolbar/picker and canvas loop artwork with cleaner circular arcs and smaller arrowheads.
+- Feedback loops are graphical annotations only; they are excluded from the computational model.
+- New loop symbols are placed with one canvas click and now default to **50 points**.
+- Feedback loops always remain square/circular when resized; their properties dialog uses one **Size (points)** value instead of independent width and height.
+- Optional loop captions are rendered below the loop graphic rather than through its center.
+- Added caption formatting in Feedback Loop Properties: font family, font size, bold, italic, and underline.
+- Feedback Loop color is intentionally controlled only by the main toolbar Color tool: the arc, arrowhead, polarity mark, and caption share one color. New reinforcing loops start red and balancing loops start blue, so the default caption color matches the loop.
+- Feedback loops remain below model entities in the annotation layer and are stored in `.ssd` models.
+- Added regression coverage for toolbar placement, direction mapping, 50-point default size, square-only resizing, caption formatting, unified Color-tool styling, properties, caption placement, persistence, loading, and bundled artwork.
+- Release verification baseline: 433/433 automated tests passing; 19/19 permanent numerical validation models retained.
+
 ## 2026-09-30 — Systemika Studio 1.1.7 — Text Box interaction repair
 - Replaced the previous Text Box double-click workarounds with a structural fix. The actual failure point was the HTML `foreignObject` interaction surface: after the first click changed canvas selection state, Chromium/Electron could retarget the second press so no reliable `dblclick` reached the embedded HTML element.
 - Text Box HTML is now presentation-only. A transparent SVG hit rectangle, in the same background annotation layer as the Text Box frame, owns selection, double-click, and context-menu interaction. This gives both clicks a stable SVG target and removes the jQuery/native click-count heuristics entirely.

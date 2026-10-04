@@ -80,7 +80,7 @@ var vars_store = new function() {
 };
 
 /*
- * This is used for saving the state before optimisation
+ * This is used for saving the state before optimization
  * And restoring afterwards  */
 var state_store = new function() {
 	self=this;

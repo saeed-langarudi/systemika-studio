@@ -4,7 +4,7 @@
 
 - Systemika Studio now checks for a newer published version shortly after startup.
 - **Help → Check for Updates...** performs the same check on demand.
-- Desktop builds read the canonical deployed WebApp at `https://systemika.no/studio/app/`, starting with `systemika-update.json` and falling back to the exact analyser/editor HTML if needed.
+- Desktop builds read the canonical deployed WebApp at `https://systemika.no/studio/app/`, starting with `systemika-update.json` and falling back to the exact analysis/editor HTML if needed.
 - The WebApp normally checks by refetching the editor page that is already running, so it works regardless of the folder used to host the WebApp.
 - The WebApp build generates `systemika-update.json` and `update.json` directly in the upload-ready WebApp root from the central version/build ID. Uploading the complete WebApp therefore publishes update metadata automatically; no separate `/download/` metadata file is required.
 - When a newer desktop release is available, Systemika shows the installed and latest versions and can open the Systemika download page. An older WebApp can reload the current deployed release directly.
@@ -59,5 +59,5 @@
 - The content-derived build ID is shared by WebApp and packaged desktop staging. Corrective builds can therefore remain version 1.1.2 while the canonical metadata still identifies a refreshed build.
 - Loading a model safely repairs model-entity names stored literally as `[Name]` by older/malformed saves; matching legacy equation references are normalized at the same time.
 - Links and their handles are below model entities in the canvas stacking order, so a nearby link no longer blocks selecting or opening a Stock, Flow, Auxiliary, Constant, or Lookup.
-- Application, favicon, Windows, macOS, WebApp, and analyser logo assets use the current Systemika logo.
+- Application, favicon, Windows, macOS, WebApp, and analysis-window logo assets use the current Systemika logo.
 - Text Boxes support font family, font size, bold, italic, underline, and left/center/right alignment.

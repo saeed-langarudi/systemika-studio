@@ -81,7 +81,8 @@ const type_size = {
 	"variable": [60, 60],
 	"flow": [60, 60],
 	"converter": [80, 60],
-	"text": [120, 60]
+	"text": [120, 60],
+	"feedbackloop": [50, 50]
 }
 
 // Name type translations
@@ -96,6 +97,7 @@ const type_basename = {
 	rectangle: "Rectangle",
 	ellipse: "Ellipse",
 	line: "Line",
+	feedbackloop: "Feedback Loop",
 	numberbox: "Numberbox",
 	text: "Text",
 	stock: "Stock",
@@ -240,17 +242,28 @@ function saveModelToBrowser() {
 	browserModelsDialog.storeModel(fileManager.storedModelName);
 }
 
+function modelSessionStorage() {
+	// Session storage survives reloads but is isolated per top-level window.
+	// That isolation is essential now that Systemika can keep multiple models
+	// open at once; ordinary localStorage would make one window overwrite
+	// another window's reload/undo state.
+	if (typeof sessionStorage !== "undefined") return sessionStorage;
+	return localStorage;
+}
+
 function preserveRestart() {
+	let storage = modelSessionStorage();
 	History.toLocalStorage();
-	localStorage.setItem("fileName", fileManager.fileName);
-	localStorage.setItem("storedModelName", fileManager.storedModelName ?? "");
-	localStorage.setItem("reloadPending", "1");
+	storage.setItem("fileName", fileManager.fileName);
+	storage.setItem("storedModelName", fileManager.storedModelName ?? "");
+	storage.setItem("reloadPending", "1");
 	applicationReload();
 }
 
 function restoreAfterRestart() {
 	do_global_log("restoring");
-	let reloadPending = localStorage.getItem("reloadPending");
+	let storage = modelSessionStorage();
+	let reloadPending = storage.getItem("reloadPending");
 
 	if (reloadPending == null) {
 		// No reload is pending
@@ -261,8 +274,8 @@ function restoreAfterRestart() {
 
 		// Set by startNewModel() so this particular reload lands on the time unit
 		// dialog directly instead of showing the picker it was triggered from.
-		let skipStartupPicker = localStorage.getItem("skipStartupPicker");
-		localStorage.removeItem("skipStartupPicker");
+		let skipStartupPicker = storage.getItem("skipStartupPicker");
+		storage.removeItem("skipStartupPicker");
 
 		if (skipStartupPicker) {
 			timeUnitDialog.show();
@@ -281,11 +294,11 @@ function restoreAfterRestart() {
 	fileManager.init();
 	do_global_log("removing pending flag");
 	// Else remove the pending reload
-	localStorage.removeItem("reloadPending");
+	storage.removeItem("reloadPending");
 
-	fileManager.fileName = localStorage.getItem("fileName");
+	fileManager.fileName = storage.getItem("fileName");
 	// Empty means the model is not in browser storage, so Save must ask for a name.
-	fileManager.storedModelName = localStorage.getItem("storedModelName") || null;
+	fileManager.storedModelName = storage.getItem("storedModelName") || null;
 	fileManager.updateTitle();
 
 	do_global_log("restore the file");
@@ -474,27 +487,29 @@ class History {
 	}
 
 	static toLocalStorage() {
-		localStorage.setItem("undoState_length", this.undoStates.length);
-		if (this.savedState == null) localStorage.removeItem("history_saved_state");
-		else localStorage.setItem("history_saved_state", this.savedState);
+		let storage = modelSessionStorage();
+		storage.setItem("undoState_length", this.undoStates.length);
+		if (this.savedState == null) storage.removeItem("history_saved_state");
+		else storage.setItem("history_saved_state", this.savedState);
 
 		for (let i in this.undoStates) {
 			let state = this.undoStates[i];
-			localStorage.setItem("undoState_" + i, state);
+			storage.setItem("undoState_" + i, state);
 		}
 
-		localStorage.setItem("undoIndex", this.undoIndex);
+		storage.setItem("undoIndex", this.undoIndex);
 	}
 
 	static fromLocalStorage() {
+		let storage = modelSessionStorage();
 		this.clearUndoHistory();
-		this.savedState = localStorage.getItem("history_saved_state");
-		let undoState_length = localStorage.getItem("undoState_length");
+		this.savedState = storage.getItem("history_saved_state");
+		let undoState_length = storage.getItem("undoState_length");
 		for (let i = 0; i < undoState_length; i++) {
-			let state = localStorage.getItem("undoState_" + i);
+			let state = storage.getItem("undoState_" + i);
 			this.undoStates.push(state);
 		}
-		this.undoIndex = localStorage.getItem("undoIndex");
+		this.undoIndex = storage.getItem("undoIndex");
 		this.restoreUndoState();
 	}
 }
@@ -1035,7 +1050,7 @@ class BaseObject {
 		let backgroundHeight = box.height + paddingY * 2;
 
 		// Keep the translucent label background clear of the Stock outline.
-		// A Stock rectangle's stroke is centred on its geometric boundary, so
+		// A Stock rectangle's stroke is centered on its geometric boundary, so
 		// merely stopping at stockTop/stockBottom/etc. still paints over half of
 		// the visible border. Reserve the half-stroke plus a small anti-aliasing
 		// gap so the outline remains fully crisp while the label background stays
@@ -1218,7 +1233,7 @@ class OnePointer extends BaseObject {
 	setPos(pos) {
 		if (pos[0] == this.pos[0] && pos[1] == this.pos[1]) {
 			// If the position has not changed we should not update it
-			// This turned out to be a huge optimisation
+			// This turned out to be a huge optimization
 			return;
 		}
 		// Recreating the array is intentional to avoid copying a reference
@@ -1908,7 +1923,8 @@ class ConverterVisual extends BasePrimitive {
 		// Links must never change the Lookup source. When the incoming Link is
 		// removed, the Lookup falls back to Time.
 		let incoming = findLinkedInPrimitives(this.id);
-		this.primitive.setAttribute("Source", incoming.length > 0 ? incoming[0].id : "Time");
+		let source = incoming.length > 0 ? (orig(incoming[0]) || incoming[0]) : null;
+		this.primitive.setAttribute("Source", source && source.id != null ? source.id : "Time");
 	}
 	nameDoubleClick() {
 		openPrimitiveDialog(this.id, "name")
@@ -2767,6 +2783,204 @@ function routeAnnotationDoubleClick(event) {
 	if (event.stopPropagation) event.stopPropagation();
 	if (typeof modelVisual.doubleClick === "function") modelVisual.doubleClick(modelVisual.id);
 	return true;
+}
+
+
+function feedbackLoopStyle(loopType) {
+	let normalized = String(loopType || "reinforcing-clockwise").toLowerCase();
+	let reinforcing = normalized.indexOf("reinforcing") === 0;
+	let clockwise = normalized.indexOf("counterclockwise") === -1;
+	return {
+		reinforcing,
+		clockwise,
+		sign: reinforcing ? "+" : "\u2212",
+		// Loop type chooses the initial semantic color only. After placement the
+		// ordinary toolbar Color tool owns the primitive's single Color attribute,
+		// which is shared by the arc, arrow, polarity mark, and caption.
+		color: reinforcing ? "red" : "blue"
+	};
+}
+
+function feedbackLoopPoint(cx, cy, rx, ry, angleDegrees) {
+	let radians = angleDegrees * Math.PI / 180;
+	return [cx + rx * Math.cos(radians), cy + ry * Math.sin(radians)];
+}
+
+class FeedbackLoopVisual extends TwoPointer {
+	constructor(id, type, pos0, pos1) {
+		super(id, type, pos0, pos1);
+		this.primitive = findID(id);
+		this.ensureSquareGeometry();
+		this.dialog = new FeedbackLoopDialog(id);
+		let defaultColor = feedbackLoopStyle(this.primitive.getAttribute("LoopType")).color;
+		this.setColor(this.primitive.getAttribute("Color") || defaultColor);
+	}
+
+	ensureSquareGeometry() {
+		let width = this.getWidth();
+		let height = this.getHeight();
+		if (Math.abs(width - height) < 0.001) return;
+		let size = Math.max(24, Math.max(width, height));
+		let center = this.getPos();
+		let startSignX = this.startX <= this.endX ? -1 : 1;
+		let startSignY = this.startY <= this.endY ? -1 : 1;
+		this.start_anchor.setPos([center[0] + startSignX * size / 2, center[1] + startSignY * size / 2]);
+		this.end_anchor.setPos([center[0] - startSignX * size / 2, center[1] - startSignY * size / 2]);
+		this.syncAnchorToPrimitive("start");
+		this.syncAnchorToPrimitive("end");
+	}
+
+	setAnchorsInEditLayer(editing) {
+		let layer = editing && SVG.flowAnchorEditLayer ? SVG.flowAnchorEditLayer : SVG.anchorLayer;
+		if (!layer) return;
+		for (let anchor of this.getAnchors()) {
+			if (anchor && anchor.group && anchor.group.parentNode !== layer) layer.appendChild(anchor.group);
+		}
+	}
+	select() {
+		super.select();
+		this.setAnchorsInEditLayer(true);
+	}
+	unselect() {
+		super.unselect();
+		this.setAnchorsInEditLayer(false);
+	}
+	setColor(color) {
+		let defaultColor = feedbackLoopStyle(this.primitive && this.primitive.getAttribute("LoopType")).color;
+		let resolvedColor = String(color || "").trim() || defaultColor;
+		super.setColor(resolvedColor);
+		this.updateGraphics();
+	}
+
+	makeGraphics() {
+		this.loopPath = SVG.path("", "red", "none", "element", {
+			"stroke-linecap": "round",
+			"stroke-linejoin": "round",
+			"pointer-events": "none"
+		});
+		this.arrowHead = SVG.path("", "none", "red", "element", { "pointer-events": "none" });
+		this.signText = SVG.text(0, 0, "+", "feedback-loop-sign", {
+			"font-family": "Arial, Helvetica, sans-serif",
+			"font-weight": "700",
+			"dominant-baseline": "middle",
+			"pointer-events": "none"
+		});
+		this.labelText = SVG.text(0, 0, "", "feedback-loop-label", {
+			"font-family": "Arial, Helvetica, sans-serif",
+			"font-weight": "500",
+			"pointer-events": "none"
+		});
+		this.clickRect = SVG.rect(0, 0, 1, 1, "transparent", "transparent", "feedback-loop-hit-target", {
+			"pointer-events": "all"
+		});
+		this.group = SVG.append(SVG.annotationLayer, SVG.group([
+			this.loopPath, this.arrowHead, this.signText, this.labelText, this.clickRect
+		]));
+		this.group.setAttribute("node_id", this.id);
+
+		$(this.group).dblclick((event) => {
+			if (routeAnnotationDoubleClick(event)) return;
+			this.dialog.show();
+		});
+	}
+
+	updateGraphics() {
+		if (!this.primitive || !this.loopPath) return;
+		let minX = this.getMinX();
+		let minY = this.getMinY();
+		let size = Math.max(24, Math.max(this.getWidth(), this.getHeight()));
+		let cx = minX + size / 2;
+		let cy = minY + size / 2;
+		let style = feedbackLoopStyle(this.primitive.getAttribute("LoopType"));
+		let color = String(this.primitive.getAttribute("Color") || "").trim() || style.color;
+		this.color = color;
+
+		// Feedback-loop graphics are always square.  A compact circular arc and a
+		// restrained arrowhead keep the symbol legible at the 50-point default and
+		// visually clean at larger sizes.
+		let strokeWidth = Math.max(2.4, Math.min(8, size * 0.065));
+		let arrowLength = Math.max(7, Math.min(18, size * 0.15));
+		let padding = strokeWidth / 2 + arrowLength * 0.45 + 1.5;
+		let radius = Math.max(7, size / 2 - padding);
+
+		// The clockwise symbol ends on the lower-right and points down/left; the
+		// counterclockwise symbol is its mirror on the lower-left.  These directions
+		// match the conventional feedback-loop icons shown in the picker.
+		let startAngle = style.clockwise ? 70 : 110;
+		let endAngle = style.clockwise ? 20 : 160;
+		let sweep = style.clockwise ? 1 : 0;
+		let start = feedbackLoopPoint(cx, cy, radius, radius, startAngle);
+		let end = feedbackLoopPoint(cx, cy, radius, radius, endAngle);
+		this.loopPath.dstring = `M ${start[0]} ${start[1]} A ${radius} ${radius} 0 1 ${sweep} ${end[0]} ${end[1]}`;
+		this.loopPath.setAttribute("stroke", color);
+		this.loopPath.setAttribute("stroke-width", strokeWidth);
+		this.loopPath.update();
+
+		// Tangent at the arc endpoint. SVG's positive-angle direction is clockwise
+		// because the canvas Y axis points down.
+		let radians = endAngle * Math.PI / 180;
+		let tx = -radius * Math.sin(radians);
+		let ty = radius * Math.cos(radians);
+		if (!style.clockwise) {
+			tx = -tx;
+			ty = -ty;
+		}
+		let tangentLength = Math.hypot(tx, ty) || 1;
+		tx /= tangentLength;
+		ty /= tangentLength;
+		let px = -ty;
+		let py = tx;
+		let baseX = end[0] - tx * arrowLength;
+		let baseY = end[1] - ty * arrowLength;
+		let halfArrowWidth = arrowLength * 0.46;
+		this.arrowHead.dstring = `M ${end[0]} ${end[1]} L ${baseX + px * halfArrowWidth} ${baseY + py * halfArrowWidth} L ${baseX - px * halfArrowWidth} ${baseY - py * halfArrowWidth} Z`;
+		this.arrowHead.setAttribute("fill", color);
+		this.arrowHead.setAttribute("stroke", "none");
+		this.arrowHead.update();
+
+		let label = String(this.primitive.getAttribute("Label") || "");
+		let signSize = Math.max(16, Math.min(52, size * 0.36));
+		let requestedLabelSize = Number(this.primitive.getAttribute("FontSize"));
+		let labelSize = Number.isFinite(requestedLabelSize)
+			? Math.round(Math.max(8, Math.min(96, requestedLabelSize)))
+			: 12;
+		let fontFamily = this.primitive.getAttribute("FontFamily") || "Arial, Helvetica, sans-serif";
+		let fontWeight = this.primitive.getAttribute("FontWeight") === "bold" ? "bold" : "normal";
+		let fontStyle = this.primitive.getAttribute("FontStyle") === "italic" ? "italic" : "normal";
+		let textDecoration = this.primitive.getAttribute("TextDecoration") === "underline" ? "underline" : "none";
+		let labelX = cx;
+		let textAnchor = "middle";
+
+		this.signText.setAttribute("x", cx);
+		this.signText.setAttribute("y", cy);
+		this.signText.setAttribute("font-size", `${signSize}px`);
+		this.signText.setAttribute("fill", color);
+		this.signText.textContent = style.sign;
+
+		// Caption is deliberately outside the loop symbol so it never cuts across
+		// the polarity mark or the loop arc. The whole annotation has one color;
+		// font styling is independent and is edited in Feedback Loop Properties.
+		this.labelText.setAttribute("x", labelX);
+		this.labelText.setAttribute("y", minY + size + labelSize + 5);
+		this.labelText.setAttribute("font-family", fontFamily);
+		this.labelText.setAttribute("font-size", `${labelSize}px`);
+		this.labelText.setAttribute("font-weight", fontWeight);
+		this.labelText.setAttribute("font-style", fontStyle);
+		this.labelText.setAttribute("text-decoration", textDecoration);
+		this.labelText.setAttribute("text-anchor", textAnchor);
+		this.labelText.setAttribute("fill", color);
+		this.labelText.textContent = label;
+
+		this.clickRect.setAttribute("x", minX);
+		this.clickRect.setAttribute("y", minY);
+		this.clickRect.setAttribute("width", size);
+		this.clickRect.setAttribute("height", size);
+	}
+
+	doubleClick(event) {
+		if (event && routeAnnotationDoubleClick(event)) return;
+		this.dialog.show();
+	}
 }
 
 class RectangleVisual extends TwoPointer {
@@ -7445,6 +7659,66 @@ function cleanUnconnectedLinks() {
 }
 
 
+
+class FeedbackLoopTool extends OnePointCreateTool {
+	static init() {
+		this.loopType = "reinforcing-clockwise";
+		this.rightClickMode = false;
+	}
+	static setLoopType(loopType) {
+		const allowed = [
+			"reinforcing-clockwise",
+			"reinforcing-counterclockwise",
+			"balancing-clockwise",
+			"balancing-counterclockwise"
+		];
+		this.loopType = allowed.includes(String(loopType)) ? String(loopType) : "reinforcing-clockwise";
+	}
+	static create(x, y) {
+		let size = type_size.feedbackloop || [50, 50];
+		let halfW = size[0] / 2;
+		let halfH = size[1] / 2;
+		let primitive = createConnector("Feedback Loop", "FeedbackLoop", null, null);
+		primitive.setAttribute("LoopType", this.loopType);
+		primitive.setAttribute("Label", "");
+		let style = feedbackLoopStyle(this.loopType);
+		primitive.setAttribute("Color", style.color);
+		let visual = new FeedbackLoopVisual(
+			primitive.id,
+			this.getType(),
+			[x - halfW, y - halfH],
+			[x + halfW, y + halfH]
+		);
+		visual.syncAnchorToPrimitive("start");
+		visual.syncAnchorToPrimitive("end");
+		visual.select();
+		this.primitive = primitive;
+	}
+	static getType() {
+		return "feedbackloop";
+	}
+	static mouseMoveSingleAnchor(x, y, shiftKey, node_id) {
+		let moveObject = get_object(node_id);
+		if (!moveObject) return;
+		let parent = get_parent(moveObject);
+		if (!parent) return;
+		let opposite = parent.start_anchor.id === node_id
+			? parent.end_anchor.getPos()
+			: parent.start_anchor.getPos();
+		let dx = x - opposite[0];
+		let dy = y - opposite[1];
+		let signX = dx < 0 ? -1 : 1;
+		let signY = dy < 0 ? -1 : 1;
+		// Feedback-loop symbols are intrinsically circular, so their bounding box
+		// must remain square regardless of modifier keys.
+		let side = Math.max(24, Math.max(Math.abs(dx), Math.abs(dy)));
+		moveObject.setPos([opposite[0] + signX * side, opposite[1] + signY * side]);
+		parent.update();
+		moveObject.updatePosition();
+	}
+}
+FeedbackLoopTool.init();
+
 class TextAreaTool extends TwoPointerTool {
 	static createTwoPointer(x, y, name) {
 		let primitive_name = findFreeName(type_basename["text"]);
@@ -8202,7 +8476,7 @@ class Zoom {
 			event.stopPropagation();
 			let factor = event.deltaY < 0 ? this.STEP : 1 / this.STEP;
 			// If one or more canvas entities are selected, keep the selection as
-			// the zoom focal point. Otherwise preserve the existing pointer-centred
+			// the zoom focal point. Otherwise preserve the existing pointer-centered
 			// Ctrl+wheel behavior.
 			let selectionAnchor = this.getSelectionAnchorClient();
 			if (selectionAnchor) this.setLevelAt(this.level * factor, selectionAnchor.x, selectionAnchor.y);
@@ -8223,9 +8497,9 @@ class Zoom {
 		return Math.min(view.clientWidth / CANVAS_WIDTH, view.clientHeight / CANVAS_HEIGHT);
 	}
 
-	// Screen position of the centre of the current canvas selection. Multiple
+	// Screen position of the center of the current canvas selection. Multiple
 	// selected entities use their centroid. Returning null preserves the normal
-	// viewport/pointer-centred zoom behavior when nothing is selected.
+	// viewport/pointer-centered zoom behavior when nothing is selected.
 	static getSelectionAnchorClient() {
 		if (typeof get_selected_root_objects !== "function") return null;
 		let selected = Object.values(get_selected_root_objects() || {}).filter(Boolean);
@@ -8287,15 +8561,15 @@ class Zoom {
 			return;
 		}
 
-		// Canvas point currently at the centre of the visible area.
-		let centreX = (view.scrollLeft + view.clientWidth / 2) / this.level;
-		let centreY = (view.scrollTop + view.clientHeight / 2) / this.level;
+		// Canvas point currently at the center of the visible area.
+		let centerX = (view.scrollLeft + view.clientWidth / 2) / this.level;
+		let centerY = (view.scrollTop + view.clientHeight / 2) / this.level;
 
 		this.level = level;
 		this.apply();
 
-		view.scrollLeft = centreX * level - view.clientWidth / 2;
-		view.scrollTop = centreY * level - view.clientHeight / 2;
+		view.scrollLeft = centerX * level - view.clientWidth / 2;
+		view.scrollTop = centerY * level - view.clientHeight / 2;
 	}
 
 	static apply() {
@@ -8489,6 +8763,7 @@ class ToolBox {
 			"movevalve": MoveValveTool,
 			"straightenlink": StraightenLinkTool,
 			"ghost": GhostTool,
+			"feedbackloop": FeedbackLoopTool,
 			"text": TextAreaTool,
 			"rectangle": RectangleTool,
 			"ellipse": EllipseTool,
@@ -8512,7 +8787,7 @@ class ToolBox {
 		let advanceSafeTools = [
 			"mouse", "step", "finish", "clear", "delete",
 			"stock", "converter", "variable", "constant", "flow", "link",
-			"table", "timeplot", "compareplot", "xyplot", "histoplot"
+			"feedbackloop", "table", "timeplot", "compareplot", "xyplot", "histoplot"
 		];
 		// RunResults is declared later in this classic script. `typeof RunResults`
 		// still throws while that lexical class binding is in its temporal dead
@@ -8546,6 +8821,7 @@ class ToolBox {
   			"flow",
   			"link",
   			"ghost",
+  			"feedbackloop",
   			"text",
   			"rectangle",
   			"ellipse",
@@ -8611,7 +8887,92 @@ class Clipboard {
 		this.mode = "copy";
 		this.selectionCenter = null;
 		this.pasteCount = 0;
+		this.sharedStorageKey = "systemika.shared-structure-clipboard.v1";
+		this.sharedTimestamp = 0;
+		this.refreshFromShared();
+		if (typeof window !== "undefined" && window.addEventListener) {
+			window.addEventListener("storage", event => {
+				if (event.key === this.sharedStorageKey) {
+					this.refreshFromShared();
+					this.updateButtons();
+				}
+			});
+			window.addEventListener("focus", () => {
+				this.refreshFromShared();
+				this.updateButtons();
+			});
+		}
 		this.updateButtons();
+	}
+	static serializeSharedItems() {
+		let serializer = new XMLSerializer();
+		return this.items.map(item => ({
+			oldId: item.oldId,
+			type: item.type,
+			name: item.name,
+			xml: serializer.serializeToString(item.value),
+			position: item.position,
+			sourceId: item.sourceId,
+			targetId: item.targetId
+		}));
+	}
+	static publishShared() {
+		if (typeof localStorage === "undefined" || !this.items.length) return;
+		try {
+			let timestamp = Date.now();
+			let payload = {
+				version: 1,
+				timestamp,
+				mode: this.mode,
+				selectionCenter: this.selectionCenter,
+				items: this.serializeSharedItems()
+			};
+			localStorage.setItem(this.sharedStorageKey, JSON.stringify(payload));
+			this.sharedTimestamp = timestamp;
+		} catch (error) {
+			console.warn("Unable to publish Systemika structure clipboard", error);
+		}
+	}
+	static refreshFromShared() {
+		if (typeof localStorage === "undefined") return false;
+		let raw;
+		try { raw = localStorage.getItem(this.sharedStorageKey); } catch (_) { return false; }
+		if (!raw) return false;
+		try {
+			let payload = JSON.parse(raw);
+			let timestamp = Number(payload && payload.timestamp) || 0;
+			if (!payload || payload.version !== 1 || !Array.isArray(payload.items) || timestamp <= this.sharedTimestamp) return false;
+			let parser = new DOMParser();
+			let items = payload.items.map(item => {
+				let doc = parser.parseFromString(String(item.xml || ""), "application/xml");
+				let value = doc.documentElement;
+				if (!value || value.nodeName === "parsererror") return null;
+				return {
+					oldId: String(item.oldId || value.getAttribute("id") || ""),
+					type: String(item.type || value.nodeName || ""),
+					name: String(item.name || value.getAttribute("name") || ""),
+					value: value.cloneNode(true),
+					position: Array.isArray(item.position) ? [Number(item.position[0]), Number(item.position[1])] : [0, 0],
+					sourceId: item.sourceId == null ? null : String(item.sourceId),
+					targetId: item.targetId == null ? null : String(item.targetId)
+				};
+			}).filter(Boolean);
+			if (!items.length) return false;
+			this.items = items;
+			// A structure copied in another model/window is always pasted as a copy.
+			// This avoids a remote Cut retaining name-preservation semantics after its
+			// first destination paste and keeps source/destination histories separate.
+			this.mode = "copy";
+			this.selectionCenter = Array.isArray(payload.selectionCenter)
+				? [Number(payload.selectionCenter[0]), Number(payload.selectionCenter[1])]
+				: centerCoordinates(items.map(item => item.position));
+			this.pasteCount = 0;
+			this.sharedTimestamp = timestamp;
+			return true;
+		} catch (error) {
+			console.warn("Unable to read Systemika structure clipboard", error);
+			return false;
+		}
 	}
 	static updateButtons() {
 		let pasteButton = typeof document !== "undefined" ? document.getElementById("btn_paste") : null;
@@ -8665,6 +9026,7 @@ class Clipboard {
 		this.mode = mode;
 		this.selectionCenter = centerCoordinates(items.map(item => item.position));
 		this.pasteCount = 0;
+		this.publishShared();
 		this.updateButtons();
 		return true;
 	}
@@ -8705,6 +9067,15 @@ class Clipboard {
 		}
 		reservedNames.add(candidate.toLowerCase());
 		return candidate;
+	}
+	static destinationPasteName(originalName, reservedNames) {
+		let base = String(originalName || "Copy").trim() || "Copy";
+		let key = base.toLowerCase();
+		if (findName(base) == null && !reservedNames.has(key)) {
+			reservedNames.add(key);
+			return base;
+		}
+		return this.freeCopyName(base, reservedNames);
 	}
 	static replaceFormulaNames(value, nameMap) {
 		if (typeof value !== "string" || !nameMap || nameMap.size === 0) return value;
@@ -8794,6 +9165,7 @@ class Clipboard {
 		return [source[0] + offset, source[1] + offset];
 	}
 	static paste() {
+		this.refreshFromShared();
 		if (!this.items.length) return false;
 		if (RunResults.isAdvanceActive()) {
 			runOverlay.requestAdvanceTermination(
@@ -8808,17 +9180,16 @@ class Clipboard {
 		let newItems = [];
 		let reservedNames = new Set();
 		let nameMap = new Map();
-		let preserveNames = this.mode === "cut";
 
-		// Decide all names first so formulas inside one copied primitive can safely
-		// refer to another copied primitive regardless of clone order.
+		// Preserve an incoming model-entity name whenever it is free in the
+		// destination model. This matters for cross-window copy/paste: copying
+		// Population into a model that does not already contain Population should
+		// keep that name. Only real destination collisions receive a suffix. The
+		// same rule still renames ordinary same-model copies because the original
+		// entity already occupies its name there.
 		for (let item of this.items) {
 			let isStaticText = String(item.type).toLowerCase() === "textarea" || String(item.type).toLowerCase() === "text";
-			item.pasteName = isStaticText
-				? item.name
-				: (preserveNames && findName(item.name) == null
-					? item.name
-					: this.freeCopyName(item.name, reservedNames));
+			item.pasteName = isStaticText ? item.name : this.destinationPasteName(item.name, reservedNames);
 			if (!isStaticText) nameMap.set(item.name, item.pasteName);
 		}
 
@@ -8926,6 +9297,10 @@ $(window).load(function () {
 		if ($(this).attr("data-action") === "toggle-question-marks") {
 			event.preventDefault();
 			DefinitionQuestionMarks.toggle();
+			return;
+		}
+		if ($(this).attr("data-action") === "feedback-loop-picker") {
+			event.preventDefault();
 			return;
 		}
 		let toolName = $(this).attr("data-tool");
@@ -9232,25 +9607,48 @@ $(window).load(function () {
 		findNextGhostOfSelection();
 	});
 	updateFindGhostsButtonState();
-	let closeColourPicker = () => {
-		let picker = document.getElementById("toolbar-colour-picker");
-		let button = document.getElementById("btn_colour");
+	let closeFeedbackLoopPicker = () => {
+		let picker = document.getElementById("feedback-loop-picker");
+		let button = document.getElementById("btn_feedbackloop");
 		if (picker) picker.hidden = true;
 		if (button) button.setAttribute("aria-expanded", "false");
 	};
-	$("#btn_colour").click(function (event) {
+	$("#btn_feedbackloop").click(function (event) {
 		event.stopPropagation();
-		let picker = document.getElementById("toolbar-colour-picker");
+		let picker = document.getElementById("feedback-loop-picker");
+		if (!picker) return;
+		let willOpen = picker.hidden;
+		closeColorPicker && closeColorPicker();
+		picker.hidden = !willOpen;
+		this.setAttribute("aria-expanded", willOpen ? "true" : "false");
+	});
+	$("#feedback-loop-picker").click(function (event) { event.stopPropagation(); });
+	$("#feedback-loop-picker .feedback-loop-option").click(function (event) {
+		event.preventDefault();
+		event.stopPropagation();
+		FeedbackLoopTool.setLoopType($(this).attr("data-loop-type"));
+		closeFeedbackLoopPicker();
+		ToolBox.setTool("feedbackloop", mouse.left);
+	});
+	let closeColorPicker = () => {
+		let picker = document.getElementById("toolbar-color-picker");
+		let button = document.getElementById("btn_color");
+		if (picker) picker.hidden = true;
+		if (button) button.setAttribute("aria-expanded", "false");
+	};
+	$("#btn_color").click(function (event) {
+		event.stopPropagation();
+		let picker = document.getElementById("toolbar-color-picker");
 		if (!picker) return;
 		picker.hidden = !picker.hidden;
 		this.setAttribute("aria-expanded", picker.hidden ? "false" : "true");
 	});
-	$("#toolbar-colour-picker").click(function (event) { event.stopPropagation(); });
-	$(document).click(function () { closeColourPicker(); });
+	$("#toolbar-color-picker").click(function (event) { event.stopPropagation(); });
+	$(document).click(function () { closeColorPicker(); closeFeedbackLoopPicker(); });
 	$("#btn_black").click(function () {
 		setColorToSelection("black");
 	});
-	$("#btn_grey").click(function () {
+	$("#btn_gray").click(function () {
 		setColorToSelection("silver");
 	});
 	$("#btn_red").click(function () {
@@ -9312,6 +9710,9 @@ $(window).load(function () {
 	});
 	$("#btn_browser_models").click(function () {
 		browserModelsDialog.show();
+	});
+	$("#btn_new_window").click(function () {
+		if (!environment.openNewWindow()) return;
 	});
 	$("#btn_license").click(function () {
 		licenseDialog.show();
@@ -9684,6 +10085,14 @@ function syncVisual(tprimitive) {
 				connection.update();
 			}
 			break;
+		case "FeedbackLoop":
+			{
+				let source_pos = getSourcePosition(tprimitive);
+				let target_pos = getTargetPosition(tprimitive);
+				let connection = new FeedbackLoopVisual(tprimitive.id, "feedbackloop", source_pos, target_pos);
+				connection.update();
+			}
+			break;
 		case "TextArea":
 			{
 				let source_pos = getSourcePosition(tprimitive);
@@ -9977,10 +10386,10 @@ runOverlay.init();
 
 // Not yet implemented
 function setColorToSelection(color) {
-	let picker = typeof document !== "undefined" ? document.getElementById("toolbar-colour-picker") : null;
-	let colourButton = typeof document !== "undefined" ? document.getElementById("btn_colour") : null;
+	let picker = typeof document !== "undefined" ? document.getElementById("toolbar-color-picker") : null;
+	let colorButton = typeof document !== "undefined" ? document.getElementById("btn_color") : null;
 	if (picker) picker.hidden = true;
-	if (colourButton) colourButton.setAttribute("aria-expanded", "false");
+	if (colorButton) colorButton.setAttribute("aria-expanded", "false");
 	let objects = get_selected_objects();
 	for (let id in objects) {
 		let obj = get_object(id);
@@ -10251,6 +10660,11 @@ class RunResults {
 		this.simulationController = SystemikaEngine.runCurrentModel({
 			rate: -1,
 			ignoreUnits: this.ignoreUnits,
+				// Calibration may provide a scheduler owned by its separate popup
+				// window. This avoids Chromium background-timer throttling in the
+				// covered editor window after Alt+Tab while leaving ordinary runs
+				// unchanged.
+				callbackScheduler: (typeof this.systemikaCallbackScheduler === "function") ? this.systemikaCallbackScheduler : null,
 			onPause: (res) => {
 				// We always need to do this, even if we paused the simulation, otherwise we cannot unpause
 				// Here is the only place we can get a handle to the simulationController
@@ -13944,6 +14358,93 @@ class TimeUnitDialog extends jqDialog {
 }
 
 
+
+class FeedbackLoopDialog extends jqDialog {
+	constructor(id) {
+		super();
+		this.primitive = findID(id);
+		this.id = id;
+		this.setTitle("Feedback Loop Properties");
+		this.setHtml(`
+			<table class="modern-table zebra">
+				<tr>
+					<td>Size (points):</td>
+					<td><input class="feedback-loop-size enter-apply" type="number" min="24" max="2000" step="1" /></td>
+				</tr>
+				<tr>
+					<td>Label:</td>
+					<td><input class="feedback-loop-label-input enter-apply" type="text" maxlength="120" /></td>
+				</tr>
+			</table>
+			<div class="systemika-text-formatting feedback-loop-text-formatting" aria-label="Feedback loop label formatting">
+				<label>Font
+					<select class="feedback-loop-font-family enter-apply">
+						<option value="Arial, Helvetica, sans-serif">Arial</option>
+						<option value="Verdana, Geneva, sans-serif">Verdana</option>
+						<option value="Georgia, serif">Georgia</option>
+						<option value="'Times New Roman', Times, serif">Times New Roman</option>
+						<option value="'Courier New', Courier, monospace">Courier New</option>
+					</select>
+				</label>
+				<label>Size <input class="feedback-loop-font-size text-font-size enter-apply" type="number" min="8" max="96" step="1" /></label>
+				<label class="systemika-text-style-toggle"><input class="feedback-loop-bold" type="checkbox" /> <b>B</b></label>
+				<label class="systemika-text-style-toggle"><input class="feedback-loop-italic" type="checkbox" /> <i>I</i></label>
+				<label class="systemika-text-style-toggle"><input class="feedback-loop-underline" type="checkbox" /> <u>U</u></label>
+			</div>
+		`);
+		this.sizeField = $(this.dialogContent).find(".feedback-loop-size");
+		this.labelField = $(this.dialogContent).find(".feedback-loop-label-input");
+		this.fontFamilyField = $(this.dialogContent).find(".feedback-loop-font-family");
+		this.fontSizeField = $(this.dialogContent).find(".feedback-loop-font-size");
+		this.boldField = $(this.dialogContent).find(".feedback-loop-bold");
+		this.italicField = $(this.dialogContent).find(".feedback-loop-italic");
+		this.underlineField = $(this.dialogContent).find(".feedback-loop-underline");
+		this.bindEnterApplyEvents();
+	}
+	beforeCreateDialog() {
+		this.dialogParameters.width = 540;
+	}
+	beforeShow() {
+		let visual = get_object(this.id);
+		let size = visual && typeof visual.getWidth === "function"
+			? Math.max(visual.getWidth(), visual.getHeight())
+			: 50;
+		this.sizeField.val(Math.round(size * 100) / 100);
+		this.labelField.val(this.primitive ? (this.primitive.getAttribute("Label") || "") : "");
+		this.fontFamilyField.val(this.primitive.getAttribute("FontFamily") || "Arial, Helvetica, sans-serif");
+		this.fontSizeField.val(this.primitive.getAttribute("FontSize") || "12");
+		this.boldField.prop("checked", this.primitive.getAttribute("FontWeight") === "bold");
+		this.italicField.prop("checked", this.primitive.getAttribute("FontStyle") === "italic");
+		this.underlineField.prop("checked", this.primitive.getAttribute("TextDecoration") === "underline");
+		setTimeout(() => this.labelField.focus(), 0);
+	}
+	makeApply() {
+		let size = Number(this.sizeField.val());
+		if (!Number.isFinite(size) || size < 24 || size > 2000) {
+			xAlert("Feedback loop size must be a finite number between 24 and 2000 points.");
+			return false;
+		}
+		if (!this.primitive) return false;
+		this.primitive.setAttribute("Label", String(this.labelField.val() || ""));
+		this.primitive.setAttribute("FontFamily", this.fontFamilyField.val() || "Arial, Helvetica, sans-serif");
+		let fontSize = Number(this.fontSizeField.val());
+		if (!Number.isFinite(fontSize)) fontSize = 12;
+		fontSize = Math.round(Math.max(8, Math.min(96, fontSize)));
+		this.primitive.setAttribute("FontSize", String(fontSize));
+		this.primitive.setAttribute("FontWeight", this.boldField.prop("checked") ? "bold" : "normal");
+		this.primitive.setAttribute("FontStyle", this.italicField.prop("checked") ? "italic" : "normal");
+		this.primitive.setAttribute("TextDecoration", this.underlineField.prop("checked") ? "underline" : "none");
+		let visual = get_object(this.id);
+		if (!visual) return;
+		let center = visual.getPos();
+		visual.start_anchor.setPos([center[0] - size / 2, center[1] - size / 2]);
+		visual.end_anchor.setPos([center[0] + size / 2, center[1] + size / 2]);
+		visual.syncAnchorToPrimitive("start");
+		visual.syncAnchorToPrimitive("end");
+		visual.update();
+	}
+}
+
 class GeometryDialog extends DisplayDialog {
 	renderStrokeHtml() {
 		let strokeWidths = ["1", "2", "3", "4", "5", "6"];
@@ -14458,6 +14959,8 @@ class GettingStartedDialog extends CloseDialog {
 				<li><b>Save the model.</b> Use Save or Save As. The red <b>Unsaved Changes</b> indicator is also clickable.</li>
 			</ol>
 			<p><b>Editing Flow pipes:</b> select a Flow by its valve, then drag either endpoint away from a Stock to detach it. While dragging the arrow or cloud endpoint, press <b>Shift</b> to insert an elbow; press and release <b>Shift</b> again to add another elbow, with no fixed limit. This works both while creating a new Flow and when reshaping an existing Flow. Right-click a selected pipe to add an elbow handle, then drag that handle to reshape the pipe. Right-click an elbow handle, or select it and press Delete/Backspace, to remove the elbow.</p>
+			<p><b>Feedback Loop graphics:</b> use the Feedback Loop tool just above Text to choose a clockwise or counterclockwise reinforcing (+) or balancing (−) loop, then click the canvas to place it. Resize it with its handles; the symbol always remains circular. Double-click the loop to enter an exact size in points, add an optional label below the loop, and format the label font, size, and emphasis. The toolbar Color tool changes the entire loop annotation—including its polarity mark and label—using one shared color. Feedback Loop graphics are annotations only and do not affect simulation equations.</p>
+			<p><b>Multiple models:</b> use <b>File → New Window...</b> to open another independent Systemika workspace. You can copy a selected model structure in one Systemika window and paste it into another. Names are preserved when they are free in the destination model; only names that already exist there receive a numbered suffix. IDs, equation references, links, and connector geometry are remapped for the destination model.</p>
 			<p>Press <b>Enter</b> to apply changes. Equations can span multiple lines; press <b>Shift+Enter</b> to insert a line break.</p>
 		</div>`);
 	}
@@ -14764,7 +15267,7 @@ class AboutDialog extends CloseDialog {
 			<div style="min-width:340px; max-width: 760px; line-height:1.45">
 			<img src="graphics/systemika_high.png" style="width: 96px; height: 96px" alt="Systemika"/><br/>
 			<b>${productName} ${systemika.version}</b><br/><br/>
-			<b><a target="_blank" href="https://systemika.no">Systemika</a></b> is educational System Dynamics software focused on learning and teaching stock-and-flow modelling. It provides a native simulation engine with Euler and fourth-order Runge-Kutta integration, strict unit-consistency reporting, interactive Advance runs, and classroom-oriented model/output tools.<br/><br/>
+			<b><a target="_blank" href="https://systemika.no">Systemika</a></b> is educational System Dynamics software focused on learning and teaching stock-and-flow modeling. It provides a native simulation engine with Euler and fourth-order Runge-Kutta integration, strict unit-consistency reporting, interactive Advance runs, and classroom-oriented model/output tools.<br/><br/>
 			Systemika was developed from the open-source <a target="_blank" href="https://stochsd.sourceforge.io">StochSD</a> codebase, which has historical lineage to <a target="_blank" href="https://insightmaker.com">Insight Maker</a>. The current Systemika simulation engine and the model infrastructure replaced during the independence work are independently written for Systemika; remaining StochSD-derived application code and attribution are covered by the project license. Historical <code>.ssd</code> storage identifiers are retained for file compatibility.<br/><br/>
 			<a target="_blank" href="https://stochsd.sourceforge.io">StochSD</a> was developed by Leif Gustafsson, Erik Gustafsson and Magnus Gustafsson at Uppsala University, Sweden. <a target="_blank" href="https://insightmaker.com">Insight Maker</a> was developed by Scott Fortmann-Roe.<br/><br/>
 			Project website: <a target="_blank" href="https://systemika.no">systemika.no</a>
@@ -14860,7 +15363,7 @@ class BrowserModelsDialog extends jqDialog {
 		saveChangedAlert(() => {
 			// newModel() reloads, which would otherwise land back on this same
 			// picker; skip it once so New Model always reaches the time unit dialog.
-			localStorage.setItem("skipStartupPicker", "1");
+			modelSessionStorage().setItem("skipStartupPicker", "1");
 			fileManager.newModel();
 		});
 	}

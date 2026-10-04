@@ -74,3 +74,30 @@ test('recognizes an externally renamed run by its new filename', async () => {
   assert.equal(loaded.metadata.runName, 'Baseline');
   assert.equal(loaded.metadata.originalRunName, 'Base');
 });
+
+
+test('metadata patches use a lightweight sidecar and merge on load without rewriting the sysrun archive', async () => {
+  const { dir, modelPath } = await fixture();
+  await runStore.writeRunPackage({ modelPath, runLabel: 'Calibration', csv: 'Time,X\r\n0,1\r\n' });
+  const runPath = path.join(dir, 'Runs', 'Calibration.sysrun');
+  const before = await fs.stat(runPath);
+  const beforeBytes = await fs.readFile(runPath);
+
+  const saved = await runStore.updateRunMetadata({
+    modelPath,
+    runLabel: 'Calibration',
+    patch: { calibrationSandbox: { version: 1, panelWidth: 444 } },
+  });
+
+  assert.match(path.basename(saved.path), /Calibration\.sysrun\.metadata\.json$/);
+  const after = await fs.stat(runPath);
+  const afterBytes = await fs.readFile(runPath);
+  assert.equal(after.size, before.size);
+  assert.deepEqual(afterBytes, beforeBytes);
+
+  const loaded = await runStore.readRunPackage({ modelPath, runLabel: 'Calibration' });
+  assert.equal(loaded.metadata.calibrationSandbox.panelWidth, 444);
+
+  await runStore.writeRunPackage({ modelPath, runLabel: 'Calibration', csv: 'Time,X\r\n0,2\r\n', overwrite: true });
+  await assert.rejects(fs.access(saved.path), error => error && error.code === 'ENOENT');
+});

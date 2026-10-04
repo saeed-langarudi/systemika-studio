@@ -201,7 +201,7 @@ var optimiserclass=function () {
 		start = tstart;
 		step = tstep;
 		out("");
-		out("New optimisation");
+		out("New optimization");
 		out("================");
 		//alert("starting new optim");
 		route="optim_init";
