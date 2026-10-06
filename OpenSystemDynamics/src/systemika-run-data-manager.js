@@ -380,6 +380,31 @@
       return promise;
     }
 
+    async ensureRunLoadedIfExists(runName) {
+      const name = String(runName || '');
+      if (!name) return this.currentRun;
+      const cached = this.runCache.get(name);
+      if (cached) return cached;
+
+      // Display selections are persisted in the .ssd model, while run datasets
+      // live in the project-local Runs folder. Missing run files are therefore
+      // normal stale references, not user-facing errors. This covers copied
+      // models, deleted Runs folders, and files removed outside Systemika.
+      const isMissingRunError = (error) => {
+        const message = String(error && error.message ? error.message : error || '');
+        return Boolean((error && error.code === 'ENOENT') || /\bENOENT\b|no such file or directory/i.test(message));
+      };
+      try {
+        if (!await this.runExists(name)) return null;
+        return await this.ensureRunLoaded(name);
+      } catch (error) {
+        // The run can disappear before either the existence check or the load
+        // completes. In both cases report it to displays simply as unavailable.
+        if (isMissingRunError(error)) return null;
+        throw error;
+      }
+    }
+
     async listRuns() {
       const api = getRunsAPI();
       if (!api) throw new Error('Run persistence is unavailable in this environment.');
@@ -419,6 +444,13 @@
       const cached = this.runCache.get(name);
       this.runCache.delete(name);
       if (this.currentRun && (this.currentRun === cached || this.currentRun.runName === name)) this.currentRun = null;
+
+      // Run deletion is a data-model operation, so every caller gets the same
+      // display cleanup. Plots/tables must never retain a deleted run merely
+      // because deletion happened outside the Manage Runs dialog.
+      if (root.SystemikaDisplayRuns && typeof root.SystemikaDisplayRuns.removeRun === 'function') {
+        root.SystemikaDisplayRuns.removeRun(name);
+      }
       return result;
     }
   }

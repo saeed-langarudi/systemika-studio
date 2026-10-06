@@ -118,7 +118,7 @@ test('dialogs close on Escape even when focused text controls stop propagation',
 
 test('Table settings use the compact selected-variable finder and expose loading state', () => {
   assert.match(editor, /class TableSelectorComponent extends PlotVariableSelectorComponent/);
-  assert.match(editor, /class PlotVariableSelectorComponent[\s\S]{0,6500}<strong>Selected Variable\(s\)<\/strong>/);
+  assert.match(editor, /class PlotVariableSelectorComponent[\s\S]{0,10000}<strong>Selected Variable\(s\)<\/strong>/);
   assert.match(editor, /<b>Selected Variable\(s\):<\/b> \${selected}/);
   assert.match(editor, /this\.data\.namesToDisplay = IdsToDisplay\.map\(findID\)\.filter\(Boolean\)\.map\(getName\)/);
   assert.match(editor, /systemika-table-selection-summary/);

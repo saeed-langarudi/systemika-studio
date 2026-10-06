@@ -456,6 +456,50 @@ function setPlotLineStyle(plotPrimitive, id, style) {
 	setPlotLineStyles(plotPrimitive, styles);
 }
 
+const DEFAULT_PLOT_VARIABLE_RANGE = Object.freeze({ auto: true, min: 0, max: 1 });
+
+function normalizePlotVariableRange(range) {
+	let auto = !(range && range.auto === false);
+	let min = range ? Number(range.min) : 0;
+	let max = range ? Number(range.max) : 1;
+	if (!Number.isFinite(min)) min = 0;
+	if (!Number.isFinite(max)) max = 1;
+	if (!(max > min)) {
+		let center = Number.isFinite(min) ? min : 0;
+		min = center - 0.5;
+		max = center + 0.5;
+	}
+	return { auto, min, max };
+}
+
+function getPlotVariableRanges(plotPrimitive) {
+	let ranges = {};
+	try {
+		let raw = plotPrimitive && plotPrimitive.getAttribute("VariableRanges");
+		if (raw) {
+			let parsed = JSON.parse(raw);
+			if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) ranges = parsed;
+		}
+	} catch (_error) { ranges = {}; }
+	let normalized = {};
+	Object.keys(ranges).forEach(id => { normalized[String(id)] = normalizePlotVariableRange(ranges[id]); });
+	return normalized;
+}
+
+function getPlotVariableRange(plotPrimitive, id) {
+	let ranges = getPlotVariableRanges(plotPrimitive);
+	return ranges[String(id)] || { ...DEFAULT_PLOT_VARIABLE_RANGE };
+}
+
+function setPlotVariableRanges(plotPrimitive, ranges) {
+	let normalized = {};
+	Object.keys(ranges || {}).forEach(id => {
+		let range = normalizePlotVariableRange(ranges[id]);
+		if (!range.auto) normalized[String(id)] = range;
+	});
+	plotPrimitive.setAttribute("VariableRanges", JSON.stringify(normalized));
+}
+
 /**
  * 	Method: setIdsToDisplay
  * 	@param {string} plotId ID of plot to set

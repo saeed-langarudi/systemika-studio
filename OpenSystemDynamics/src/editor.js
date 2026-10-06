@@ -4034,6 +4034,107 @@ function stylePlotLegendLineSamples(chartDiv, plot, seriesSettings, maxSeries) {
 	}
 }
 
+const SYSTEMIKA_MULTISCALE_AXES = Object.freeze(["yaxis", "y2axis", "y3axis", "y4axis", "y5axis", "y6axis", "y7axis", "y8axis", "y9axis"]);
+
+function multiscaleAxisName(index) {
+	let i = Math.max(0, Math.min(SYSTEMIKA_MULTISCALE_AXES.length - 1, Number(index) || 0));
+	return SYSTEMIKA_MULTISCALE_AXES[i];
+}
+
+function isPlotMultiscaleEnabled(primitive) {
+	return !primitive || String(primitive.getAttribute("MultiScale") || "true") !== "false";
+}
+
+function buildMultiScaleAxes(primitive, ids, renderer) {
+	let axes = {};
+	let ranges = typeof getPlotVariableRanges === "function" ? getPlotVariableRanges(primitive) : {};
+	(ids || []).slice(0, SYSTEMIKA_MULTISCALE_AXES.length).forEach((id, index) => {
+		let range = ranges[String(id)] || { auto: true, min: 0, max: 1 };
+		let name = multiscaleAxisName(index);
+		axes[name] = {
+			renderer: renderer || $.jqplot.LinearAxisRenderer,
+			// jqPlot still uses these axes for the independent data transforms, but
+			// Systemika renders their scales together in one labelled gutter at left.
+			show: false,
+			showTicks: false,
+			showTickMarks: false,
+			showLabel: false,
+			drawBaseline: false,
+			min: range.auto ? undefined : range.min,
+			max: range.auto ? undefined : range.max,
+			numberTicks: 3
+		};
+	});
+	return axes;
+}
+
+function formatMultiScaleValue(value) {
+	let number = Number(value);
+	if (!Number.isFinite(number)) return "—";
+	let abs = Math.abs(number);
+	if ((abs >= 10000 || (abs > 0 && abs < 0.001))) return number.toExponential(2);
+	return Number(number.toPrecision(4)).toString();
+}
+
+function renderMultiScaleKey(visual, ids) {
+	if (!visual || !visual.chartDiv || !visual.plot || !isPlotMultiscaleEnabled(visual.primitive)) return;
+	let old = visual.chartDiv.querySelector(".systemika-multiscale-axis-gutter");
+	if (old) old.remove();
+	let list = (ids || []).slice(0, SYSTEMIKA_MULTISCALE_AXES.length);
+	if (!list.length) return;
+
+	let doc = visual.chartDiv.ownerDocument || document;
+	let host = doc.createElement("div");
+	host.className = "systemika-multiscale-axis-gutter";
+	host.style.position = "absolute";
+	host.style.left = "2px";
+	host.style.top = "0";
+	host.style.bottom = "0";
+	host.style.width = "86px";
+	host.style.pointerEvents = "none";
+	host.style.fontSize = "11px";
+	host.style.lineHeight = "1.15";
+	host.style.zIndex = "3";
+
+	let pad = visual.plot._gridPadding || { top: 10, bottom: 40 };
+	let gridTop = Number(pad.top) || 10;
+	let gridBottom = Number(pad.bottom) || 40;
+	let chartHeight = Math.max(1, visual.chartDiv.clientHeight || parseFloat(visual.chartDiv.style.height) || 1);
+	let gridHeight = Math.max(1, chartHeight - gridTop - gridBottom);
+	let positions = [gridTop, gridTop + gridHeight / 2, gridTop + gridHeight];
+
+	positions.forEach((top, tickIndex) => {
+		let row = doc.createElement("div");
+		row.className = "systemika-multiscale-axis-row";
+		row.style.position = "absolute";
+		row.style.right = "4px";
+		row.style.top = `${top}px`;
+		row.style.transform = tickIndex === 0 ? "translateY(0)" : (tickIndex === 1 ? "translateY(-50%)" : "translateY(-100%)");
+		row.style.textAlign = "right";
+		row.style.whiteSpace = "nowrap";
+		list.forEach((id, index) => {
+			let axis = visual.plot.axes && visual.plot.axes[multiscaleAxisName(index)];
+			if (!axis) return;
+			let min = Number(axis.min), max = Number(axis.max);
+			let value = tickIndex === 0 ? max : (tickIndex === 1 ? (min + max) / 2 : min);
+			let item = doc.createElement("div");
+			let seriesIndex = 0;
+			for (let k = 0; k < index; k++) {
+				let prev = String(list[k]);
+				seriesIndex += visual.gens && visual.gens.idGen ? visual.gens.idGen.filter(arr => arr.indexOf(prev) !== -1).length : 1;
+			}
+			let color = visual.plot.series && visual.plot.series[seriesIndex] ? visual.plot.series[seriesIndex].color : "#444";
+			item.style.color = color || "#444";
+			item.textContent = `${index + 1}  ${formatMultiScaleValue(value)}`;
+			row.appendChild(item);
+		});
+		host.appendChild(row);
+	});
+
+	if (getComputedStyle(visual.chartDiv).position === "static") visual.chartDiv.style.position = "relative";
+	visual.chartDiv.appendChild(host);
+}
+
 function plotBottomLegendOptions(show = true) {
 	let options = {
 		show: Boolean(show),
@@ -5281,17 +5382,19 @@ class DataGenerations {
 		return seriesArray;
 	}
 
-	getSeriesSettingsArray(wantedIds, hasNumberedLines, colorFromPrimitive) {
+	getSeriesSettingsArray(wantedIds, hasNumberedLines, colorFromPrimitive, multiScale = true) {
 		let seriesSettingsArray = [];
 		let countLine = 0;
-		for (let wantedId of wantedIds) {
+		let axisNames = ["yaxis", "y2axis", "y3axis", "y4axis", "y5axis", "y6axis", "y7axis", "y8axis", "y9axis"];
+		for (let wantedIndex = 0; wantedIndex < wantedIds.length; wantedIndex++) {
+			let wantedId = wantedIds[wantedIndex];
 			for (let i = 0; i < this.idGen.length; i++) {
 				let j = this.idGen[i].indexOf(wantedId);
 				if (j === -1) continue;
 				countLine++;
 				let runLabel = this.runLabelGen[i] || `Run ${i + 1}`;
 				let baseLabel = wantedIds.length === 1 ? runLabel : `${this.labelGen[i][j]} [${runLabel}]`;
-				seriesSettingsArray.push({
+				let settings = {
 					showLabel: true,
 					lineWidth: this.lineWidthGen[i][j],
 					label: `${(hasNumberedLines ? `${countLine}. ` : "")}${baseLabel}`,
@@ -5306,7 +5409,9 @@ class DataGenerations {
 						ypadding: 0,
 						location: "n"
 					}
-				});
+				};
+				if (multiScale) settings.yaxis = axisNames[Math.min(wantedIndex, axisNames.length - 1)];
+				seriesSettingsArray.push(settings);
 			}
 		}
 		return seriesSettingsArray;
@@ -5364,12 +5469,19 @@ class ComparePlotVisual extends PlotVisual {
 
 		try {
 			if (window.systemikaSimulationData && systemikaSimulationData.persistenceAvailable()) {
-				await Promise.all(savedNames.map(name => systemikaSimulationData.ensureRunLoaded(name)));
+				let loaded = await Promise.all(savedNames.map(async (name) => ({
+					name,
+					run: await systemikaSimulationData.ensureRunLoadedIfExists(name),
+				})));
+				let unavailable = new Set(loaded.filter(item => !item.run).map(item => item.name));
+				if (unavailable.size) {
+					runNames = runNames.filter(name => !unavailable.has(name));
+					setCompareRunNames(this.primitive, runNames);
+				}
 			}
 		} catch (error) {
 			if (request !== this.runSourceRequest) return;
 			console.error(error);
-			xAlert(`Unable to load Time Plot run data.<br/><br/>${htmlEscape(error.message || String(error))}`);
 			return;
 		}
 		if (request !== this.runSourceRequest) return;
@@ -5418,7 +5530,8 @@ class ComparePlotVisual extends PlotVisual {
 		this.serieSettingsArray = this.gens.getSeriesSettingsArray(
 			idsToDisplay,
 			hasNumberedLines,
-			this.primitive.getAttribute("ColorFromPrimitive") === "true"
+			this.primitive.getAttribute("ColorFromPrimitive") === "true",
+			isPlotMultiscaleEnabled(this.primitive)
 		);
 		setTimeout(() => this.updateChart(), 200);
 	}
@@ -5437,10 +5550,24 @@ class ComparePlotVisual extends PlotVisual {
 		let max = Number(axisLimits.timeaxis.auto ? (bounds ? bounds.max : fallbackEnd) : axisLimits.timeaxis.max);
 		let tickList = this.getTicks(min, max);
 
+		let idsToDisplay = getDisplayIds(this.primitive);
+		let multiScale = isPlotMultiscaleEnabled(this.primitive);
+		let yRenderer = (this.primitive.getAttribute("YLogScale") === "true") ? $.jqplot.LogAxisRenderer : $.jqplot.LinearAxisRenderer;
+		let yAxes = multiScale
+			? buildMultiScaleAxes(this.primitive, idsToDisplay, yRenderer)
+			: { yaxis: {
+				renderer: yRenderer,
+				labelRenderer: $.jqplot.CanvasAxisLabelRenderer,
+				label: this.primitive.getAttribute("LeftAxisLabel"),
+				min: axisLimits.yaxis.auto ? undefined : axisLimits.yaxis.min,
+				max: axisLimits.yaxis.auto ? undefined : axisLimits.yaxis.max
+			} };
+
 		this.plot = renderSystemikaJqPlot(this.chartDiv, this.serieArray, {
 			title: this.primitive.getAttribute("TitleLabel"),
 			series: this.serieSettingsArray,
 			grid: { background: "transparent", shadow: false },
+			gridPadding: multiScale ? { left: 94, right: 12 } : undefined,
 			axes: {
 				xaxis: {
 					label: timeAxisLabel(),
@@ -5449,13 +5576,7 @@ class ComparePlotVisual extends PlotVisual {
 					max: max,
 					ticks: tickList,
 				},
-				yaxis: {
-					renderer: (this.primitive.getAttribute("YLogScale") === "true") ? $.jqplot.LogAxisRenderer : $.jqplot.LinearAxisRenderer,
-					labelRenderer: $.jqplot.CanvasAxisLabelRenderer,
-					label: this.primitive.getAttribute("LeftAxisLabel"),
-					min: axisLimits.yaxis.auto ? undefined : axisLimits.yaxis.min,
-					max: axisLimits.yaxis.auto ? undefined : axisLimits.yaxis.max
-				}
+				...yAxes
 			},
 			highlighter: {
 				show: this.primitive.getAttribute("ShowHighlighter") === "true",
@@ -5470,7 +5591,8 @@ class ComparePlotVisual extends PlotVisual {
 		});
 		stylePlotLegendLineSamples(this.chartDiv, this.plot, this.serieSettingsArray);
 		spacePlotLegendFromGrid(this.chartDiv);
-		if (!isNaN(this.plot.axes.yaxis.min) && !isNaN(this.plot.axes.yaxis.max)) {
+		if (multiScale) renderMultiScaleKey(this, idsToDisplay);
+		if (!multiScale && !isNaN(this.plot.axes.yaxis.min) && !isNaN(this.plot.axes.yaxis.max)) {
 			axisLimits.yaxis.min = this.plot.axes.yaxis.min;
 			axisLimits.yaxis.max = this.plot.axes.yaxis.max;
 			this.primitive.setAttribute("AxisLimits", JSON.stringify(axisLimits));
@@ -6744,6 +6866,11 @@ BaseTool.init();
 
 class ClearTool extends BaseTool {
 	static enterTool() {
+		if (!SystemikaOutputDevices.hasDisplayedResults()) {
+			SystemikaOutputDevices.updateClearButtonState();
+			ToolBox.setTool("mouse");
+			return;
+		}
 		SystemikaOutputDevices.clearAll();
 		ToolBox.setTool("mouse");
 	}
@@ -10471,6 +10598,26 @@ async function updateRecentsMenu() {
 // manager. Clearing affects only rendered plot/table contents; it does not
 // delete display objects, run selections, or saved .sysrun files.
 const SystemikaOutputDevices = {
+	hasDisplayedResults() {
+		let seen = new Set();
+		for (let collection of [object_array, connection_array]) {
+			for (let key in (collection || {})) {
+				let visual = collection[key];
+				if (!visual || seen.has(visual)) continue;
+				seen.add(visual);
+				if (typeof TableVisual !== "undefined" && visual instanceof TableVisual) {
+					if (visual.data && Array.isArray(visual.data.results) && visual.data.results.length) return true;
+				} else if (typeof PlotVisual !== "undefined" && visual instanceof PlotVisual) {
+					if (Array.isArray(visual.serieArray) && visual.serieArray.some(series => Array.isArray(series) && series.length)) return true;
+				}
+			}
+		}
+		return false;
+	},
+	updateClearButtonState() {
+		let button = document.getElementById("btn_clear");
+		if (button) button.disabled = !this.hasDisplayedResults();
+	},
 	clearAll() {
 		let seen = new Set();
 		for (let collection of [object_array, connection_array]) {
@@ -10482,13 +10629,16 @@ const SystemikaOutputDevices = {
 					if (visual.data) visual.data.results = [];
 					visual.updateHTML(`<div class="empty-plot-header">Table</div><div style="padding:8px;">No displayed results.</div>`);
 				} else if (typeof PlotVisual !== "undefined" && visual instanceof PlotVisual) {
+					visual.serieArray = [];
 					if (typeof visual.setEmptyPlot === "function") visual.setEmptyPlot();
 				}
 			}
 		}
+		this.updateClearButtonState();
 	},
 	refreshAll() {
 		if (typeof RunResults !== "undefined") RunResults.triggerRunFinished();
+		setTimeout(() => this.updateClearButtonState(), 260);
 	}
 };
 if (typeof window !== "undefined") window.SystemikaOutputDevices = SystemikaOutputDevices;
@@ -11175,6 +11325,9 @@ class RunResults {
 				delete this.runSubscribers[id];
 			}
 		}
+		if (typeof SystemikaOutputDevices !== "undefined") {
+			setTimeout(() => SystemikaOutputDevices.updateClearButtonState(), 260);
+		}
 	}
 }
 RunResults.init();
@@ -11803,7 +11956,6 @@ class SystemikaRunsManagerDialog extends jqDialog {
 			try {
 				this.status("Deleting…");
 				await systemikaSimulationData.deleteRun(doomed);
-				removeRunFromDisplaySelections(doomed);
 				SystemikaOutputDevices.refreshAll();
 				this.selectedRun = "";
 				await this.reload();
@@ -11826,7 +11978,6 @@ class SystemikaRunsManagerDialog extends jqDialog {
 					let name = String(run.runName || "");
 					if (!name) continue;
 					await systemikaSimulationData.deleteRun(name);
-					removeRunFromDisplaySelections(name);
 				}
 				SystemikaOutputDevices.refreshAll();
 				this.selectedRun = "";
@@ -12155,7 +12306,9 @@ class PlotVariableSelectorComponent extends PrimitiveSelectorComponent {
 	constructor(parent, displayLimit, options = {}) {
 		super(parent, displayLimit);
 		this.withLineStyle = Boolean(options.lineStyle);
+		this.withRange = Boolean(options.range);
 		this.styles = {};
+		this.ranges = {};
 	}
 	patternValue(pattern) {
 		return JSON.stringify(Array.isArray(pattern) && pattern.length ? pattern : [1]);
@@ -12177,6 +12330,48 @@ class PlotVariableSelectorComponent extends PrimitiveSelectorComponent {
 			<span class="cm-primitive cm-${color} systemika-variable-name" title="${htmlEscape(getName(primitive))}">${htmlEscape(getName(primitive))}</span>
 		</div>`;
 	}
+	rangeButtonHtml(id) {
+		if (!this.withRange) return "";
+		let range = this.ranges[String(id)] || { auto: true, min: 0, max: 1 };
+		let title = range.auto ? "Automatic range" : `Range ${range.min} to ${range.max}`;
+		return `<button type="button" class="plot-variable-range-button ${range.auto ? "" : "custom-range"}" data-id="${htmlEscape(String(id))}" title="${htmlEscape(title)}" aria-label="Range for ${htmlEscape(findID(id) ? getName(findID(id)) : String(id))}">Range</button>`;
+	}
+	openRangeDialog(id) {
+		let key = String(id);
+		let primitive = findID(key);
+		let current = this.ranges[key] || { auto: true, min: 0, max: 1 };
+		let host = $(`<div class="systemika-variable-range-dialog">
+			<label><input type="checkbox" class="range-auto" ${current.auto ? "checked" : ""}> Automatic range</label>
+			<div class="systemika-range-fields">
+				<label>Minimum <input type="number" class="range-min" step="any" value="${htmlEscape(String(current.min))}"></label>
+				<label>Maximum <input type="number" class="range-max" step="any" value="${htmlEscape(String(current.max))}"></label>
+			</div>
+			<div class="systemika-range-warning" aria-live="polite"></div>
+		</div>`).appendTo(document.body);
+		let sync = () => host.find(".systemika-range-fields input").prop("disabled", host.find(".range-auto").prop("checked"));
+		host.find(".range-auto").change(sync); sync();
+		let close = () => { try { host.dialog("destroy"); } catch (_error) {} host.remove(); };
+		host.dialog({
+			title: `Range — ${primitive ? getName(primitive) : key}`, modal: true, width: 330, resizable: false,
+			buttons: {
+				Apply: () => {
+					let auto = host.find(".range-auto").prop("checked");
+					let min = Number(host.find(".range-min").val());
+					let max = Number(host.find(".range-max").val());
+					if (!auto && (!Number.isFinite(min) || !Number.isFinite(max) || !(max > min))) {
+						host.find(".systemika-range-warning").text("Maximum must be greater than minimum.");
+						return;
+					}
+					this.ranges[key] = auto ? { auto: true, min: 0, max: 1 } : { auto: false, min, max };
+					this.updateSelectedList();
+					this.parent.requestLiveApply(0);
+					close();
+				},
+				Cancel: close
+			},
+			close
+		});
+	}
 	styleControlsHtml(id) {
 		if (!this.withLineStyle) return "";
 		let style = this.ensureStyle(id);
@@ -12194,17 +12389,18 @@ class PlotVariableSelectorComponent extends PrimitiveSelectorComponent {
 		</select>`;
 	}
 	selectedGridClass() {
+		if (this.withLineStyle && this.withRange) return "systemika-variable-grid systemika-variable-grid-styled-range";
 		return this.withLineStyle ? "systemika-variable-grid systemika-variable-grid-styled" : "systemika-variable-grid systemika-variable-grid-simple";
 	}
 	renderSelectedColumns() {
 		if (!this.withLineStyle) return "";
 		return `<div class="${this.selectedGridClass()} systemika-variable-columns" aria-hidden="true">
-			<span>Variable</span><span>Dash</span><span>Width</span>
+			<span>Variable</span><span>Dash</span><span>Width</span>${this.withRange ? "<span>Range</span>" : ""}
 		</div>`;
 	}
 	renderSelectedRow(id, index) {
 		return `<div class="${this.selectedGridClass()} systemika-variable-row" data-id="${htmlEscape(String(id))}">
-			${this.variableIdentityHtml(id)}${this.styleControlsHtml(id)}
+			${this.variableIdentityHtml(id)}${this.styleControlsHtml(id)}${this.rangeButtonHtml(id)}
 		</div>`;
 	}
 	renderSelectedRows() {
@@ -12237,6 +12433,10 @@ class PlotVariableSelectorComponent extends PrimitiveSelectorComponent {
 		if (this.withLineStyle) {
 			this.styles = getPlotLineStyles(this.primitive);
 			this.displayIds.forEach(id => this.ensureStyle(id));
+		}
+		if (this.withRange) {
+			this.ranges = getPlotVariableRanges(this.primitive);
+			this.displayIds.forEach(id => { if (!this.ranges[String(id)]) this.ranges[String(id)] = { auto: true, min: 0, max: 1 }; });
 		}
 		return `<div class="systemika-plot-variable-selector">
 			<div class="systemika-variable-selector-heading">
@@ -12278,6 +12478,7 @@ class PlotVariableSelectorComponent extends PrimitiveSelectorComponent {
 			let id = String($(event.currentTarget).attr("data-id") || "");
 			this.removeButtonHandler(event);
 			if (this.withLineStyle) delete this.styles[id];
+			if (this.withRange) delete this.ranges[id];
 			this.updateSelectedList();
 			this.updateFinderResults();
 			this.parent.requestLiveApply(0);
@@ -12300,6 +12501,11 @@ class PlotVariableSelectorComponent extends PrimitiveSelectorComponent {
 			let style = this.ensureStyle(id);
 			style.width = Number.isFinite(width) && width > 0 ? width : 2;
 			this.parent.requestLiveApply(0);
+		});
+		this.find(".systemika-variable-selected-list .plot-variable-range-button").click(event => {
+			event.preventDefault();
+			event.stopPropagation();
+			this.openRangeDialog(String($(event.currentTarget).attr("data-id") || ""));
 		});
 		this.bindPlotSpecificRowEvents();
 	}
@@ -12338,6 +12544,11 @@ class PlotVariableSelectorComponent extends PrimitiveSelectorComponent {
 			let activeStyles = {};
 			this.displayIds.forEach(id => { activeStyles[String(id)] = this.ensureStyle(id); });
 			setPlotLineStyles(this.primitive, activeStyles);
+		}
+		if (this.withRange) {
+			let activeRanges = {};
+			this.displayIds.forEach(id => { activeRanges[String(id)] = this.ranges[String(id)] || { auto: true, min: 0, max: 1 }; });
+			setPlotVariableRanges(this.primitive, activeRanges);
 		}
 	}
 }
@@ -12430,15 +12641,19 @@ function renameRunInDisplaySelections(oldName, newName) {
 	if (typeof primitives !== "function") return;
 	let from = String(oldName || "");
 	let to = String(newName || "");
-	for (let type of ["TimePlot"]) {
+	for (let type of ["TimePlot", "ComparePlot", "XyPlot", "HistoPlot"]) {
 		for (let primitive of (primitives(type) || [])) {
-			if (getDisplayRunName(primitive) === from) primitive.setAttribute("RunName", to);
+			if (window.SystemikaPlotPages && SystemikaPlotPages.isPagedPrimitive(primitive)) {
+				SystemikaPlotPages.renameRun(primitive, from, to);
+				continue;
+			}
+			if (type === "TimePlot") {
+				if (getDisplayRunName(primitive) === from) primitive.setAttribute("RunName", to);
+			} else setCompareRunNames(primitive, getCompareRunNames(primitive).map(name => name === from ? to : name));
 		}
 	}
-	for (let type of ["ComparePlot", "Table", "XyPlot", "HistoPlot"]) {
-		for (let primitive of (primitives(type) || [])) {
-			setCompareRunNames(primitive, getCompareRunNames(primitive).map(name => name === from ? to : name));
-		}
+	for (let primitive of (primitives("Table") || [])) {
+		setCompareRunNames(primitive, getCompareRunNames(primitive).map(name => name === from ? to : name));
 	}
 	notifySystemikaRunsChanged({ action: "rename", oldName: from, newName: to });
 }
@@ -12446,15 +12661,19 @@ function renameRunInDisplaySelections(oldName, newName) {
 function removeRunFromDisplaySelections(runName) {
 	if (typeof primitives !== "function") return;
 	let doomed = String(runName || "");
-	for (let type of ["TimePlot"]) {
+	for (let type of ["TimePlot", "ComparePlot", "XyPlot", "HistoPlot"]) {
 		for (let primitive of (primitives(type) || [])) {
-			if (getDisplayRunName(primitive) === doomed) primitive.setAttribute("RunName", "");
+			if (window.SystemikaPlotPages && SystemikaPlotPages.isPagedPrimitive(primitive)) {
+				SystemikaPlotPages.removeRun(primitive, doomed);
+				continue;
+			}
+			if (type === "TimePlot") {
+				if (getDisplayRunName(primitive) === doomed) primitive.setAttribute("RunName", "");
+			} else setCompareRunNames(primitive, getCompareRunNames(primitive).filter(name => name !== doomed));
 		}
 	}
-	for (let type of ["ComparePlot", "Table", "XyPlot", "HistoPlot"]) {
-		for (let primitive of (primitives(type) || [])) {
-			setCompareRunNames(primitive, getCompareRunNames(primitive).filter(name => name !== doomed));
-		}
+	for (let primitive of (primitives("Table") || [])) {
+		setCompareRunNames(primitive, getCompareRunNames(primitive).filter(name => name !== doomed));
 	}
 	notifySystemikaRunsChanged({ action: "remove", runName: doomed });
 }
@@ -12515,16 +12734,29 @@ function selectNewRunForDisplays(runName) {
 	let name = String(runName || "").trim();
 	if (!name || typeof primitives !== "function") return;
 
-	for (let type of ["TimePlot"]) {
-		for (let primitive of (primitives(type) || [])) primitive.setAttribute("RunName", name);
+	// Plot pages persist their own run selections. Update every saved page, not
+	// only the page that happens to be active when a run completes. This keeps
+	// newly-created runs selected across the entire output workspace and also
+	// prevents hidden pages from reviving stale run references later.
+	for (let type of ["TimePlot", "ComparePlot", "XyPlot", "HistoPlot"]) {
+		for (let primitive of (primitives(type) || [])) {
+			if (window.SystemikaPlotPages && SystemikaPlotPages.isPagedPrimitive(primitive)) {
+				SystemikaPlotPages.selectNewRun(primitive, name);
+				continue;
+			}
+			if (type === "TimePlot") primitive.setAttribute("RunName", name);
+			else {
+				let selected = getCompareRunNames(primitive).filter(Boolean);
+				if (!selected.includes(name)) selected.push(name);
+				setCompareRunNames(primitive, selected);
+			}
+		}
 	}
 
-	for (let type of ["ComparePlot", "Table", "XyPlot", "HistoPlot"]) {
-		for (let primitive of (primitives(type) || [])) {
-			let selected = getCompareRunNames(primitive).filter(Boolean);
-			if (!selected.includes(name)) selected.push(name);
-			setCompareRunNames(primitive, selected);
-		}
+	for (let primitive of (primitives("Table") || [])) {
+		let selected = getCompareRunNames(primitive).filter(Boolean);
+		if (!selected.includes(name)) selected.push(name);
+		setCompareRunNames(primitive, selected);
 	}
 
 	if (typeof window !== "undefined") {
@@ -12572,7 +12804,13 @@ function ensureDisplayRunAvailable(primitive, onLoaded) {
 	if (systemikaSimulationData.hasRun(runName)) return true;
 	if (!systemikaSimulationData.persistenceAvailable()) return false;
 
-	systemikaSimulationData.ensureRunLoaded(runName).then(() => {
+	systemikaSimulationData.ensureRunLoadedIfExists(runName).then((run) => {
+		if (!run) {
+			// The model may have been copied without its project-local Runs folder.
+			// Keep the display itself, but detach the stale saved-run reference so
+			// the next simulation can populate it normally.
+			primitive.setAttribute("RunName", "");
+		}
 		if (typeof onLoaded === "function") onLoaded();
 	}).catch((error) => {
 		console.error(error);
@@ -12590,7 +12828,17 @@ function ensureDisplayRunsAvailable(primitive, onLoaded) {
 	if (!missing.length) return true;
 	if (!systemikaSimulationData.persistenceAvailable()) return false;
 
-	Promise.all(missing.map(name => systemikaSimulationData.ensureRunLoaded(name))).then(() => {
+	Promise.all(missing.map(async (name) => ({
+		name,
+		run: await systemikaSimulationData.ensureRunLoadedIfExists(name),
+	}))).then((results) => {
+		let unavailable = new Set(results.filter(result => !result.run).map(result => result.name));
+		if (unavailable.size) {
+			// RunNames travels with the model file; .sysrun data does not unless the
+			// Runs folder is copied too. Prune only references that are absent in the
+			// copied model's current project directory.
+			setCompareRunNames(primitive, runNames.filter(name => !unavailable.has(name)));
+		}
 		if (typeof onLoaded === "function") onLoaded();
 	}).catch((error) => {
 		console.error(error);
@@ -12787,7 +13035,12 @@ class CompareRunsSelectorComponent extends HtmlComponent {
 		try {
 			if (savedNames.length && window.systemikaSimulationData) {
 				status.text("Loading selected runs…");
-				await Promise.all(savedNames.map(name => systemikaSimulationData.ensureRunLoaded(name)));
+				let loaded = await Promise.all(savedNames.map(async (name) => ({
+					name,
+					run: await systemikaSimulationData.ensureRunLoadedIfExists(name),
+				})));
+				let unavailable = new Set(loaded.filter(item => !item.run).map(item => item.name));
+				if (unavailable.size) names = names.filter(name => !unavailable.has(name));
 			}
 			setCompareRunNames(this.primitive, names);
 			this.updateStatus();
@@ -12899,7 +13152,12 @@ class RunSelectorComponent extends HtmlComponent {
 				html += `<option value="${htmlEscape(name)}">${htmlEscape(name)}</option>`;
 			}
 			if (selected && selected !== currentName && !names.includes(selected)) {
-				html += `<option value="${htmlEscape(selected)}">${htmlEscape(selected)} (missing)</option>`;
+				// A deleted/missing run is not a selectable display source. Remove the
+				// stale model attribute immediately and fall back to the live source,
+				// another saved run, or an empty plot without notifying the user.
+				this.primitive.setAttribute("RunName", "");
+				selected = "";
+				effectiveSelected = currentName || "";
 			}
 
 			// If there is no live run yet, make an existing saved run immediately
@@ -12953,7 +13211,8 @@ class RunSelectorComponent extends HtmlComponent {
 			try {
 				if (runName) {
 					status.text(`Loading ${runName}…`);
-					await systemikaSimulationData.ensureRunLoaded(runName);
+					let loaded = await systemikaSimulationData.ensureRunLoadedIfExists(runName);
+					if (!loaded) runName = "";
 				}
 				this.primitive.setAttribute("RunName", runName);
 				let displayName = runName || getCurrentRunSourceName();
@@ -13417,7 +13676,7 @@ class ComparePlotDialog extends DisplayDialog {
 		super(id);
 		this.setTitle("Time Plot Properties");
 
-		let entitySelector = new PlotVariableSelectorComponent(this, undefined, { lineStyle: true });
+		let entitySelector = new PlotVariableSelectorComponent(this, undefined, { lineStyle: true, range: true });
 		this.topComponents = [entitySelector];
 		this.components = [
 			[new CompareRunsSelectorComponent(this)],

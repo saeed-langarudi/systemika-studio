@@ -24,9 +24,9 @@ test('new completed runs are auto-selected before display subscribers refresh', 
   assert.ok(commitIndex >= 0 && saveIndex > commitIndex);
 
   const helper = sourceBetween('function selectNewRunForDisplays(runName)', 'function getCompareRunBounds(primitive)');
-  assert.match(helper, /\["TimePlot"\]/);
+  assert.match(helper, /SystemikaPlotPages\.selectNewRun\(primitive, name\)/);
   assert.match(helper, /primitive\.setAttribute\("RunName", name\)/);
-  assert.match(helper, /\["ComparePlot", "Table", "XyPlot", "HistoPlot"\]/);
+  assert.match(helper, /primitives\("Table"\)/);
   assert.match(helper, /selected\.push\(name\)/);
 });
 

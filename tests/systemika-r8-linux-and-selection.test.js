@@ -82,6 +82,7 @@ test('deleted runs are pruned and run selectors refresh when the run set changes
   assert.match(selector, /setCompareRunNames\(this\.primitive, prunedSelected\)/);
   assert.match(selector, /systemika:runs-changed/);
   const manager = between(editor, 'class SystemikaRunsManagerDialog', 'let systemikaRunsManagerDialog');
-  assert.match(manager, /removeRunFromDisplaySelections\(doomed\)/);
+  assert.doesNotMatch(manager, /removeRunFromDisplaySelections\(doomed\)/, 'UI should rely on data-layer deletion cleanup');
+  assert.match(dataManagerSource, /SystemikaDisplayRuns\.removeRun/);
   assert.match(manager, /SystemikaOutputDevices\.refreshAll\(\)/);
 });

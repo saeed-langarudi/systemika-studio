@@ -11,12 +11,12 @@
   const ATTRIBUTES = Object.freeze({
     TimePlot: [
       "Primitives", "Sides", "RunName", "AxisLimits",
-      "LineOptions", "LineStyles", "TitleLabel", "LeftAxisLabel", "RightAxisLabel",
+      "LineOptions", "LineStyles", "VariableRanges", "MultiScale", "TitleLabel", "LeftAxisLabel", "RightAxisLabel",
       "HasNumberedLines", "ColorFromPrimitive", "ShowHighlighter", "Color"
     ],
     ComparePlot: [
       "Primitives", "RunNames", "RunName", "AxisLimits",
-      "LineOptions", "LineStyles", "TitleLabel", "LeftAxisLabel", "HasNumberedLines",
+      "LineOptions", "LineStyles", "VariableRanges", "MultiScale", "TitleLabel", "LeftAxisLabel", "HasNumberedLines",
       "ColorFromPrimitive", "ShowHighlighter", "Color"
     ],
     XyPlot: [
@@ -199,6 +199,82 @@
     return { count: saved.pages.length, index: saved.index, name: saved.pages[saved.index].name };
   }
 
+
+  function parseRunNamesFromAttrs(attrs) {
+    const raw = String((attrs && attrs.RunNames) || "").trim();
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          const unique = [];
+          for (const value of parsed) {
+            const name = String(value == null ? "" : value).trim();
+            if (!unique.includes(name)) unique.push(name);
+          }
+          if (unique.length) return unique;
+        }
+      } catch (_error) {}
+    }
+    return [String((attrs && attrs.RunName) || "").trim()];
+  }
+
+  function updateRunReferences(primitive, updater) {
+    if (!isPagedPrimitive(primitive) || typeof updater !== "function") return false;
+    const saved = persistCurrentPage(primitive);
+    if (!saved) return false;
+    const type = primitiveType(primitive);
+    let changed = false;
+    for (const page of saved.pages) {
+      if (type === "TimePlot") {
+        const before = String(page.attrs.RunName || "").trim();
+        const after = String(updater([before], true)[0] || "").trim();
+        if (after !== before) { page.attrs.RunName = after; changed = true; }
+        continue;
+      }
+      const before = parseRunNamesFromAttrs(page.attrs);
+      const after = updater(before.slice(), false).map(value => String(value == null ? "" : value).trim());
+      const unique = [];
+      for (const name of after) if (!unique.includes(name)) unique.push(name);
+      const encoded = JSON.stringify(unique);
+      if (String(page.attrs.RunNames || "") !== encoded || String(page.attrs.RunName || "") !== "") {
+        page.attrs.RunNames = encoded;
+        page.attrs.RunName = "";
+        changed = true;
+      }
+    }
+    if (changed) {
+      writeState(primitive, saved.pages, saved.index);
+      applyPage(primitive, saved.pages[saved.index]);
+    }
+    return changed;
+  }
+
+  function selectNewRun(primitive, runName) {
+    const name = String(runName || "").trim();
+    if (!name) return false;
+    return updateRunReferences(primitive, (names, single) => {
+      if (single) return [name];
+      const selected = names.filter(Boolean);
+      if (!selected.includes(name)) selected.push(name);
+      return selected;
+    });
+  }
+
+  function removeRun(primitive, runName) {
+    const doomed = String(runName || "").trim();
+    if (!doomed) return false;
+    return updateRunReferences(primitive, (names, single) => single
+      ? [names[0] === doomed ? "" : names[0]]
+      : names.filter(name => name !== doomed));
+  }
+
+  function renameRun(primitive, oldName, newName) {
+    const from = String(oldName || "").trim();
+    const to = String(newName || "").trim();
+    if (!from || !to || from === to) return false;
+    return updateRunReferences(primitive, names => names.map(name => name === from ? to : name));
+  }
+
   function removeReference(primitive, removeId) {
     if (!isPagedPrimitive(primitive)) return false;
     const saved = persistCurrentPage(primitive);
@@ -248,6 +324,9 @@
     deletePage,
     setPageName,
     getInfo,
+    selectNewRun,
+    removeRun,
+    renameRun,
     removeReference
   });
 });

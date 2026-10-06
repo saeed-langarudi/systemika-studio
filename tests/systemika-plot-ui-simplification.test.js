@@ -76,5 +76,7 @@ test('Manage Runs provides confirmed Delete All behavior', () => {
   assert.match(manager, /Delete <b>all \$\{runs\.length\} saved run/);
   assert.match(manager, /for \(let run of runs\)/);
   assert.match(manager, /systemikaSimulationData\.deleteRun\(name\)/);
-  assert.match(manager, /removeRunFromDisplaySelections\(name\)/);
+  assert.doesNotMatch(manager, /removeRunFromDisplaySelections\(name\)/);
+  const dataManager = fs.readFileSync(path.join(root, 'OpenSystemDynamics', 'src', 'systemika-run-data-manager.js'), 'utf8');
+  assert.match(dataManager, /SystemikaDisplayRuns\.removeRun/);
 });

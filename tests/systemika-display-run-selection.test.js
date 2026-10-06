@@ -48,7 +48,9 @@ test('Compare Plot exposes a multi-run selector and persists a run list', () => 
   assert.match(body, /new CompareRunsSelectorComponent\(this\)/);
   assert.match(editor, /function getCompareRunNames\(primitive\)/);
   assert.match(editor, /primitive\.setAttribute\("RunNames", JSON\.stringify\(unique\)\)/);
-  assert.match(editor, /Promise\.all\(savedNames\.map\(name => systemikaSimulationData\.ensureRunLoaded\(name\)\)\)/);
+  assert.match(editor, /systemikaSimulationData\.ensureRunLoadedIfExists\(name\)/);
+  assert.match(editor, /setCompareRunNames\(this\.primitive, runNames\)/);
+  assert.doesNotMatch(editor, /Unable to load Time Plot run data/);
 });
 
 test('Compare Plot created after a run refreshes live data, including partial Advance data', () => {

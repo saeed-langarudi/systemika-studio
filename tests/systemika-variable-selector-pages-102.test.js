@@ -37,9 +37,10 @@ test('Time Plot variable rows contain dash, width, and axis controls; Compare Pl
   const compareDialog = between(editor, 'class ComparePlotDialog', 'class HistogramOptionsComponent');
   assert.match(selector, /line-pattern-select plot-variable-style-select/);
   assert.match(selector, /line-width-select plot-variable-style-select/);
+  assert.match(selector, /plot-variable-range-button/);
   assert.match(timeSelector, /plot-variable-axis-select/);
   assert.match(timeDialog, /new TimePlotSelectorComponent\(this\)/);
-  assert.match(compareDialog, /new PlotVariableSelectorComponent\(this, undefined, \{ lineStyle: true \}\)/);
+  assert.match(compareDialog, /new PlotVariableSelectorComponent\(this, undefined, \{ lineStyle: true, range: true \}\)/);
   assert.doesNotMatch(timeDialog, /LineOptionsComponent/);
   assert.doesNotMatch(compareDialog, /LineOptionsComponent/);
 });
