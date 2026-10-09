@@ -125,6 +125,18 @@ text.name_element {
     margin-inline: auto 1rem;
     color: var(--color-text-secondary);
 }
+.current-model-name {
+    margin-left: auto;
+    margin-right: 0.75rem;
+    min-width: 0;
+    max-width: min(48vw, 42rem);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+}
 
 /* tool panel */
 .tool-panel {
@@ -1654,7 +1666,7 @@ b[data-arg]::before {
     background: white;
 }
 
-/* 1.1.9: per-variable time-plot ranges and momentary toolbar feedback. */
+/* 1.1.10: per-variable time-plot ranges and momentary toolbar feedback. */
 .systemika-variable-grid-styled-range {
     grid-template-columns: minmax(0, 1fr) 72px 46px 58px;
 }

@@ -114,15 +114,19 @@ test('web file manager clearly falls back when project directory picker is unava
 
 
 
-test('Firefox fallback shows a persistent compatibility notice in the status bar', () => {
+test('Firefox fallback shows a blocking compatibility screen', () => {
   const modalNotices = [];
 
   function makeDocument() {
     const statusNotice = { id: 'systemika-browser-compatibility-status', style: { display: 'none' } };
     const aboutButton = { textContent: '' };
+    const elements = new Map();
+    const body = { appendChild(el) { elements.set(el.id, el); } };
     return {
-      title: '',
+      title: '', body,
+      createElement(tag) { return { tag, style: {}, children: [], setAttribute() {}, append(...nodes) { this.children.push(...nodes); }, appendChild(el) { this.children.push(el); } }; },
       getElementById(id) {
+        if (id === 'systemika-unsupported-browser-screen') return elements.get(id);
         if (id === 'systemika-browser-compatibility-status') return statusNotice;
         if (id === 'btn_about') return aboutButton;
         return null;
@@ -144,7 +148,7 @@ test('Firefox fallback shows a persistent compatibility notice in the status bar
   assert.equal(first.fileManager.isFirefoxLimitedMode(), true);
   assert.equal(first.fileManager.shouldSuppressRunManagerUnavailableAlert(), true);
   assert.equal(modalNotices.length, 0);
-  assert.equal(firstDocument.statusNotice.style.display, 'flex');
+  assert.ok(firstDocument.getElementById('systemika-unsupported-browser-screen'));
   assert.equal(firstDocument.aboutButton.textContent, 'About Systemika Studio');
 
   // The notice is deliberately permanent rather than a one-time/dismissible warning.
@@ -155,7 +159,7 @@ test('Firefox fallback shows a persistent compatibility notice in the status bar
   }, { protocol: 'http:', origin: 'http://localhost:8765' });
   second.xAlert = (message) => modalNotices.push(message);
   second.environment.ready();
-  assert.equal(secondDocument.statusNotice.style.display, 'flex');
+  assert.ok(secondDocument.getElementById('systemika-unsupported-browser-screen'));
   assert.equal(modalNotices.length, 0);
 });
 
@@ -170,9 +174,12 @@ test('Firefox storage-mode explanation is suppressed while the persistent compat
   assert.equal(alerts, 0);
 });
 
-test('Safari fallback shares the persistent compatibility notice and suppresses repeated storage alerts', () => {
+test('Safari fallback is unsupported and suppresses repeated storage alerts', () => {
   const statusNotice = { style: { display: 'none' } };
-  const document = { title: '', getElementById(id) { if (id === 'systemika-browser-compatibility-status') return statusNotice; if (id === 'btn_about') return { textContent: '' }; return null; } };
+  const elements = new Map();
+  const document = { title: '', body: { appendChild(node) { elements.set(node.id, node); } },
+    createElement(tag) { return { tag, setAttribute() {}, append() {}, appendChild() {}, style: {} }; },
+    getElementById(id) { if (id === 'systemika-unsupported-browser-screen') return elements.get(id); if (id === 'systemika-browser-compatibility-status') return statusNotice; if (id === 'btn_about') return { textContent: '' }; return null; } };
   const context = loadEnvironment({ navigator: { userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/18.6 Safari/605.1.15' }, document }, { protocol: 'http:', origin: 'http://localhost:8765' });
   let alerts = 0;
   context.xAlert = () => { alerts += 1; };
@@ -181,7 +188,7 @@ test('Safari fallback shares the persistent compatibility notice and suppresses 
   assert.equal(context.fileManager.isFirefoxLimitedMode(), true);
   assert.equal(context.fileManager.shouldSuppressRunManagerUnavailableAlert(), true);
   context.fileManager.explainStorageMode();
-  assert.equal(statusNotice.style.display, 'flex');
+  assert.ok(document.getElementById('systemika-unsupported-browser-screen'));
   assert.equal(alerts, 0);
 });
 

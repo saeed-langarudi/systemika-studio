@@ -365,6 +365,17 @@
       const api = getRunsAPI();
       if (!api) throw new Error('Run persistence is unavailable in this environment.');
       const stored = await api.load(this.modelPath(), name);
+      // Legacy runs without IDs are still readable. Never associate a run
+      // explicitly belonging to another model with the active model.
+      const savedId = stored.metadata && stored.metadata.model && stored.metadata.model.id;
+      const setting = typeof primitives === 'function' ? primitives('Setting')[0] : null;
+      const currentId = setting && typeof setting.getAttribute === 'function'
+        ? setting.getAttribute('SystemikaModelId') : null;
+      if (savedId && currentId && savedId !== currentId) {
+        const error = new Error(`Run '${name}' belongs to a different model and was not loaded.`);
+        error.code = 'RUN_MODEL_MISMATCH';
+        throw error;
+      }
       return this.fromCsv(stored.csv, stored.metadata, makeCurrent);
     }
 
@@ -400,7 +411,7 @@
       } catch (error) {
         // The run can disappear before either the existence check or the load
         // completes. In both cases report it to displays simply as unavailable.
-        if (isMissingRunError(error)) return null;
+        if (isMissingRunError(error) || (error && error.code === 'RUN_MODEL_MISMATCH')) return null;
         throw error;
       }
     }

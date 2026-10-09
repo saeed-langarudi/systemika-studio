@@ -1,3 +1,46 @@
+## Systemika Studio 1.2.0 — Table SVG export (2026-10-09)
+
+- Added **Export SVG** to Table Output headers, alongside the existing **Export CSV**, using the same header button style as plots.
+- Table SVG exports reconstruct the entire table as native vector shapes and text, including off-screen rows, time units, visible numeric formatting, variable colors, zebra rows, and multi-run grouped column headings.
+- Existing CSV export and simulation/model formats are unchanged. Added targeted regression tests covering complete exports, grouped headers, XML escaping, and empty-state errors.
+
+## Systemika Studio 1.2.0 — Lookup warning consistency (2026-10-09)
+
+- Lookup name validation now uses the exact same red warning styling, field layout, and allowed-character wording as Stock/Flow/Auxiliary variable names. Invalid names still cannot be applied.
+- Added regression coverage for matching warning markup, invalid names, and warning clearing; version remains 1.2.0.
+
+## Systemika Studio 1.2.0 — corrective release candidate (2026-10-09)
+
+- Unsupported browser (Firefox/Safari) notice uses a responsive, wrapped system-font layout instead of inheriting the application's single-line/monospace styles.
+- Web Open Model uses a simplified .ssd file-picker configuration, avoids persisted `startIn` directory handles, and attempts to invoke the native picker from the top-level same-origin page instead of the editor iframe. It retains previously authorized Runs associations and handles ordinary open errors without a folder-picker loop. **Chromium's native file-picker crash has not been reproduced in this environment; manual Chrome/Edge validation is still required.**
+- Lookup name entry now provides the same immediate invalid-name warning as the other variables. Spaces, reserved/duplicate or otherwise invalid identifiers prevent Apply and leave existing values unchanged.
+- The top-left definition summary shows bare entity names (e.g., `Criminals = 0 | Unit: Unitless`) rather than legacy Insight Maker `[Criminals]` brackets; equation syntax and saved model format are unchanged.
+- Added focused regression tests for naming, information-bar formatting, browser notice styles, and top-level file-picker routing. No desktop installers rebuilt.
+
+## Source refinement: portable projects and Runs recovery (based on 1.1.10)
+
+- Preserves shared `Runs/` and separate `.sysrun` archives (no per-model run directories or model embedding).
+- Adds stable `SystemikaModelId` to the existing Setting attributes and the metadata of newly saved runs. Save As preserves the model lineage; legacy models get an ID on their next save.
+- Manage Runs opens without requiring a folder-picker round trip; Locate Runs Folder is an explicit recovery command. The browser folder picker starts in local Documents instead of inadvertently targeting the localhost origin.
+- Adds Export Model with Runs to the Runs manager in browser and Electron, producing a standard portable ZIP containing the `.ssd` and existing `Runs/*.sysrun` archives and metadata sidecars.
+- Missing Runs never delete the actual `.ssd` and folder permission errors are shown inside the manager instead of triggering another folder picker.
+
+## 2026-10-08 — Systemika Studio 1.1.10 — corrective plotting, debugging, WebApp Runs, and units refinements
+
+- Kept multiscale Y-axis labels fully outside the plotting rectangle, including longer formatted scale values.
+- Restored horizontal Y-grid lines in SVG/PNG plot exports and increased X-axis-title padding below tick labels.
+- Numerical simulation failures now report the simulation time of the failing evaluation and retain all valid samples produced before the error so plots and tables remain available for debugging.
+- In the WebApp, clicking the Runs folder tool on an already-open local model now requests project-folder permission immediately from that user gesture, allowing existing project-local Runs to become accessible before a simulation is started.
+- Unit checking is now case-insensitive for unit symbols while remaining strict about genuinely different symbols and dimensional structure.
+- Release verification baseline: 469/469 automated tests passing.
+
+## 2026-10-07 — Systemika Studio 1.1.10 — UI consistency refinements
+
+- Added a persistent current-model name indicator to the model window.
+- Removed inconsistent File-menu tooltips and removed the nonessential Models in Browser menu command while retaining browser-storage startup/save workflows.
+- Clarified multiscale plot labels: variable numbers are black and followed by a colon, while scale values retain the corresponding curve color.
+- Added a remove control for selected Calibration Sandbox constants.
+
 ## 2026-09-30 — Systemika Studio 1.1.8 — Feedback Loop annotation tool
 
 - Corrective 1.1.8 build: Calibration Sandbox now opens against the available screen area and is maximized automatically in the Electron desktop app so the full workspace is visible immediately.

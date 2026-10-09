@@ -318,7 +318,7 @@
       ? manager.getRunStorageDirectoryHandle()
       : null;
     if (!handle) {
-      const error = new Error('The model project folder is not connected. Run the model or choose Manage Runs to authorize its folder.');
+      const error = new Error('The model folder is not connected. Open Manage Runs and choose Connect Model Folder to authorize it.');
       error.code = 'PROJECT_DIRECTORY_NOT_CONNECTED';
       throw error;
     }
@@ -575,7 +575,37 @@
     return false;
   }
 
+  async function exportPortable() {
+    const manager = currentFileManager();
+    if (!manager || !manager.fileHandle) throw new Error('Save the model to a local .ssd file before exporting.');
+    const project = await ensureAccess();
+    const modelFile = await manager.fileHandle.getFile();
+    const entries = [{ name: modelFile.name, data: new Uint8Array(await modelFile.arrayBuffer()) }];
+    const runs = await project.getDirectoryHandle(RUNS_DIR_NAME, { create: false }).catch(error => {
+      if (notFound(error)) return null;
+      throw error;
+    });
+    if (runs) {
+      for await (const [name, handle] of runs.entries()) {
+        if (handle.kind !== 'file' || !/\.sysrun(?:\.metadata\.json)?$/i.test(name)) continue;
+        const file = await handle.getFile();
+        entries.push({ name: `${RUNS_DIR_NAME}/${name}`, data: new Uint8Array(await file.arrayBuffer()) });
+      }
+    }
+    const zip = await makeZip(entries);
+    const url = URL.createObjectURL(new Blob([zip], { type: 'application/zip' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = modelFile.name.replace(/\.ssd$/i, '') + '-with-runs.zip';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+    return { runFiles: entries.length - 1 };
+  }
+
   const api = {
+    exportPortable,
     isSupported,
     isReady,
     ensureAccess,

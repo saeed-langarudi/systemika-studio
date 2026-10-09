@@ -72,8 +72,8 @@ terms of the Affero General Public License (http://www.gnu.org/licenses/agpl-3.0
 	<script type="text/javascript" src="systemika-units.js"></script>
 	<script type="text/javascript" src="systemika-plot-pages.js"></script>
 	<script type="text/javascript" src="systemika-documentation.js"></script>
-	<script type="text/javascript" src="editor.js?v=1.1.9"></script>
-	<script type="text/javascript" src="systemika-calibration-sandbox.js?v=1.1.9"></script>
+	<script type="text/javascript" src="editor.js?v=1.2.0"></script>
+	<script type="text/javascript" src="systemika-calibration-sandbox.js?v=1.2.0"></script>
 	<!-- endbuild -->
 
 	<!-- build:css opensystemdynamics.css  -->
@@ -81,7 +81,7 @@ terms of the Affero General Public License (http://www.gnu.org/licenses/agpl-3.0
 	<link rel="stylesheet" href="./codemirror/theme/stochsdtheme.css" />
 	<link rel="stylesheet" href="./codemirror/theme/oneline.css" />
 	<link rel="stylesheet" href="./codemirror/theme/resize.css" />
-	<link rel="stylesheet" type="text/css" href="style/editor.css?v=1.1.9">
+	<link rel="stylesheet" type="text/css" href="style/editor.css?v=1.2.0">
 	<link rel="stylesheet" type="text/css" href="style/systemika-runs.css" />
 	<link class="include" rel="stylesheet" type="text/css" href="jquery/jqplot-1.0.8/jquery.jqplot.min.css" />
 	<link rel="stylesheet" href="jquery/jquery-ui-1.12.1/jquery-ui.css" />
@@ -103,10 +103,10 @@ terms of the Affero General Public License (http://www.gnu.org/licenses/agpl-3.0
 					<button class="menuButton" id="btn_file">File</button>
 					<div class="menuContent">
 						<span>
-							<button id="btn_new" data-title="New (Ctrl+N)"><u>N</u>ew<span class="shortcut">Ctrl N</span></button>
+							<button id="btn_new"><u>N</u>ew<span class="shortcut">Ctrl N</span></button>
 						</span>
 						<span>
-							<button id="btn_new_window" data-title="New Window">New Window...</button>
+							<button id="btn_new_window">New Window...</button>
 						</span>
 						<span>
 							<button id="btn_load"><u>O</u>pen<span class="shortcut">Ctrl O</span></button>
@@ -115,16 +115,13 @@ terms of the Affero General Public License (http://www.gnu.org/licenses/agpl-3.0
 							<button id="btn_save"><u>S</u>ave<span class="shortcut">Ctrl S</span></button>
 						</span>
 						<span>
-							<button id="btn_save_as" data-title="Save As (Ctrl+Shift+S)" style="display: none;">Save As...<span class="shortcut">Ctrl Shift S</span></button>
+							<button id="btn_save_as" style="display: none;">Save As...<span class="shortcut">Ctrl Shift S</span></button>
 						</span>
 						<span class="menuSeparator">
 							<button id="btn_import" style="display: none;">Import from file...</button>
 						</span>
 						<span>
 							<button id="btn_export" style="display: none;">Export to file...</button>
-						</span>
-						<span>
-							<button id="btn_browser_models" style="display: none;">Models in Browser...</button>
 						</span>
 						<span id="recent_title" style="display: none">
 							<p>Recently Opened</p>
@@ -199,6 +196,7 @@ terms of the Affero General Public License (http://www.gnu.org/licenses/agpl-3.0
 						<span><button id="btn_thirdparty">Third-party Notices</button></span>
 					</div>
 				</div>
+				<div id="current-model-name" class="current-model-name" aria-label="Current model">Untitled model</div>
 
 			</div>
 
@@ -322,7 +320,7 @@ terms of the Affero General Public License (http://www.gnu.org/licenses/agpl-3.0
 				<div class="info-bar__definition-error info-box__element"
 					data-title="Definition Error">
 				</div>
-				<div id="systemika-browser-compatibility-status" class="systemika-browser-compatibility-status" role="status" aria-label="Browser compatibility notice" title="Firefox and Safari do not provide the local project-folder access used for full file and simulation-run management.">Firefox and Safari are not fully supported: use Chrome or Edge for full file and run management.</div>
+				<div id="systemika-browser-compatibility-status" class="systemika-browser-compatibility-status" role="status" aria-label="Browser compatibility notice" title="Firefox and Safari do not provide the local project-folder access used for full file and simulation-run management.">Systemika Studio WebApp requires Chrome or Edge.</div>
 		</div>
 
 		<!-- Working area -->

@@ -461,6 +461,28 @@ ipcMain.handle("systemika:runs:delete", async (event, modelPath, runLabel) => {
 	return systemikaRunStore.deleteRun(modelPath, runLabel);
 });
 
+ipcMain.handle("systemika:runs:export-portable", async (event, modelPath) => {
+    const resolved = systemikaRunStore.assertSavedModelPath(modelPath);
+    const projectName = path.basename(resolved);
+    const entries = [{ name: projectName, data: await fs.readFile(resolved) }];
+    const folder = systemikaRunStore.runsDirectoryForModel(resolved);
+    try {
+        for (const name of await fs.readdir(folder)) {
+            if (!/\.sysrun(?:\.metadata\.json)?$/i.test(name)) continue;
+            entries.push({ name: `Runs/${name}`, data: await fs.readFile(path.join(folder, name)) });
+        }
+    } catch (error) { if (error.code !== 'ENOENT') throw error; }
+    const owner = BrowserWindow.fromWebContents(event.sender) || mainWindow;
+    const target = await dialog.showSaveDialog(owner, {
+        title: 'Export Model with Runs',
+        defaultPath: path.join(path.dirname(resolved), projectName.replace(/\.ssd$/i, '') + '-with-runs.zip'),
+        filters: [{ name: 'ZIP archive', extensions: ['zip'] }],
+    });
+    if (target.canceled || !target.filePath) return null;
+    await fs.writeFile(target.filePath, await systemikaRunStore._internal.makeZip(entries));
+    return { path: target.filePath, runFiles: entries.length - 1 };
+});
+
 ipcMain.handle("systemika:runs:open-folder", async (event, modelPath) => {
 	const dir = await systemikaRunStore.ensureRunsDirectory(modelPath);
 	const errorText = await shell.openPath(dir);

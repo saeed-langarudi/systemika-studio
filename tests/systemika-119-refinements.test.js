@@ -58,9 +58,9 @@ test('time plots default to per-variable multiscale and persist per-variable cus
   assert.match(newApi, /function setPlotVariableRanges/);
   assert.match(editor, /buildMultiScaleAxes\(this\.primitive, idsToDisplay, yRenderer\)/);
   assert.match(editor, /settings\.yaxis = axisNames\[Math\.min\(wantedIndex, axisNames\.length - 1\)\]/);
-  assert.match(editor, /class ComparePlotVisual[\s\S]*?updateChart\(\)[\s\S]*?if \(multiScale\) renderMultiScaleKey\(this, idsToDisplay\)/);
+  assert.match(editor, /class ComparePlotVisual[\s\S]*?updateChart\(\)[\s\S]*?if \(multiScale\) \{[\s\S]*?renderMultiScaleKey\(this, idsToDisplay\)/);
   assert.match(editor, /systemika-multiscale-axis-gutter/);
-  assert.match(editor, /gridPadding: multiScale \? \{ left: 94, right: 12 \}/);
+  assert.match(editor, /gridPadding: multiScale \? \{ left: 112, right: 12 \}/);
   assert.match(editor, /numberTicks: 3/);
   assert.match(editor, /showTicks: false/);
   assert.match(editor, /plot-variable-range-button/);

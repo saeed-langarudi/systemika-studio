@@ -107,7 +107,23 @@
       }
 
       if (!await ensureSavedModel()) return { proceed: false, cancelled: true };
-      if (!await ensurePersistenceReady()) return { proceed: false, cancelled: true };
+      try {
+        if (!await ensurePersistenceReady()) return { proceed: false, cancelled: true };
+      } catch (error) {
+        if (error && error.code === 'PROJECT_DIRECTORY_NOT_CONNECTED') {
+          // Simulations are still allowed, but never silently discard a run
+          // that the student expected to save to disk.
+          const message = 'The model is open, but its saved Runs folder is not connected.\n\n' +
+            'To save this simulation as a run file, open Manage Runs and select Connect Model Folder.\n\n' +
+            'Continue this simulation without saving its run file?';
+          const approved = typeof root.yesNoAlert === 'function'
+            ? await new Promise(resolve => root.yesNoAlert(
+                message.replace(/\n/g, '<br/>'), answer => resolve(answer === 'yes')))
+            : false;
+          return { proceed: approved, persist: false, runName, overwrite: false };
+        }
+        throw error;
+      }
 
       const exists = await root.systemikaSimulationData.runExists(runName);
       if (!exists) return { proceed: true, persist: true, runName, overwrite: false };
@@ -167,6 +183,7 @@
           ? fileManager.fileName.split(/[\\/]/).pop()
           : '',
         hadUnsavedChanges: typeof History !== 'undefined' ? Boolean(History.unsavedChanges) : false,
+        id: typeof systemikaModelIdentifier === 'function' ? systemikaModelIdentifier() : null,
       },
       simulation: {
         startTime: typeof getTimeStart === 'function' ? getTimeStart() : null,
@@ -274,13 +291,71 @@
       explainUnavailablePersistence();
       return;
     }
-    if (!await ensureSavedModel()) return;
-    if (!await ensurePersistenceReady()) return;
+    // For an already-open local model, request project-folder permission as the
+    // very first privileged action from the folder-button click. Chromium can
+    // discard transient user activation after unrelated awaits, which made the
+    // first-time WebApp workflow appear to require a simulation before Runs
+    // became visible. Unsaved models still go through Save As first.
+    const alreadySaved = typeof fileManager !== 'undefined' && Boolean(fileManager.fileName);
+    if (!alreadySaved && !await ensureSavedModel()) return;
+    // Do not block the Runs manager behind a mandatory directory picker.
+    // Its explicit Locate Runs action obtains permission if required.
+    if (typeof root.systemikaSimulationData !== 'undefined' && root.systemikaSimulationData
+        && typeof root.systemikaSimulationData.refreshRunIndex === 'function') {
+      try {
+        if (!getRunsAPI().ensureAccess || (typeof fileManager !== 'undefined'
+            && fileManager.getRunStorageDirectoryHandle && fileManager.getRunStorageDirectoryHandle())) {
+          await root.systemikaSimulationData.refreshRunIndex();
+        }
+      } catch (error) { console.warn('Runs are unavailable until the folder is reconnected:', error); }
+    }
     if (typeof root.openSystemikaRunsManager === 'function') {
       root.openSystemikaRunsManager();
       return;
     }
     throw new Error('The Systemika Runs manager is not available.');
+  }
+
+  async function locateRunsFolder() {
+    if (!await ensureSavedModel()) return false;
+    const api = getRunsAPI();
+    if (!api || typeof api.ensureAccess !== 'function') return true; // Desktop uses the model path.
+    // Keep an existing valid project directory. Do not clear it just because
+    // a user clicked the recovery action; otherwise every click forces a picker.
+    const manager = typeof fileManager !== 'undefined' ? fileManager : null;
+    const existing = manager && manager.getRunStorageDirectoryHandle && manager.getRunStorageDirectoryHandle();
+    if (existing && manager.directoryContainsCurrentModel && await manager.directoryContainsCurrentModel(existing)) return true;
+    if (!manager || typeof manager.ensureRunStorageAccess !== 'function') return false;
+    try {
+      await manager.ensureRunStorageAccess({ promptForDirectory: true });
+    } catch (error) {
+      if (error && error.name === 'AbortError') return false;
+      throw error;
+    }
+    // The simulation data manager has no refreshRunIndex method. The folder
+    // selection itself updates the active project handle; listRuns reads fresh
+    // entries on each call. Clear potentially stale in-memory run packages.
+    const data = root.systemikaSimulationData;
+    if (data && data.runCache && typeof data.runCache.clear === 'function') data.runCache.clear();
+    return true;
+  }
+
+  async function exportPortableModel() {
+    if (!await ensureSavedModel()) return;
+    const api = getRunsAPI();
+    if (!api) throw new Error('Persistent run storage is unavailable.');
+    if (typeof api.exportPortable === 'function') {
+      await api.exportPortable();
+      return;
+    }
+    if (typeof root.getElectronAPI === 'function') {
+      const electron = root.getElectronAPI();
+      if (electron && electron.runs && electron.runs.exportPortable) {
+        await electron.runs.exportPortable(fileManager.fileName);
+        return;
+      }
+    }
+    throw new Error('Portable export is not available in this environment.');
   }
 
   function updateBusyUi() {
@@ -368,6 +443,8 @@
     captureCompletedRun,
     commitUserRun,
     openRunsFolder,
+    locateRunsFolder,
+    exportPortableModel,
     isBusy,
   };
 })(window);

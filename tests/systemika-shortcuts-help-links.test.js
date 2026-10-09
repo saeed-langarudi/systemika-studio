@@ -45,7 +45,7 @@ test('New model and dialog Apply shortcuts are exposed and implemented', () => {
   const start = editor.indexOf('class KeyboardShortcutsDialog extends CloseDialog');
   const end = editor.indexOf('function helpTemplateText', start);
   const shortcuts = editor.slice(start, end);
-  assert.match(html, /id="btn_new"[^>]*data-title="New \(Ctrl\+N\)"/);
+  assert.match(html, /id="btn_new"[^>]*>[\s\S]{0,80}<span class="shortcut">Ctrl N<\/span>/);
   assert.match(editor, /event\.key\.toLowerCase\(\) == "n"[\s\S]{0,120}#btn_new/);
   assert.match(shortcuts, /New model/);
   assert.match(shortcuts, /Apply changes in dialog/);

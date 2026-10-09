@@ -544,3 +544,21 @@ test('editor contains no legacy macro or simulation-function registration hooks'
     assert.equal(editor.includes(legacy), false, `${legacy} should be removed from active editor source`);
   }
 });
+
+
+test('numerical failure reports its simulation time and returns all valid prior samples', () => {
+  let failure = null;
+  const controller = engine.createController({
+    timeStart: 0, timeLength: 5, dt: 1, method: 'Euler',
+    variables: [{ id: 'x', name: 'X', equation: '1 / (2 - T)' }]
+  }, {
+    asyncCallbacks: false,
+    onError(payload) { failure = payload; }
+  });
+  controller.start();
+  assert.ok(failure);
+  assert.equal(failure.errorTime, 2);
+  assert.match(failure.error, /Error occurred at simulation time 2\./);
+  assert.deepEqual(failure.partialResults.times, [0, 1]);
+  assert.deepEqual(failure.partialResults.value('x'), [0.5, 1]);
+});

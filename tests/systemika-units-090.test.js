@@ -16,12 +16,13 @@ function hasError(result, fragment) {
   return result.errors.some(issue => issue.message.includes(fragment));
 }
 
-test('unit parser normalizes algebra but keeps symbols literal and case-sensitive', () => {
+test('unit parser normalizes algebra and treats unit-symbol case as insignificant', () => {
   assert.ok(units.unitsEqual(units.parseUnit('Person/Year'), units.parseUnit('Person*Year^-1')));
   assert.ok(units.unitsEqual(units.parseUnit('USD/(Person*Year)'), units.parseUnit('USD/Person/Year')));
   assert.equal(units.unitsEqual(units.parseUnit('USD'), units.parseUnit('$')), false);
   assert.equal(units.unitsEqual(units.parseUnit('Person'), units.parseUnit('People')), false);
-  assert.equal(units.unitsEqual(units.parseUnit('Year'), units.parseUnit('year')), false);
+  assert.equal(units.unitsEqual(units.parseUnit('Year'), units.parseUnit('year')), true);
+  assert.equal(units.unitsEqual(units.parseUnit('PERSON/Year'), units.parseUnit('person/year')), true);
 });
 
 test('unit parser rejects implicit multiplication and conversion factors', () => {

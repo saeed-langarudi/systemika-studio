@@ -72,7 +72,7 @@ test('custom cut and color assets and green Run play icon are installed', () => 
 });
 
 test('limited-browser status explicitly names Firefox and Safari', () => {
-  assert.match(html, /Firefox and Safari are not fully supported: use Chrome or Edge for full file and run management\./);
+  assert.match(html, /Systemika Studio WebApp requires Chrome or Edge\./);
 });
 
 

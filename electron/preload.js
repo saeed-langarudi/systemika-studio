@@ -42,6 +42,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
 		duplicate: (modelPath, sourceLabel, targetLabel) => ipcRenderer.invoke("systemika:runs:duplicate", modelPath, sourceLabel, targetLabel),
 		delete: (modelPath, runLabel) => ipcRenderer.invoke("systemika:runs:delete", modelPath, runLabel),
 		openFolder: (modelPath) => ipcRenderer.invoke("systemika:runs:open-folder", modelPath),
+        exportPortable: (modelPath) => ipcRenderer.invoke("systemika:runs:export-portable", modelPath),
 		confirmOverwrite: (runLabel) => ipcRenderer.invoke("systemika:runs:confirm-overwrite", runLabel),
 	},
 

@@ -108,7 +108,85 @@ class BaseFileManager {
   supportsProjectRunStorage() {
     return false;
   }
-  async ensureRunStorageAccess() {
+  // Use SHA-256 where available. A length+hash fallback keeps older test
+  // environments functional; the browser normally takes the SHA-256 path.
+  async fingerprintContents(contents) {
+    const text = String(contents);
+    if (typeof crypto !== 'undefined' && crypto.subtle && typeof TextEncoder !== 'undefined') {
+      const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+      return text.length + ':' + Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
+    }
+    let a = 2166136261, b = 2166136261;
+    for (let i = 0; i < text.length; i++) {
+      a = Math.imul(a ^ text.charCodeAt(i), 16777619);
+      b = Math.imul(b ^ text.charCodeAt(i), 2246822519);
+    }
+    return text.length + ':' + (a >>> 0).toString(16) + ':' + (b >>> 0).toString(16);
+  }
+
+  // Standard file inputs do not expose a FileSystemHandle. Reattach to an
+  // already authorized folder only if the on-disk model has the exact same
+  // contents as the selected file; matching filenames alone is unsafe.
+  async findMatchingKnownFolder(fileName, fingerprint) {
+    if (!fileName || !fingerprint) return null;
+    let saved = [];
+    try { saved = await idbKeyval.get(this.knownProjectFoldersKey) || []; } catch (_) {}
+    const candidates = [this.projectDirectoryHandle, ...(Array.isArray(saved) ? saved : [])];
+    let match = null;
+    for (const directory of candidates) {
+      if (!directory || typeof directory.queryPermission !== 'function') continue;
+      try {
+        if (await directory.queryPermission({ mode: 'readwrite' }) !== 'granted') continue;
+        const handle = await directory.getFileHandle(fileName, { create: false });
+        const file = await handle.getFile();
+        if (await this.fingerprintContents(await file.text()) !== fingerprint) continue;
+        if (match && !await this.sameEntry(match.directory, directory)) return null; // ambiguous copies
+        match = { directory, handle };
+      } catch (_) { /* Unrelated, moved, or revoked folder. */ }
+    }
+    return match;
+  }
+
+  // Previously approved folders can be matched to a selected file without
+  // prompting. A file picker alone never provides access to its parent folder.
+  async reconnectKnownFolder(fileHandle) {
+    if (!fileHandle) return null;
+    const saved = await idbKeyval.get(this.knownProjectFoldersKey).catch(() => []);
+    const candidates = [this.projectDirectoryHandle, ...(Array.isArray(saved) ? saved : [])];
+    for (const directory of candidates) {
+      if (!directory || typeof directory.queryPermission !== 'function') continue;
+      try {
+        if (await directory.queryPermission({ mode: 'readwrite' }) !== 'granted') continue;
+        const candidate = await directory.getFileHandle(fileHandle.name, { create: false });
+        if (await this.sameEntry(candidate, fileHandle)) {
+          this.projectDirectoryHandle = directory;
+          await idbKeyval.set(this.projectDirectoryStorageKey, directory);
+          return directory;
+        }
+      } catch (_) { /* Moved, revoked, or unrelated directory; skip it. */ }
+    }
+    return null;
+  }
+
+  async rememberProjectFolder(directoryHandle) {
+    const saved = await idbKeyval.get(this.knownProjectFoldersKey).catch(() => []);
+    const known = Array.isArray(saved) ? saved : [];
+    const unique = [];
+    for (const handle of [directoryHandle, ...known]) {
+      if (!handle) continue;
+      let duplicate = false;
+      for (const previous of unique) {
+        if (await this.sameEntry(handle, previous)) { duplicate = true; break; }
+      }
+      if (!duplicate) unique.push(handle);
+      if (unique.length >= 20) break;
+    }
+    await idbKeyval.set(this.knownProjectFoldersKey, unique);
+    this.projectDirectoryHandle = directoryHandle;
+    await idbKeyval.set(this.projectDirectoryStorageKey, directoryHandle);
+  }
+
+  async ensureRunStorageAccess({ promptForDirectory = false } = {}) {
     return null;
   }
   getRunStorageDirectoryHandle() {
@@ -157,7 +235,17 @@ class BaseFileManager {
   updateSaveTime() {
     this.lastSaved = new Date().toLocaleTimeString();
   }
+  updateModelNameDisplay() {
+    if (typeof document === "undefined" || typeof document.getElementById !== "function") return;
+    const display = document.getElementById("current-model-name");
+    if (!display) return;
+    let name = this.fileName || this.storedModelName || "";
+    if (name) name = String(name).split(/[\\/]/).pop();
+    display.textContent = name || "Untitled model";
+    display.title = name || "Untitled model";
+  }
   updateTitle() {
+    this.updateModelNameDisplay();
     let title = this.softwareName;
     const nbsp = String.fromCharCode(160);
     if (this.fileName != "") {
@@ -178,6 +266,7 @@ class BaseFileManager {
       window.systemikaSimulationData.clearCache();
     }
     this._fileName = newFileName;
+    this.updateModelNameDisplay();
   }
   get fileName() {
     return this._fileName;
@@ -263,6 +352,7 @@ class WebFileManagerBasic extends BaseFileManager {
   }
   // Keep the web browser tab concise. File/storage state is shown inside the UI.
   updateTitle() {
+    this.updateModelNameDisplay();
     if (typeof window !== "undefined" && window !== window.top) setParentTitle(webAppName);
     else if (typeof document !== "undefined") document.title = webAppName;
   }
@@ -415,10 +505,17 @@ class WebFileManagerModern extends BaseFileManager {
     }
     this.fileHandleStorageKey = `fileHandle:${sessionId}`;
     this.projectDirectoryStorageKey = `systemikaProjectDirectoryHandle:${sessionId}`;
+    this.knownProjectFoldersKey = 'systemika.authorizedProjectFolders.v1';
+    // A normal HTML file input gives us the file, not a writable OS handle.
+    // Remember a fingerprint across the editor reload so explicit folder
+    // connection can verify the original file, not just its common filename.
+    this.openedModelFingerprintKey = 'systemika.openedModelFingerprint.v1';
+    this.openedModelFingerprint = storage.getItem(this.openedModelFingerprintKey) || null;
   }
 
   // Keep the web browser tab concise. File/storage state is shown inside the UI.
   updateTitle() {
+    this.updateModelNameDisplay();
     if (typeof window !== "undefined" && window !== window.top) setParentTitle(webAppName);
     else if (typeof document !== "undefined") document.title = webAppName;
   }
@@ -433,6 +530,9 @@ class WebFileManagerModern extends BaseFileManager {
     await idbKeyval.del(this.projectDirectoryStorageKey);
     this.fileHandle = undefined;
     this.projectDirectoryHandle = undefined;
+    this.openedModelFingerprint = null;
+    const storage = typeof sessionStorage !== 'undefined' ? sessionStorage : localStorage;
+    storage.removeItem(this.openedModelFingerprintKey);
   }
 
   supportsProjectRunStorage() {
@@ -461,6 +561,11 @@ class WebFileManagerModern extends BaseFileManager {
     const sameFile = await this.sameEntry(this.fileHandle, fileHandle);
     this.fileHandle = fileHandle;
     await idbKeyval.set(this.fileHandleStorageKey, this.fileHandle);
+    if (fileHandle) {
+      this.openedModelFingerprint = null;
+      const storage = typeof sessionStorage !== 'undefined' ? sessionStorage : localStorage;
+      storage.removeItem(this.openedModelFingerprintKey);
+    }
     if (!sameFile) await this.clearProjectDirectoryHandle();
   }
 
@@ -474,39 +579,91 @@ class WebFileManagerModern extends BaseFileManager {
     }
   }
 
-  async ensureRunStorageAccess() {
+  // Previously approved folders can be matched to a selected file without
+  // prompting. A file picker alone never provides access to its parent folder.
+  async reconnectKnownFolder(fileHandle) {
+    if (!fileHandle) return null;
+    const saved = await idbKeyval.get(this.knownProjectFoldersKey).catch(() => []);
+    const candidates = [this.projectDirectoryHandle, ...(Array.isArray(saved) ? saved : [])];
+    for (const directory of candidates) {
+      if (!directory || typeof directory.queryPermission !== 'function') continue;
+      try {
+        if (await directory.queryPermission({ mode: 'readwrite' }) !== 'granted') continue;
+        const candidate = await directory.getFileHandle(fileHandle.name, { create: false });
+        if (await this.sameEntry(candidate, fileHandle)) {
+          this.projectDirectoryHandle = directory;
+          await idbKeyval.set(this.projectDirectoryStorageKey, directory);
+          return directory;
+        }
+      } catch (_) { /* Moved, revoked, or unrelated directory; skip it. */ }
+    }
+    return null;
+  }
+
+  async rememberProjectFolder(directoryHandle) {
+    const saved = await idbKeyval.get(this.knownProjectFoldersKey).catch(() => []);
+    const known = Array.isArray(saved) ? saved : [];
+    const unique = [];
+    for (const handle of [directoryHandle, ...known]) {
+      if (!handle) continue;
+      let duplicate = false;
+      for (const previous of unique) {
+        if (await this.sameEntry(handle, previous)) { duplicate = true; break; }
+      }
+      if (!duplicate) unique.push(handle);
+      if (unique.length >= 20) break;
+    }
+    await idbKeyval.set(this.knownProjectFoldersKey, unique);
+    this.projectDirectoryHandle = directoryHandle;
+    await idbKeyval.set(this.projectDirectoryStorageKey, directoryHandle);
+  }
+
+  async ensureRunStorageAccess({ promptForDirectory = false } = {}) {
     if (!this.supportsProjectRunStorage()) {
       const error = new Error("This browser cannot grant Systemika access to a local project folder.");
       error.code = "RUN_STORAGE_UNAVAILABLE";
       throw error;
     }
-    if (!this.fileHandle) {
+    if (!this.fileHandle && !(this.fileName && this.openedModelFingerprint)) {
       const error = new Error("Save or open the model as a local .ssd file before managing persistent simulation runs.");
       error.code = "MODEL_NOT_SAVED";
       throw error;
     }
 
-    if (this.projectDirectoryHandle) {
-      const allowed = await this.verifyPermission(this.projectDirectoryHandle, true);
-      if (allowed && await this.directoryContainsCurrentModel(this.projectDirectoryHandle)) {
-        return this.projectDirectoryHandle;
+    // No permission prompts from Open Model, Run, or Manage Runs.
+    // Only the explicit Connect Model Folder button opens a folder picker.
+    if (!promptForDirectory) {
+      const known = this.fileHandle
+        ? await this.reconnectKnownFolder(this.fileHandle)
+        : await this.findMatchingKnownFolder(this.fileName, this.openedModelFingerprint);
+      if (known) {
+        if (!this.fileHandle) {
+          await this.setFileHandle(known.handle);
+          this.projectDirectoryHandle = known.directory;
+          await idbKeyval.set(this.projectDirectoryStorageKey, known.directory);
+          return known.directory;
+        }
+        return known;
       }
       await this.clearProjectDirectoryHandle();
+      const error = new Error('Saved runs are not connected. Open Manage Runs and choose Connect Model Folder to authorize the folder containing this .ssd file.');
+      error.code = 'PROJECT_DIRECTORY_NOT_CONNECTED';
+      throw error;
     }
 
-    // Browsers deliberately do not expose a selected file's parent directory.
-    // Ask the user to authorize the model's project folder; startIn points the
-    // picker at the model handle so supported browsers open in the right place.
+    // Explicit button click: call the native picker before any IndexedDB or
+    // permission awaits can consume the browser's transient user activation.
+    // Browsers do not reveal a file's parent directory automatically.
     let directoryHandle;
     try {
       directoryHandle = await window.showDirectoryPicker({
         id: "systemika-project-directory",
         mode: "readwrite",
-        startIn: this.fileHandle,
+        startIn: this.fileHandle || "documents",
       });
     } catch (error) {
-      if (error && error.name === "NotAllowedError") {
-        const wrapped = new Error("The browser requires a fresh click before it can authorize the project folder. Click Run or Manage Runs again, then select the folder containing the current .ssd model.");
+      if (error && (error.name === "SecurityError" || error.name === "NotAllowedError")) {
+        const wrapped = new Error("The browser could not open a local project folder. Select a normal folder on your computer containing the .ssd file, not the localhost website. If the browser blocks folder access, cancel and continue editing; Systemika will not keep reopening the picker.");
         wrapped.code = "PROJECT_DIRECTORY_USER_ACTIVATION_REQUIRED";
         throw wrapped;
       }
@@ -518,14 +675,29 @@ class WebFileManagerModern extends BaseFileManager {
       error.code = "PROJECT_DIRECTORY_PERMISSION_DENIED";
       throw error;
     }
-    if (!await this.directoryContainsCurrentModel(directoryHandle)) {
-      const error = new Error(`The selected folder does not contain the currently open model (${this.fileHandle.name}). Select that model's containing folder.`);
-      error.code = "WRONG_PROJECT_DIRECTORY";
-      throw error;
+    let recoveredHandle = null;
+    if (this.fileHandle) {
+      if (!await this.directoryContainsCurrentModel(directoryHandle)) {
+        const error = new Error(`The selected folder does not contain the currently open model (${this.fileHandle.name}). Select that model's containing folder.`);
+        error.code = "WRONG_PROJECT_DIRECTORY";
+        throw error;
+      }
+    } else {
+      try {
+        recoveredHandle = await directoryHandle.getFileHandle(this.fileName, { create: false });
+        const file = await recoveredHandle.getFile();
+        const fingerprint = await this.fingerprintContents(await file.text());
+        if (fingerprint !== this.openedModelFingerprint) recoveredHandle = null;
+      } catch (_) { recoveredHandle = null; }
+      if (!recoveredHandle) {
+        const error = new Error(`Select the folder containing the exact model file you opened (${this.fileName}). A different model with the same name will not be connected.`);
+        error.code = "WRONG_PROJECT_DIRECTORY";
+        throw error;
+      }
+      await this.setFileHandle(recoveredHandle);
     }
 
-    this.projectDirectoryHandle = directoryHandle;
-    await idbKeyval.set(this.projectDirectoryStorageKey, directoryHandle);
+    await this.rememberProjectFolder(directoryHandle);
     return directoryHandle;
   }
 
@@ -594,7 +766,7 @@ class WebFileManagerModern extends BaseFileManager {
         {
           description: "Systemika Models",
           accept: {
-            "text/stochsd": [".ssd"],
+            "application/octet-stream": [".ssd"],
           },
         },
       ],
@@ -607,7 +779,7 @@ class WebFileManagerModern extends BaseFileManager {
     // parent directory. Choosing the project directory first means the exact
     // same handle can immediately back Runs/*.sysrun without a second privileged
     // picker operation on the first simulation run.
-    const startIn = this.projectDirectoryHandle || this.fileHandle || "documents";
+    const startIn = this.projectDirectoryHandle || "documents";
     const directoryHandle = await window.showDirectoryPicker({
       id: "systemika-project-directory",
       mode: "readwrite",
@@ -653,8 +825,7 @@ class WebFileManagerModern extends BaseFileManager {
 
     const chosenHandle = existingHandle || await directoryHandle.getFileHandle(chosenName, { create: true });
     await this.setFileHandle(chosenHandle);
-    this.projectDirectoryHandle = directoryHandle;
-    await idbKeyval.set(this.projectDirectoryStorageKey, directoryHandle);
+    await this.rememberProjectFolder(directoryHandle);
     this.fileName = this.fileHandle.name;
     return true;
   }
@@ -747,10 +918,64 @@ class WebFileManagerModern extends BaseFileManager {
     await this.addToRecent();
     await this.updateUIAfterSave(contents);
   }
-  async loadModel() {
-    const options = this.getFilePickerOptions();
-    const [tmpFileHandle] = await window.showOpenFilePicker(options);
-    await this.loadFromFileHandle(tmpFileHandle);
+  // Open Model uses the standard browser file input rather than Chromium's
+  // showOpenFilePicker. The latter has caused native-picker crashes for some
+  // users, and a file chooser does not require cross-frame API calls.
+  // A writable handle is recovered only from a previously approved folder
+  // whose actual model contents match, or via explicit Connect Model Folder.
+  loadModel() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = Settings.fileExtension;
+    input.style.display = 'none';
+    input.addEventListener('change', async () => {
+      try {
+        const file = input.files && input.files[0];
+        if (file) await this.loadFromSelectedFile(file);
+      } catch (error) {
+        console.error('Systemika could not open the selected model', error);
+        const message = 'Unable to open the selected model. ' +
+          (error && error.message ? error.message : String(error));
+        if (typeof xAlert === 'function') xAlert(message.replace(/&/g, '&amp;').replace(/</g, '&lt;'));
+        else if (typeof window.alert === 'function') window.alert(message);
+      } finally {
+        input.remove();
+      }
+    });
+    input.addEventListener('cancel', () => input.remove());
+    document.body.appendChild(input);
+    input.click();
+  }
+
+  async loadFromSelectedFile(file) {
+    if (!file || !/\.ssd$/i.test(file.name)) {
+      throw new Error('Select a Systemika model (.ssd) file.');
+    }
+    // Read before altering the current model. Do not allow empty or clearly
+    // unrelated files to trigger an editor reload.
+    const fileData = await file.text();
+    if (!fileData || !/<InsightMakerModel(?:\s|>)/i.test(fileData)) {
+      throw new Error('The selected file does not contain a valid Systemika model.');
+    }
+    const fingerprint = await this.fingerprintContents(fileData);
+    const match = await this.findMatchingKnownFolder(file.name, fingerprint);
+    // Never silently reuse a handle from the previously opened model.
+    await this.setFileHandle(null);
+    if (match) {
+      await this.setFileHandle(match.handle);
+      this.projectDirectoryHandle = match.directory;
+      await idbKeyval.set(this.projectDirectoryStorageKey, match.directory);
+    } else {
+      this.openedModelFingerprint = fingerprint;
+      const storage = typeof sessionStorage !== 'undefined' ? sessionStorage : localStorage;
+      storage.setItem(this.openedModelFingerprintKey, fingerprint);
+    }
+    this.fileName = file.name;
+    this.storedModelName = null;
+    this.lastSaved = null;
+    History.forceCustomUndoState(fileData);
+    this.updateTitle();
+    preserveRestart();
   }
 
   async verifyPermission(fileHandle, withWrite) {
@@ -782,7 +1007,12 @@ class WebFileManagerModern extends BaseFileManager {
     if (!allowedPermission) {
       return;
     }
+    // A remembered folder is reconnected only if permission is already granted
+    // and it contains exactly this file. Never carry across stale permissions.
     await this.setFileHandle(fileHandle);
+    if (!await this.reconnectKnownFolder(fileHandle)) {
+      await this.clearProjectDirectoryHandle();
+    }
     const file = await fileHandle.getFile();
     const fileData = await file.text();
     this.fileName = file.name;
@@ -965,6 +1195,9 @@ class WebEnvironment extends BaseEnvironment {
     if (typeof window === "undefined") {
       return { available: false, reason: "NO_WINDOW" };
     }
+    if (isLimitedProjectBrowser()) {
+      return { available: false, reason: 'UNSUPPORTED_BROWSER' };
+    }
     if (window.isSecureContext === false) {
       return { available: false, reason: "INSECURE_CONTEXT" };
     }
@@ -1007,16 +1240,46 @@ class WebEnvironment extends BaseEnvironment {
     return this.showBrowserCompatibilityStatus();
   }
 
+  showUnsupportedBrowserScreen() {
+    if (typeof document === 'undefined') return false;
+    let hostDocument = document;
+    try {
+      if (window.top && window.top !== window && window.top.document && window.top.document.body) {
+        hostDocument = window.top.document;
+      }
+    } catch (_) { /* Cross-origin embedding: use the editor document. */ }
+    if (!hostDocument.body || typeof hostDocument.createElement !== 'function') return false;
+    if (hostDocument.getElementById('systemika-unsupported-browser-screen')) return true;
+    const screen = hostDocument.createElement('div');
+    screen.id = 'systemika-unsupported-browser-screen';
+    screen.setAttribute('role', 'alertdialog');
+    screen.setAttribute('aria-modal', 'true');
+    screen.setAttribute('aria-label', 'Unsupported web browser');
+    screen.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:#f5f6f8;display:flex;justify-content:center;align-items:center;padding:24px;box-sizing:border-box';
+    const panel = hostDocument.createElement('div');
+    panel.style.cssText = 'background:#fff;color:#20242b;padding:32px;border-radius:12px;max-width:560px;min-width:0;width:100%;box-sizing:border-box;box-shadow:0 8px 30px #0002;font:16px/1.5 system-ui,sans-serif;white-space:normal;overflow-wrap:anywhere;word-break:normal';
+    const heading = hostDocument.createElement('h1');
+    heading.textContent = 'Browser not supported';
+    heading.style.cssText = 'display:block;font:700 24px/1.3 system-ui,sans-serif;margin:0 0 16px;white-space:normal;overflow-wrap:anywhere';
+    const message = hostDocument.createElement('p');
+    message.textContent = 'Systemika Studio WebApp requires Google Chrome or Microsoft Edge with local file access enabled. Open this page in a supported browser, or use Systemika Studio Desktop.';
+    message.style.cssText = 'display:block;max-width:100%;margin:0 0 12px;white-space:normal;overflow-wrap:anywhere;word-break:normal;font:400 16px/1.5 system-ui,sans-serif';
+    const help = hostDocument.createElement('p');
+    help.textContent = 'Your models and simulation runs have not been changed.';
+    help.style.cssText = 'display:block;max-width:100%;margin:0;color:#555;white-space:normal;overflow-wrap:anywhere;font:400 14px/1.5 system-ui,sans-serif';
+    panel.append(heading, message, help);
+    screen.appendChild(panel);
+    hostDocument.body.appendChild(screen);
+    return true;
+  }
+
   ready() {
     if (typeof document !== "undefined") {
       const aboutButton = document.getElementById("btn_about");
       if (aboutButton) aboutButton.textContent = "About Systemika Studio";
     }
-    if (isLimitedProjectBrowser()) {
-      // Firefox and Safari remain in limited project-storage mode. Keep the
-      // guidance permanently visible in the normal status bar instead of using
-      // a modal or floating notice.
-      this.showBrowserCompatibilityStatus();
+    if (isLimitedProjectBrowser() || !this.getProjectFileAccessStatus().available) {
+      this.showUnsupportedBrowserScreen();
     }
     return null;
     /*

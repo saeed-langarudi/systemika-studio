@@ -34,7 +34,7 @@ test('selected SVG entities and handles are elevated over HTML plot overlays', (
 });
 
 test('Save As has Ctrl+Shift+S and Rotate Name has R', () => {
-  assert.match(html, /id="btn_save_as"[^>]*data-title="Save As \(Ctrl\+Shift\+S\)"[\s\S]{0,100}Ctrl Shift S/);
+  assert.match(html, /id="btn_save_as"[^>]*[\s\S]{0,100}<span class="shortcut">Ctrl Shift S<\/span>/);
   assert.match(editor, /event\.key\.toLowerCase\(\) == "s"[\s\S]{0,180}event\.shiftKey[\s\S]{0,120}#btn_save_as/);
   assert.match(html, /id="btn_rotatename"[^>]*data-title="Rotate Name \(R\)"/);
   assert.match(editor, /r:\s*"rotatename"/);

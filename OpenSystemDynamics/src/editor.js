@@ -590,7 +590,7 @@ class InfoBar {
 
 			let definitionLines = definition.split("\n");
 			if (definitionLines[0] !== "") {
-				this.cmInfoDef.setValue(`[${name}] = ${definitionLines[0]} | Unit: ${getUnits(primitive)}`);
+				this.cmInfoDef.setValue(`${name} = ${definitionLines[0]} | Unit: ${getUnits(primitive)}`);
 			} else {
 				let type = selected.type;
 
@@ -3244,6 +3244,7 @@ const SystemikaOutputDock = {
 		let visual = this.activeVisual;
 		if (visual instanceof TableVisual) {
 			this.setHeaderActions([
+				{ label: "Export SVG", title: "Export complete table as SVG", run: () => exportTableVisualSvg(visual) },
 				{ label: "Export CSV", title: "Export table data as CSV", run: () => visual.data && visual.data.exportCSV() }
 			]);
 			return;
@@ -4087,10 +4088,16 @@ function renderMultiScaleKey(visual, ids) {
 	let host = doc.createElement("div");
 	host.className = "systemika-multiscale-axis-gutter";
 	host.style.position = "absolute";
-	host.style.left = "2px";
+	// Keep the complete multiscale gutter strictly outside the plotting grid.
+	// The previous width calculation could grow into the data area for longer
+	// tick labels. Anchor the gutter between the optional Y label and the grid.
+	let gridLeft = Number((visual.plot._gridPadding || {}).left) || 112;
+	let gutterLeft = String(visual.primitive.getAttribute("LeftAxisLabel") || "").trim() ? 24 : 4;
+	let gutterRightGap = 8;
+	host.style.left = `${gutterLeft}px`;
 	host.style.top = "0";
 	host.style.bottom = "0";
-	host.style.width = "86px";
+	host.style.width = `${Math.max(46, gridLeft - gutterLeft - gutterRightGap)}px`;
 	host.style.pointerEvents = "none";
 	host.style.fontSize = "11px";
 	host.style.lineHeight = "1.15";
@@ -4103,11 +4110,25 @@ function renderMultiScaleKey(visual, ids) {
 	let gridHeight = Math.max(1, chartHeight - gridTop - gridBottom);
 	let positions = [gridTop, gridTop + gridHeight / 2, gridTop + gridHeight];
 
+	// Reserve one consistently aligned value column for every variable scale.
+	// This keeps e.g. "1: 700" and "2: 1200" visually column-aligned even
+	// when the formatted values have different lengths.
+	let formattedTicks = positions.map((_, tickIndex) => list.map((id, index) => {
+		let axis = visual.plot.axes && visual.plot.axes[multiscaleAxisName(index)];
+		if (!axis) return "—";
+		let min = Number(axis.min), max = Number(axis.max);
+		let value = tickIndex === 0 ? max : (tickIndex === 1 ? (min + max) / 2 : min);
+		return formatMultiScaleValue(value);
+	}));
+	let maxValueChars = Math.max(1, ...formattedTicks.flat().map(value => String(value).length));
+	let valueColumnWidth = `minmax(0, ${Math.max(4, maxValueChars + 1)}ch)`;
+
 	positions.forEach((top, tickIndex) => {
 		let row = doc.createElement("div");
 		row.className = "systemika-multiscale-axis-row";
 		row.style.position = "absolute";
-		row.style.right = "4px";
+		row.style.left = "0";
+		row.style.right = "0";
 		row.style.top = `${top}px`;
 		row.style.transform = tickIndex === 0 ? "translateY(0)" : (tickIndex === 1 ? "translateY(-50%)" : "translateY(-100%)");
 		row.style.textAlign = "right";
@@ -4115,17 +4136,32 @@ function renderMultiScaleKey(visual, ids) {
 		list.forEach((id, index) => {
 			let axis = visual.plot.axes && visual.plot.axes[multiscaleAxisName(index)];
 			if (!axis) return;
-			let min = Number(axis.min), max = Number(axis.max);
-			let value = tickIndex === 0 ? max : (tickIndex === 1 ? (min + max) / 2 : min);
 			let item = doc.createElement("div");
+			item.style.display = "grid";
+			item.style.gridTemplateColumns = `20px ${valueColumnWidth}`;
+			item.style.width = "100%";
+			item.style.columnGap = "3px";
+			item.style.justifyContent = "end";
 			let seriesIndex = 0;
 			for (let k = 0; k < index; k++) {
 				let prev = String(list[k]);
 				seriesIndex += visual.gens && visual.gens.idGen ? visual.gens.idGen.filter(arr => arr.indexOf(prev) !== -1).length : 1;
 			}
 			let color = visual.plot.series && visual.plot.series[seriesIndex] ? visual.plot.series[seriesIndex].color : "#444";
-			item.style.color = color || "#444";
-			item.textContent = `${index + 1}  ${formatMultiScaleValue(value)}`;
+			let number = doc.createElement("span");
+			number.className = "systemika-multiscale-variable-number";
+			number.style.color = "#000";
+			number.style.textAlign = "right";
+			number.style.fontVariantNumeric = "tabular-nums";
+			number.textContent = `${index + 1}:`;
+			let scaleValue = doc.createElement("span");
+			scaleValue.className = "systemika-multiscale-scale-value";
+			scaleValue.style.color = color || "#444";
+			scaleValue.style.textAlign = "right";
+			scaleValue.style.fontVariantNumeric = "tabular-nums";
+			scaleValue.textContent = formattedTicks[tickIndex][index];
+			item.appendChild(number);
+			item.appendChild(scaleValue);
 			row.appendChild(item);
 		});
 		host.appendChild(row);
@@ -4133,6 +4169,31 @@ function renderMultiScaleKey(visual, ids) {
 
 	if (getComputedStyle(visual.chartDiv).position === "static") visual.chartDiv.style.position = "relative";
 	visual.chartDiv.appendChild(host);
+}
+
+function renderMultiScaleYAxisLabel(visual) {
+	if (!visual || !visual.chartDiv || !isPlotMultiscaleEnabled(visual.primitive)) return;
+	let old = visual.chartDiv.querySelector(".systemika-multiscale-y-label");
+	if (old) old.remove();
+	let text = String(visual.primitive.getAttribute("LeftAxisLabel") || "").trim();
+	if (!text) return;
+	let doc = visual.chartDiv.ownerDocument || document;
+	let label = doc.createElement("div");
+	label.className = "systemika-multiscale-y-label";
+	label.textContent = text;
+	label.style.position = "absolute";
+	label.style.left = "2px";
+	label.style.top = "50%";
+	label.style.transform = "translate(-38%, -50%) rotate(-90deg)";
+	label.style.transformOrigin = "center";
+	label.style.whiteSpace = "nowrap";
+	label.style.pointerEvents = "none";
+	label.style.zIndex = "4";
+	label.style.fontFamily = "Arial, sans-serif";
+	label.style.fontSize = "12px";
+	label.style.color = "#222";
+	if (getComputedStyle(visual.chartDiv).position === "static") visual.chartDiv.style.position = "relative";
+	visual.chartDiv.appendChild(label);
 }
 
 function plotBottomLegendOptions(show = true) {
@@ -4414,6 +4475,65 @@ function renderXyCurveNumbers(visual) {
 	}
 }
 
+function graphComparePointLabelsSvg(visual) {
+	if (!(visual instanceof ComparePlotVisual) || !visual.plot || !Array.isArray(visual.plot.series)) return "";
+	let chunks = [];
+	for (let series of visual.plot.series) {
+		if (!series || !Array.isArray(series.data) || !series._xaxis || !series._yaxis) continue;
+		for (let row of series.data) {
+			if (!row || row.length < 3 || row[2] === null || row[2] === undefined || row[2] === "") continue;
+			let x = Number(row[0]), y = Number(row[1]);
+			if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+			let px = series._xaxis.u2p(x), py = series._yaxis.u2p(y);
+			if (!Number.isFinite(px) || !Number.isFinite(py)) continue;
+			chunks.push(`<text x="${px}" y="${py - 5}" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#555" stroke="#ffffff" stroke-width="2.5" paint-order="stroke fill">${graphXmlEscape(row[2])}</text>`);
+		}
+	}
+	return chunks.join("");
+}
+
+function graphMultiScaleGridSvg(visual, grid) {
+	if (!(visual instanceof ComparePlotVisual) || !visual.plot || !isPlotMultiscaleEnabled(visual.primitive)) return "";
+	// Multiscale axes are intentionally hidden in jqPlot, so graphAxisTicksSvg()
+	// cannot export their horizontal grid. Recreate the shared visual grid used
+	// by the live plot at max / midpoint / min.
+	let positions = [grid.top, (grid.top + grid.bottom) / 2, grid.bottom];
+	return positions.map(y => `<line x1="${grid.left}" y1="${y}" x2="${grid.right}" y2="${y}" stroke="#e6e6e6" stroke-width="1"/>`).join("");
+}
+
+function graphMultiScaleTicksSvg(visual, grid) {
+	if (!(visual instanceof ComparePlotVisual) || !visual.plot || !isPlotMultiscaleEnabled(visual.primitive)) return "";
+	let ids = getDisplayIds(visual.primitive).slice(0, SYSTEMIKA_MULTISCALE_AXES.length);
+	if (!ids.length) return "";
+	let chunks = [];
+	let xNumber = 20, xValue = Math.max(42, grid.left - 9);
+	for (let tickIndex = 0; tickIndex < 3; tickIndex++) {
+		let y = tickIndex === 0 ? grid.top + 4 : (tickIndex === 1 ? (grid.top + grid.bottom) / 2 + 4 : grid.bottom + 4);
+		for (let index = 0; index < ids.length; index++) {
+			let axis = visual.plot.axes && visual.plot.axes[multiscaleAxisName(index)];
+			if (!axis) continue;
+			let min = Number(axis.min), max = Number(axis.max);
+			if (!Number.isFinite(min) || !Number.isFinite(max)) continue;
+			let value = tickIndex === 0 ? max : (tickIndex === 1 ? (min + max) / 2 : min);
+			let seriesIndex = 0;
+			for (let k = 0; k < index; k++) {
+				let prev = String(ids[k]);
+				seriesIndex += visual.gens && visual.gens.idGen ? visual.gens.idGen.filter(arr => arr.indexOf(prev) !== -1).length : 1;
+			}
+			let color = visual.plot.series && visual.plot.series[seriesIndex] ? visual.plot.series[seriesIndex].color : "#444";
+			let lineOffset = index * 12;
+			chunks.push(`<text x="${xNumber}" y="${y + lineOffset}" text-anchor="end" font-family="Arial, sans-serif" font-size="10" fill="#000">${index + 1}:</text>`);
+			chunks.push(`<text x="${xValue}" y="${y + lineOffset}" text-anchor="end" font-family="Arial, sans-serif" font-size="10" fill="${graphXmlEscape(color)}">${graphXmlEscape(formatMultiScaleValue(value))}</text>`);
+		}
+	}
+	let label = String(visual.primitive.getAttribute("LeftAxisLabel") || "").trim();
+	if (label) {
+		let cy = (grid.top + grid.bottom) / 2;
+		chunks.push(`<text x="9" y="${cy}" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#111" transform="rotate(-90 9 ${cy})">${graphXmlEscape(label)}</text>`);
+	}
+	return chunks.join("");
+}
+
 function graphXyNumbersSvg(visual) {
 	if (!(visual instanceof XyPlotVisual) || !visual.plot || visual.primitive.getAttribute("ShowNumber") !== "true") return "";
 	let chunks = [];
@@ -4492,17 +4612,25 @@ function buildGraphSvgPayload(visual) {
 	let chunks = [`<svg xmlns="http://www.w3.org/2000/svg" width="${exportWidth}" height="${exportHeight}" viewBox="0 0 ${exportWidth} ${exportHeight}">`];
 	// Intentionally no background rectangle: exported SVG, PNG, and clipboard images remain transparent.
 	chunks.push(graphAxisTicksSvg(plot.axes && plot.axes.xaxis, "x", grid, width, height));
-	chunks.push(graphAxisTicksSvg(plot.axes && plot.axes.yaxis, "y", grid, width, height));
-	chunks.push(graphAxisTicksSvg(plot.axes && plot.axes.y2axis, "y2", grid, width, height));
+	if (visual instanceof ComparePlotVisual && isPlotMultiscaleEnabled(visual.primitive)) {
+		chunks.push(graphMultiScaleGridSvg(visual, grid));
+		chunks.push(graphMultiScaleTicksSvg(visual, grid));
+	}
+	else {
+		chunks.push(graphAxisTicksSvg(plot.axes && plot.axes.yaxis, "y", grid, width, height));
+		chunks.push(graphAxisTicksSvg(plot.axes && plot.axes.y2axis, "y2", grid, width, height));
+	}
 	chunks.push(`<rect x="${grid.left}" y="${grid.top}" width="${Math.max(0, grid.right - grid.left)}" height="${Math.max(0, grid.bottom - grid.top)}" fill="none" stroke="#b8b8b8" stroke-width="1"/>`);
 	chunks.push(graphSeriesSvg(plot));
+	chunks.push(graphComparePointLabelsSvg(visual));
 	chunks.push(graphXyNumbersSvg(visual));
 	let title = graphPlainText(plot.title && plot.title.text);
 	if (title) chunks.push(`<text x="${(grid.left + grid.right) / 2}" y="17" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#111">${graphXmlEscape(title)}</text>`);
 	let xLabel = graphPlainText(plot.axes && plot.axes.xaxis && plot.axes.xaxis.label);
-	let xLabelY = legend ? Math.min(legendTop - 8, grid.bottom + 26) : height - 4;
+	// Give the X-axis title a clear gap below tick labels in exported figures.
+	let xLabelY = legend ? Math.min(legendTop - 8, grid.bottom + 34) : Math.min(height - 4, grid.bottom + 34);
 	if (xLabel) chunks.push(`<text x="${(grid.left + grid.right) / 2}" y="${xLabelY}" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#111">${graphXmlEscape(xLabel)}</text>`);
-	let yLabel = graphPlainText(plot.axes && plot.axes.yaxis && plot.axes.yaxis.label);
+	let yLabel = (visual instanceof ComparePlotVisual && isPlotMultiscaleEnabled(visual.primitive)) ? "" : graphPlainText(plot.axes && plot.axes.yaxis && plot.axes.yaxis.label);
 	if (yLabel) chunks.push(`<text x="13" y="${(grid.top + grid.bottom) / 2}" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#111" transform="rotate(-90 13 ${(grid.top + grid.bottom) / 2})">${graphXmlEscape(yLabel)}</text>`);
 	let y2Label = graphPlainText(plot.axes && plot.axes.y2axis && plot.axes.y2axis.label);
 	if (y2Label) chunks.push(`<text x="${width - 13}" y="${(grid.top + grid.bottom) / 2}" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#111" transform="rotate(90 ${width - 13} ${(grid.top + grid.bottom) / 2})">${graphXmlEscape(y2Label)}</text>`);
@@ -4738,6 +4866,135 @@ function exportPlotDataCsv(visual) {
 	}
 }
 
+// Export a complete vector table, including rows outside the scroll viewport.
+// Derive the cells from the rendered table so the SVG uses exactly the same
+// numerical precision, column order, run headings and time units as the panel.
+// Native SVG shapes/text (not a screenshot or foreignObject) keep it editable
+// and portable in external illustration and document tools.
+function tableSvgCellText(cell) {
+	let unit = cell && cell.querySelector && cell.querySelector(".time-unit");
+	if (unit) {
+		let label = cell.querySelector("div:not(.time-unit)");
+		return [label ? label.textContent.trim() : "Time", unit.textContent.trim()].filter(Boolean);
+	}
+	return [String(cell && cell.textContent || "").replace(/\s+/g, " ").trim()];
+}
+
+function tableSvgGrid(table) {
+	if (!table || !table.tHead || !table.tBodies || !table.tBodies.length) {
+		throw new Error("The table is not currently available for export.");
+	}
+	let headerRows = Array.from(table.tHead.rows);
+	let bodyRows = Array.from(table.tBodies).flatMap(body => Array.from(body.rows));
+	if (!headerRows.length || !bodyRows.length) throw new Error("There are no table results to export.");
+	let rows = headerRows.concat(bodyRows);
+	let occupied = [];
+	let cells = [];
+	let columnCount = 0;
+	rows.forEach((row, rowIndex) => {
+		if (!occupied[rowIndex]) occupied[rowIndex] = new Set();
+		let column = 0;
+		for (let cell of Array.from(row.cells)) {
+			while (occupied[rowIndex].has(column)) column++;
+			let colSpan = Math.max(1, Number(cell.colSpan) || 1);
+			let rowSpan = Math.max(1, Number(cell.rowSpan) || 1);
+			let lines = tableSvgCellText(cell);
+			let coloredName = cell.querySelector && cell.querySelector(".cm-primitive");
+			let computedColor = coloredName && typeof getComputedStyle === "function" ? getComputedStyle(coloredName).color : "";
+			let textColor = /^(?:#[0-9a-f]{3,8}|rgba?\([0-9.,%\s]+\)|[a-z]+)$/i.test(computedColor) ? computedColor : "#222";
+			cells.push({ row: rowIndex, col: column, colSpan, rowSpan, lines, textColor, header: rowIndex < headerRows.length });
+			for (let r = rowIndex; r < rowIndex + rowSpan; r++) {
+				if (!occupied[r]) occupied[r] = new Set();
+				for (let c = column; c < column + colSpan; c++) occupied[r].add(c);
+			}
+			column += colSpan;
+			columnCount = Math.max(columnCount, column);
+		}
+	});
+	return { cells, columnCount, headerCount: headerRows.length, bodyCount: bodyRows.length };
+}
+
+function buildTableSvgPayload(visual) {
+	let table = (visual && visual.dockElement && visual.dockElement.querySelector("table.sticky-table")) ||
+		(visual && visual.htmlElement && visual.htmlElement.cutDiv && visual.htmlElement.cutDiv.querySelector("table.sticky-table"));
+	let grid = tableSvgGrid(table);
+	let ctx = null;
+	if (typeof document !== "undefined") {
+		let canvas = document.createElement("canvas");
+		ctx = canvas && typeof canvas.getContext === "function" ? canvas.getContext("2d") : null;
+	}
+	let measure = (value, bold) => {
+		let text = String(value || "");
+		if (ctx) {
+			ctx.font = `${bold ? "bold " : ""}12px Arial, sans-serif`;
+			return ctx.measureText(text).width;
+		}
+		return text.length * (bold ? 7.6 : 7);
+	};
+	let columnWidths = new Array(grid.columnCount).fill(92);
+	columnWidths[0] = 96;
+	for (let cell of grid.cells) {
+		if (cell.colSpan !== 1) continue;
+		let needed = Math.max(...cell.lines.map(line => measure(line, cell.header)), 0) + 22;
+		columnWidths[cell.col] = Math.max(columnWidths[cell.col], Math.ceil(needed));
+	}
+	// Variable headers may cover multiple run columns; allocate enough total
+	// width for the full variable name without clipping the heading.
+	for (let cell of grid.cells) {
+		if (cell.colSpan <= 1) continue;
+		let needed = Math.max(...cell.lines.map(line => measure(line, true)), 0) + 22;
+		let current = columnWidths.slice(cell.col, cell.col + cell.colSpan).reduce((a, b) => a + b, 0);
+		if (needed > current) {
+			let extra = (needed - current) / cell.colSpan;
+			for (let col = cell.col; col < cell.col + cell.colSpan; col++) columnWidths[col] += extra;
+		}
+	}
+	let xPositions = [0];
+	for (let width of columnWidths) xPositions.push(xPositions[xPositions.length - 1] + width);
+	let top = 37;
+	let headerHeight = 38;
+	let bodyHeight = 26;
+	let width = Math.ceil(xPositions[xPositions.length - 1]);
+	let height = top + grid.headerCount * headerHeight + grid.bodyCount * bodyHeight + 1;
+	let title = (visual && visual.primitive && typeof getName === "function") ? String(getName(visual.primitive) || "Table") : "Table";
+	let chunks = [`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img">`,
+		`<title>${graphXmlEscape(title)}</title>`,
+		`<text x="10" y="24" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#202124">${graphXmlEscape(title)}</text>`];
+	let cellY = row => top + Math.min(row, grid.headerCount) * headerHeight + Math.max(0, row - grid.headerCount) * bodyHeight;
+	for (let cell of grid.cells) {
+		let x = xPositions[cell.col];
+		let y = cellY(cell.row);
+		let endRow = cell.row + cell.rowSpan;
+		let h = cellY(endRow) - y;
+		let w = xPositions[cell.col + cell.colSpan] - x;
+		let fill = cell.header ? "#ffffff" : ((cell.row - grid.headerCount) % 2 === 0 ? "#f4f4f4" : "#ffffff");
+		let border = cell.col === 0 ? "#555" : "#c8ccd1";
+		chunks.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}" stroke="${border}" stroke-width="0.8"/>`);
+		let numeric = !cell.header && cell.col > 0;
+		let anchor = numeric ? "end" : "middle";
+		let tx = numeric ? x + w - 10 : x + w / 2;
+		let lines = cell.lines;
+		let lineHeight = 15;
+		let centerY = y + h / 2;
+		let firstBaseline = centerY - (lines.length - 1) * lineHeight / 2 + 4;
+		for (let index = 0; index < lines.length; index++) {
+			let subheading = cell.header && cell.col === 0 && index > 0;
+			chunks.push(`<text x="${tx}" y="${firstBaseline + index * lineHeight}" text-anchor="${anchor}" font-family="Arial, sans-serif" font-size="${subheading ? 11 : 12}" ${cell.header && !subheading ? 'font-weight="bold" ' : ""}fill="${cell.textColor}">${graphXmlEscape(lines[index])}</text>`);
+		}
+	}
+	chunks.push("</svg>");
+	return { svg: chunks.join(""), width, height };
+}
+
+async function exportTableVisualSvg(visual) {
+	try {
+		let payload = buildTableSvgPayload(visual);
+		await fileManager.exportFile(payload.svg, ".svg");
+	} catch (error) {
+		xAlert(`Unable to export table as SVG.<br/><br/>${htmlEscape(error.message || String(error))}`);
+	}
+}
+
 async function exportGraphVisual(visual, format) {
 	try {
 		if (!visual || !visual.chartDiv || !visual.plot) throw new Error("The graph is not currently available for export.");
@@ -4820,7 +5077,10 @@ class PlotVisual extends HtmlOverlayTwoPointer {
 		if (!this.pageNavDiv || !window.SystemikaPlotPages) return;
 		let info = SystemikaPlotPages.getInfo(this.primitive);
 		let label = info.name || `Page ${info.index + 1}`;
-		let shortLabel = `${label}  ${info.index + 1}/${info.count}`;
+		let isDefaultPageName = /^Page\s+\d+$/i.test(String(label).trim());
+		let shortLabel = isDefaultPageName
+			? `Page ${info.index + 1}/${info.count}`
+			: `${label}  ${info.index + 1}/${info.count}`;
 		$(this.pageNavDiv).find(".plot-page-label").text(shortLabel).attr("title", `${label} — Page ${info.index + 1} of ${info.count}`);
 		$(this.pageNavDiv).find(".plot-page-prev").prop("disabled", info.index <= 0);
 		$(this.pageNavDiv).find(".plot-page-next").prop("disabled", info.index >= info.count - 1);
@@ -4914,7 +5174,7 @@ class PlotVisual extends HtmlOverlayTwoPointer {
 			<div id="${this.chartId}" style="width:0px; height:0px; z-index: 100;"></div>
 			<div id="${this.pageNavId}" class="systemika-plot-page-nav">
 				<button type="button" class="plot-page-prev" title="Previous page">&#8249;</button>
-				<span class="plot-page-label" title="Plot page">Page 1  1/1</span>
+				<span class="plot-page-label" title="Plot page">Page 1/1</span>
 				<button type="button" class="plot-page-next" title="Next page">&#8250;</button>
 				<button type="button" class="plot-page-add" title="Add page" aria-label="Add page">+</button>
 				<button type="button" class="plot-page-delete" title="Delete page" aria-label="Delete page">−</button>
@@ -5567,7 +5827,7 @@ class ComparePlotVisual extends PlotVisual {
 			title: this.primitive.getAttribute("TitleLabel"),
 			series: this.serieSettingsArray,
 			grid: { background: "transparent", shadow: false },
-			gridPadding: multiScale ? { left: 94, right: 12 } : undefined,
+			gridPadding: multiScale ? { left: 112, right: 12 } : undefined,
 			axes: {
 				xaxis: {
 					label: timeAxisLabel(),
@@ -5591,7 +5851,10 @@ class ComparePlotVisual extends PlotVisual {
 		});
 		stylePlotLegendLineSamples(this.chartDiv, this.plot, this.serieSettingsArray);
 		spacePlotLegendFromGrid(this.chartDiv);
-		if (multiScale) renderMultiScaleKey(this, idsToDisplay);
+		if (multiScale) {
+			renderMultiScaleKey(this, idsToDisplay);
+			renderMultiScaleYAxisLabel(this);
+		}
 		if (!multiScale && !isNaN(this.plot.axes.yaxis.min) && !isNaN(this.plot.axes.yaxis.max)) {
 			axisLimits.yaxis.min = this.plot.axes.yaxis.min;
 			axisLimits.yaxis.max = this.plot.axes.yaxis.max;
@@ -9835,9 +10098,6 @@ $(window).load(function () {
 	$("#btn_directory").click(function () {
 		directoryDialog.show();
 	});
-	$("#btn_browser_models").click(function () {
-		browserModelsDialog.show();
-	});
 	$("#btn_new_window").click(function () {
 		if (!environment.openNewWindow()) return;
 	});
@@ -9883,12 +10143,6 @@ $(window).load(function () {
 		// Import and Export instead.
 		$("#btn_import").show();
 		$("#btn_export").show();
-	} else if (environment instanceof WebEnvironment) {
-		// Files are already what Save and Open mean, so browser storage is offered
-		// as a second place to keep models rather than as the default. Desktop
-		// (Electron) has no use for browser storage at all — it has real files —
-		// so this stays hidden there.
-		$("#btn_browser_models").show();
 	}
 	if (fileManager.hasRecentFiles()) {
 		for (let i = 0; i < Settings.MaxRecentFiles; i++) {
@@ -10873,6 +11127,21 @@ class RunResults {
 				}
 			},
 			onError: (res) => {
+				// Preserve every valid sample produced before a numerical failure. This
+				// lets the user inspect plots/tables up to the failing simulation time.
+				if (res && res.partialResults && Number(res.partialResults.periods) > 0) {
+					this.storeResults(res.partialResults);
+					this.updateProgressBar();
+					let failedDecision = this.systemikaRunDecision;
+					let failedRunName = failedDecision && failedDecision.runName
+						? failedDecision.runName
+						: (window.SystemikaRunManager ? SystemikaRunManager.getRunName() : "Base");
+					if (window.SystemikaRunManager) SystemikaRunManager.captureLiveRun(failedRunName);
+					if (window.SystemikaDisplayRuns && typeof window.SystemikaDisplayRuns.selectNewRun === "function") {
+						window.SystemikaDisplayRuns.selectNewRun(failedRunName);
+					}
+					this.triggerRunFinished();
+				}
 				if (res && res.error) xAlert(`Simulation error:<br/><br/>${htmlEscape(res.error)}`);
 				do_global_log("onError stop simulation");
 				this.systemikaRunDecision = null;
@@ -10991,11 +11260,17 @@ class RunResults {
 				});
 			},
 			onError: (res) => {
+				if (res && res.partialResults && Number(res.partialResults.periods) > 0) {
+					this.storeResults(res.partialResults);
+					this.updateProgressBar();
+					if (window.SystemikaRunManager) SystemikaRunManager.captureLiveRun();
+					this.triggerRunFinished();
+				}
 				if (res && res.error) xAlert(`Simulation error:<br/><br/>${htmlEscape(res.error)}`);
 				this.systemikaAdvanceDecision = null;
-				if (this.advanceDisplaySelectionSnapshot && window.SystemikaDisplayRuns && typeof window.SystemikaDisplayRuns.restoreSelections === "function") {
-					window.SystemikaDisplayRuns.restoreSelections(this.advanceDisplaySelectionSnapshot, window.SystemikaRunManager ? SystemikaRunManager.getRunName() : "");
-				}
+				// Keep the failed Advance trajectory selected so the user can inspect
+				// the values leading up to the numerical problem. Reset remains the
+				// explicit action that restores the pre-Advance display selection.
 				this.advanceDisplaySelectionSnapshot = null;
 				this.stopSimulation();
 			}
@@ -11854,12 +12129,30 @@ class SystemikaRunsManagerDialog extends jqDialog {
 					<label for="systemika-runs-manager-name"><b>Name:</b></label>
 					<input id="systemika-runs-manager-name" type="text" style="flex:1; min-width:220px;" autocomplete="off" />
 				</div>
+                <div style="display:flex; gap:0.5rem; margin-top:0.75rem; flex-wrap:wrap;">
+                    <button type="button" class="systemika-runs-recover">Connect Model Folder</button>
+                    <button type="button" class="systemika-runs-export">Export Model with Runs</button>
+                </div>
 				<div class="systemika-runs-manager-status" style="min-height:1.4em; margin-top:0.5rem;"></div>
 			</div>`);
 		this.nameInput = $(this.dialogContent).find("#systemika-runs-manager-name");
 		// Run names are ordinary text.  Never let letters typed here bubble to
 		// the editor's single-key creation shortcuts.
 		this.nameInput.on("keydown keyup keypress", event => event.stopPropagation());
+        $(this.dialogContent).find('.systemika-runs-recover').on('click', async () => {
+            try {
+                this.status('Select the folder containing the open .ssd model. Do not select or create the Runs subfolder.');
+                if (await SystemikaRunManager.locateRunsFolder()) await this.reload();
+                else this.status('Folder selection cancelled. The model remains usable.');
+            } catch (error) { this.status(error.message || String(error), true); }
+        });
+        $(this.dialogContent).find('.systemika-runs-export').on('click', async () => {
+            try {
+                this.status('Preparing portable model archive…');
+                await SystemikaRunManager.exportPortableModel();
+                this.status('Export completed or download started.');
+            } catch (error) { this.status(error.message || String(error), true); }
+        });
 	}
 	beforeCreateDialog() {
 		this.dialogParameters.buttons = {
@@ -11887,6 +12180,20 @@ class SystemikaRunsManagerDialog extends jqDialog {
 		let list = $(this.dialogContent).find(".systemika-runs-manager-list");
 		this.status("Loading runs…");
 		try {
+            // In the webapp a file picker supplies a file handle, not access to
+            // its parent directory. Opening Manage Runs must never force a
+            // separate folder picker; recovery is explicit and optional.
+            const fm = typeof fileManager !== 'undefined' ? fileManager : null;
+            const browserStore = window.systemikaBrowserRuns;
+            if (browserStore && typeof browserStore.isSupported === 'function' && browserStore.isSupported()
+                && fm && typeof fm.getRunStorageDirectoryHandle === 'function'
+                && !fm.getRunStorageDirectoryHandle()) {
+                list.html('<div style="padding:0.75rem;">Runs are not connected for this model.</div>');
+                this.selectedRun = '';
+                this.nameInput.val('');
+                this.status('To access existing runs, use Connect Model Folder and select the folder containing the open .ssd file. Systemika will find its Runs subfolder automatically.');
+                return;
+            }
 			let runs = await systemikaSimulationData.listRuns();
 			if (!runs.length) {
 				list.html(`<div style="padding:0.75rem;">No saved runs.</div>`);
@@ -13682,8 +13989,7 @@ class ComparePlotDialog extends DisplayDialog {
 			[new CompareRunsSelectorComponent(this)],
 			[
 				new AxisLimitsComponent(this, [
-					{ text: "Time", key: "timeaxis", isTimeAxis: true },
-					{ text: "Y-Axis", key: "yaxis" }
+					{ text: "Time", key: "timeaxis", isTimeAxis: true }
 				]),
 				new LabelTableComponent(this, [
 					{ text: "Title", attribute: "TitleLabel" },
@@ -14878,7 +15184,8 @@ class ConverterDialog extends jqDialog {
 			<div style="display: grid; grid-template-columns: auto auto; grid-gap: 1rem; max-height: 80vh;">
 				<div class="primitive-settings" style="padding: 1rem 0;">
 						<b>Name:</b><br/>
-						<input class="name-field" style="width: 100%;" type="text" value=""><br/><br/>
+						<input class="name-field" style="width: 100%;" type="text" value="" aria-describedby="converter-name-warning"><br/>
+						<div id="converter-name-warning" class="name-warning-div" role="status" aria-live="polite"></div><br/>
 						<div style="display: flex; justify-content: space-between; width: 100%; align-items: baseline;">
 							<b>Definition:</b><span>${this.renderHelpButtonHtml("converter-help")}</span>
 						</div>
@@ -14977,6 +15284,7 @@ class ConverterDialog extends jqDialog {
 			}
 		})
 		this.nameField = $(this.dialogContent).find(".name-field").get(0);
+		$(this.nameField).on("input", () => this.validateLookupName(true));
 		this.unitField = $(this.dialogContent).find(".unit-field").get(0);
 		this.commentField = $(this.dialogContent).find(".comment-field").get(0);
 		$(this.nameField).keydown((event) => {
@@ -14993,6 +15301,38 @@ class ConverterDialog extends jqDialog {
 				this.cmValueField.focus();
 			}
 		});
+	}
+	validateLookupName(showWarning = true) {
+		const raw = String($(this.nameField).val() ?? "");
+		const name = stripBrackets(raw);
+		const isFree = isNameFree(name, this.primitive ? this.primitive.id : undefined);
+		const validSyntax = !/\s/.test(raw) && isValidToolName(name) &&
+			validPrimitiveName(name, this.primitive);
+		const valid = Boolean(name && isFree && validSyntax);
+		$(this.nameField).css("background-color", valid ? "white" : "pink");
+		// Match the existing Stock/Flow/Auxiliary name warning: the same
+		// warningHtml() styling, validation language, and visible layout.
+		let warning = "";
+		if (!valid && showWarning) {
+			if (!isFree) {
+				const safeName = name.replace(/[&<>"']/g, (character) => ({
+					"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+				})[character]);
+				warning = warningHtml(`Name <b>${safeName}</b> is taken.`);
+			} else if (!name) {
+				warning = warningHtml(`Name cannot be empty.`);
+			} else if (/\s/.test(raw) || !isValidToolName(name)) {
+				warning = warningHtml(`
+					Allowed characters are: <br/>
+					<b>A-Z</b>, <b>a-z</b>, <b>_</b> (anywhere)
+					<br/><b>0-9</b> (if not first character)
+				`);
+			} else if (!validPrimitiveName(name, this.primitive)) {
+				warning = warningHtml(`Name cannot contain bracket, parenthesis, or quote`);
+			}
+		}
+		$(this.dialogContent).find(".name-warning-div").html(warning);
+		return valid;
 	}
 	isValidCellValue(strValue) {
 		return !(strValue.trim() === "" || isNaN(strValue))
@@ -15030,6 +15370,7 @@ class ConverterDialog extends jqDialog {
 		this.setTitle(`${oldNameBrackets} properties`);
 
 		$(this.nameField).val(oldNameBrackets);
+		this.validateLookupName(false);
 		$(this.unitField).val(getUnits(this.primitive));
 		$(this.commentField).val(this.primitive.getAttribute("Note") || "");
 		this.cmValueField.setValue(oldValue);
@@ -15125,6 +15466,13 @@ class ConverterDialog extends jqDialog {
 	}
 	makeApply() {
 		if (this.primitive) {
+			// A rejected name must not close the dialog or partly commit the
+			// lookup definition. Keep its validation consistent with other
+			// Systemika variable types.
+			if (!this.validateLookupName(true)) {
+				this.nameField.focus();
+				return false;
+			}
 			// Handle value
 			let value = this.cmValueField.getValue();
 			setValue2(this.primitive, value);
@@ -15135,12 +15483,8 @@ class ConverterDialog extends jqDialog {
 			let oldName = getName(this.primitive);
 			let newName = stripBrackets($(this.dialogContent).find(".name-field").val());
 			if (oldName != newName) {
-				if (isNameFree(newName)) {
-					setName(this.primitive, newName);
-					changeReferencesToName(this.primitive.id, oldName, newName);
-				} else {
-					xAlert(`The name <b>${newName}</b> is already a taken name. \nName was not changed.`);
-				}
+				setName(this.primitive, newName);
+				changeReferencesToName(this.primitive.id, oldName, newName);
 			}
 			// Update visual object to add/remove "?" icon
 			let visualObject = object_array[this.primitive.id];

@@ -49,6 +49,22 @@
     return n;
   }
 
+  function attachSimulationErrorContext(error, time, item) {
+    if (!error || typeof error !== "object") return error;
+    const details = Object.assign({}, error.details || {});
+    if (details.time == null && Number.isFinite(Number(time))) details.time = Number(time);
+    if (item && details.primitiveId == null) details.primitiveId = item.id == null ? null : String(item.id);
+    if (item && details.primitiveName == null) details.primitiveName = item.name == null ? null : String(item.name);
+    error.details = details;
+    return error;
+  }
+
+  function displaySimulationTime(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return null;
+    return Number(n.toPrecision(12)).toString();
+  }
+
   function numericTolerance(...values) {
     let scale = 1;
     values.forEach(value => {
@@ -962,32 +978,37 @@
       if (cache.has(item.id)) return cache.get(item.id);
       if (stack.has(item.id)) {
         const cycle = [...stack, item.id].map(id => this.model.idMap.get(id)?.name || id).join(" -> ");
-        throw new SystemikaEngineError(`Circular equation dependency detected: ${cycle}.`);
+        throw attachSimulationErrorContext(new SystemikaEngineError(`Circular equation dependency detected: ${cycle}.`), time, item);
       }
       stack.add(item.id);
-      let value;
-      if (item.type === "converter") {
-        let input;
-        if (normalizeKey(item.sourceId) === "time") input = time;
-        else {
-          const source = this.model.idMap.get(item.sourceId);
-          if (source.type === "stock") {
-            input = Object.prototype.hasOwnProperty.call(state, source.id)
-              ? state[source.id]
-              : (initializing && resolveInitial ? resolveInitial(source) : state[source.id]);
-          } else {
-            input = this.evaluateItem(source, state, time, cache, stack, initializing, resolveInitial);
+      try {
+        let value;
+        if (item.type === "converter") {
+          let input;
+          if (normalizeKey(item.sourceId) === "time") input = time;
+          else {
+            const source = this.model.idMap.get(item.sourceId);
+            if (source.type === "stock") {
+              input = Object.prototype.hasOwnProperty.call(state, source.id)
+                ? state[source.id]
+                : (initializing && resolveInitial ? resolveInitial(source) : state[source.id]);
+            } else {
+              input = this.evaluateItem(source, state, time, cache, stack, initializing, resolveInitial);
+            }
           }
+          value = interpolate(item.points, finiteNumber(input, `Input to lookup '${item.name}'`), item.interpolation);
+        } else {
+          const ast = this.overrides.get(item.id) || item.ast;
+          value = this.evaluateAstFor(ast, state, time, cache, stack, initializing, resolveInitial);
+          value = finiteNumber(value, `Equation of '${item.name}'`);
         }
-        value = interpolate(item.points, finiteNumber(input, `Input to lookup '${item.name}'`), item.interpolation);
-      } else {
-        const ast = this.overrides.get(item.id) || item.ast;
-        value = this.evaluateAstFor(ast, state, time, cache, stack, initializing, resolveInitial);
-        value = finiteNumber(value, `Equation of '${item.name}'`);
+        cache.set(item.id, value);
+        return value;
+      } catch (error) {
+        throw attachSimulationErrorContext(error, time, item);
+      } finally {
+        stack.delete(item.id);
       }
-      stack.delete(item.id);
-      cache.set(item.id, value);
-      return value;
     }
 
     evaluateAll(state, time) {
@@ -1365,8 +1386,22 @@
         this.runChunk();
       } catch (error) {
         this.running = false;
+        // Snapshot all valid rows accumulated before the failing evaluation so
+        // plots and tables can still be used for debugging the failed run.
+        const partialResults = this.currentResults();
         this.terminated = true;
-        const payload = { error: error.message || String(error), errorPrimitive: null };
+        const errorTime = error && error.details && Number.isFinite(Number(error.details.time))
+          ? Number(error.details.time)
+          : this.runtime.time;
+        const shownTime = displaySimulationTime(errorTime);
+        const baseMessage = error && error.message ? error.message : String(error);
+        const message = shownTime == null ? baseMessage : `${baseMessage} Error occurred at simulation time ${shownTime}.`;
+        const payload = {
+          error: message,
+          errorPrimitive: error && error.details ? (error.details.primitiveId || null) : null,
+          errorTime,
+          partialResults
+        };
         if (typeof this.config.onError === "function") this.emitCallback("onError", payload);
         else throw error;
       }

@@ -212,7 +212,23 @@ class SystemikaModelDocument {
 	}
 }
 
+function systemikaModelIdentifier() {
+    // The Setting attribute is serialized in ordinary .ssd XML. Save As retains
+    // the model lineage; existing models receive an identifier on first save/run.
+    const setting = typeof primitives === "function" ? primitives("Setting")[0] : null;
+    if (!setting || typeof setting.getAttribute !== "function" || typeof setting.setAttribute !== "function") return null;
+    let id = setting.getAttribute("SystemikaModelId");
+    if (!id) {
+        id = (typeof crypto !== "undefined" && crypto.randomUUID)
+            ? crypto.randomUUID()
+            : "sys-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2);
+        setting.setAttribute("SystemikaModelId", id);
+    }
+    return id;
+}
+
 function createModelFileData() {
+    systemikaModelIdentifier();
 	SystemikaModelDocumentWriter = new SystemikaModelDocument();
 	SystemikaModelDocumentWriter.appendPrimitives();
 	return SystemikaModelDocumentWriter.getXmlString();

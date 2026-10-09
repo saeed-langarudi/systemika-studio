@@ -246,3 +246,44 @@ test('modern web mode authorizes the project folder and persists through the bro
   assert.equal(context.lastSave.modelPath, '/models/Test.ssd');
   assert.equal(context.lastSave.payload.runLabel, 'Web Run');
 });
+
+test('web run without folder permission offers explicitly acknowledged transient simulation', async () => {
+  const context = makeContext({ electron: false, runName: 'Exploration' });
+  context.systemikaRuns = undefined;
+  context.systemikaBrowserRuns = {
+    isSupported: () => true,
+    async ensureAccess() {
+      const error = new Error('folder not connected');
+      error.code = 'PROJECT_DIRECTORY_NOT_CONNECTED';
+      throw error;
+    },
+  };
+  context.yesNoAlert = (message, done) => {
+    context.warning = message;
+    done('yes');
+  };
+  loadScripts(context);
+  const decision = await context.SystemikaRunManager.prepareUserRun();
+  assert.equal(decision.proceed, true);
+  assert.equal(decision.persist, false);
+  assert.equal(decision.runName, 'Exploration');
+  assert.match(context.warning, /without saving its run file/);
+});
+
+test('web run without folder permission can be cancelled without launching a simulation', async () => {
+  const context = makeContext({ electron: false, runName: 'Exploration' });
+  context.systemikaRuns = undefined;
+  context.systemikaBrowserRuns = {
+    isSupported: () => true,
+    async ensureAccess() {
+      const error = new Error('folder not connected');
+      error.code = 'PROJECT_DIRECTORY_NOT_CONNECTED';
+      throw error;
+    },
+  };
+  context.yesNoAlert = (_message, done) => done('no');
+  loadScripts(context);
+  const decision = await context.SystemikaRunManager.prepareUserRun();
+  assert.equal(decision.proceed, false);
+  assert.equal(context.lastSave, undefined);
+});

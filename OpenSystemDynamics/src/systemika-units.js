@@ -18,7 +18,7 @@
   "use strict";
 
   const EPS = 1e-12;
-  const DIMENSIONLESS_NAMES = new Set(["Unitless"]);
+  const DIMENSIONLESS_NAMES = new Set(["unitless"]);
 
   class UnitCheckError extends Error {
     constructor(message, position, expression) {
@@ -38,20 +38,32 @@
     return n;
   }
 
+  function canonicalUnitSymbol(symbol) {
+    return String(symbol == null ? "" : symbol).trim().toLowerCase();
+  }
+
   function makeUnit(entries) {
     const powers = new Map();
+    const labels = new Map();
     if (entries) {
       for (const [symbol, rawExponent] of entries) {
+        const key = canonicalUnitSymbol(symbol);
         const exponent = cleanExponent(rawExponent);
-        if (exponent === 0) continue;
-        powers.set(String(symbol), exponent);
+        if (!key || exponent === 0) continue;
+        const next = cleanExponent((powers.get(key) || 0) + exponent);
+        if (next === 0) { powers.delete(key); labels.delete(key); }
+        else {
+          powers.set(key, next);
+          if (!labels.has(key)) labels.set(key, String(symbol));
+        }
       }
     }
-    return { powers };
+    return { powers, labels };
   }
 
   function cloneUnit(unit) {
-    return makeUnit(unit && unit.powers ? unit.powers.entries() : []);
+    if (!unit || !unit.powers) return makeUnit();
+    return makeUnit([...unit.powers.entries()].map(([key, exponent]) => [unit.labels && unit.labels.get(key) ? unit.labels.get(key) : key, exponent]));
   }
 
   function dimensionlessUnit() { return makeUnit(); }
@@ -61,8 +73,13 @@
     const out = cloneUnit(left);
     for (const [symbol, exponent] of right.powers.entries()) {
       const next = cleanExponent((out.powers.get(symbol) || 0) + direction * exponent);
-      if (next === 0) out.powers.delete(symbol);
-      else out.powers.set(symbol, next);
+      if (next === 0) {
+        out.powers.delete(symbol);
+        if (out.labels) out.labels.delete(symbol);
+      } else {
+        out.powers.set(symbol, next);
+        if (out.labels && !out.labels.has(symbol)) out.labels.set(symbol, right.labels && right.labels.get(symbol) ? right.labels.get(symbol) : symbol);
+      }
     }
     return out;
   }
@@ -74,7 +91,10 @@
     const out = makeUnit();
     for (const [symbol, value] of unit.powers.entries()) {
       const next = cleanExponent(value * exponent);
-      if (next !== 0) out.powers.set(symbol, next);
+      if (next !== 0) {
+        out.powers.set(symbol, next);
+        if (out.labels) out.labels.set(symbol, unit.labels && unit.labels.get(symbol) ? unit.labels.get(symbol) : symbol);
+      }
     }
     return out;
   }
@@ -103,8 +123,9 @@
     const positive = [];
     const negative = [];
     [...unit.powers.entries()].sort((a, b) => a[0].localeCompare(b[0])).forEach(([symbol, exponent]) => {
-      if (exponent > 0) positive.push(formatFactor(symbol, exponent));
-      else negative.push(formatFactor(symbol, exponent));
+      const displaySymbol = unit.labels && unit.labels.get(symbol) ? unit.labels.get(symbol) : symbol;
+      if (exponent > 0) positive.push(formatFactor(displaySymbol, exponent));
+      else negative.push(formatFactor(displaySymbol, exponent));
     });
     const numerator = positive.length ? positive.join("*") : "1";
     if (!negative.length) return numerator;
@@ -156,7 +177,7 @@
     }
     parse() {
       if (!this.expression) throw new UnitCheckError("Unit is not specified.", 0, this.expression);
-      if (DIMENSIONLESS_NAMES.has(this.expression) || this.expression === "1") return dimensionlessUnit();
+      if (DIMENSIONLESS_NAMES.has(this.expression.toLowerCase()) || this.expression === "1") return dimensionlessUnit();
       const value = this.parseProduct();
       if (this.tokens.current.type !== "eof") {
         this.tokens.fail("Expected '*' or '/' between unit symbols.", this.tokens.current.position);
@@ -194,7 +215,7 @@
       }
       if (token.type === "symbol") {
         this.tokens.next();
-        if (DIMENSIONLESS_NAMES.has(token.value)) return dimensionlessUnit();
+        if (DIMENSIONLESS_NAMES.has(String(token.value).toLowerCase())) return dimensionlessUnit();
         return makeUnit([[token.value, 1]]);
       }
       if (token.type === "(") {
