@@ -188,6 +188,57 @@ test('renderer prefers the established electronAPI.runs bridge', async () => {
   assert.deepEqual(context.lastExists, { modelPath: '/models/Test.ssd', runName: 'Base' });
 });
 
+test('desktop portable export passes the saved absolute model path to Electron', async () => {
+  const context = makeContext({ modelPath: '/models/Exercise 1.ssd' });
+  context.systemikaRuns = undefined;
+  let exportPath;
+  context.electronAPI = { runs: {
+    async exportPortable(modelPath) {
+      exportPath = modelPath;
+      if (!modelPath) throw new Error('The model must be saved before a simulation run can be stored.');
+      return { path: '/models/Exercise 1-with-runs.zip', runFiles: 2 };
+    },
+  } };
+  context.getElectronAPI = () => context.electronAPI;
+  loadScripts(context);
+  const result = await context.SystemikaRunManager.exportPortableModel();
+  assert.equal(exportPath, '/models/Exercise 1.ssd');
+  assert.equal(result.runFiles, 2);
+});
+
+test('web portable export remains compatible when passed a model filename', async () => {
+  const context = makeContext({ modelPath: 'Example.ssd', electron: false });
+  context.systemikaRuns = undefined;
+  const calls = [];
+  context.systemikaBrowserRuns = {
+    isSupported: () => true,
+    async exportPortable(filename) {
+      calls.push(filename);
+      return { runFiles: 1 };
+    },
+  };
+  loadScripts(context);
+  assert.equal((await context.SystemikaRunManager.exportPortableModel()).runFiles, 1);
+  assert.deepEqual(calls, ['Example.ssd']);
+});
+
+test('explicit Connect Model Folder opens picker even when folder is already connected', async () => {
+  const context = makeContext({ electron: false });
+  context.systemikaRuns = undefined;
+  let picked = 0;
+  const folder = { name: 'OldProject' };
+  context.fileManager.getRunStorageDirectoryHandle = () => folder;
+  context.fileManager.ensureRunStorageAccess = async ({ promptForDirectory }) => {
+    assert.equal(promptForDirectory, true);
+    picked++;
+    return { name: 'NewProject' };
+  };
+  context.systemikaBrowserRuns = { isSupported: () => true, async ensureAccess() {} };
+  loadScripts(context);
+  assert.equal(await context.SystemikaRunManager.locateRunsFolder(), true);
+  assert.equal(picked, 1);
+});
+
 
 test('Advance can snapshot partial results into the current named run without saving to disk', async () => {
   const context = makeContext({ exists: false, runName: 'Base' });

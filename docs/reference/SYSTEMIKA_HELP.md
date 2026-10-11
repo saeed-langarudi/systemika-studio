@@ -24,7 +24,9 @@ Flow definitions may evaluate to positive or negative values. Systemika does not
 | Save / Save As | Ctrl/Cmd+S / Ctrl/Cmd+Shift+S |
 | Undo / Redo | Ctrl/Cmd+Z / Ctrl/Cmd+Y |
 | Open equation/properties for selected model variable | Enter |
-| Mouse tool | M |
+| Mouse tool | Esc |
+| Move Valve | M |
+| Straighten Link | N |
 | Cut / Copy / Paste | Ctrl/Cmd+X / Ctrl/Cmd+C / Ctrl/Cmd+V |
 | Select all | Ctrl/Cmd+A |
 | Delete selection | Delete or Backspace |

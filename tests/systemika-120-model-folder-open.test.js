@@ -164,15 +164,70 @@ test('Connect Model Folder restores a matching file handle after standard file-i
   assert.ok(memory.get(manager.knownProjectFoldersKey).includes(correct));
 });
 
-test('Explicit Connect Model Folder still checks exact FileSystemHandle when one is present', async () => {
+test('Explicit Connect Model Folder rejects a different model when a handle is present', async () => {
   const { window, manager } = setup();
   const model = makeHandle();
-  const other = makeHandle();
+  const other = makeHandle('Example.ssd', MODEL_XML + '<!-- not the same model -->');
   manager.fileHandle = model;
   const unrelated = makeDirectory(new Map([[model.name, other]]));
   window.showDirectoryPicker = async () => unrelated;
   await assert.rejects(manager.ensureRunStorageAccess({ promptForDirectory: true }),
     err => err.code === 'WRONG_PROJECT_DIRECTORY');
+});
+
+test('Explicit folder change can switch to an identical saved model copy', async () => {
+  const { window, manager, memory } = setup();
+  const original = makeHandle();
+  const copied = makeHandle();
+  const oldFolder = makeDirectory(new Map([[original.name, original]]));
+  const newFolder = makeDirectory(new Map([[copied.name, copied]]));
+  oldFolder.name = 'PreviousProject';
+  newFolder.name = 'NewProject';
+  manager.fileHandle = original;
+  manager.fileName = original.name;
+  await manager.rememberProjectFolder(oldFolder);
+  let prompts = 0;
+  window.showDirectoryPicker = async opts => {
+    prompts++;
+    assert.equal(opts.startIn, original);
+    return newFolder;
+  };
+  assert.equal(await manager.ensureRunStorageAccess({ promptForDirectory: true }), newFolder);
+  assert.equal(prompts, 1);
+  assert.equal(manager.fileHandle, copied, 'saving subsequently targets the matching model copy');
+  assert.equal(manager.getRunStorageDirectoryHandle(), newFolder);
+  assert.equal(memory.get(manager.projectDirectoryStorageKey), newFolder);
+});
+
+test('Changing to a folder with different model contents is rejected without losing the old connection', async () => {
+  const { window, manager } = setup();
+  const original = makeHandle();
+  const wrong = makeHandle('Example.ssd', MODEL_XML + '<!-- different model -->');
+  const oldFolder = makeDirectory(new Map([[original.name, original]]));
+  const wrongFolder = makeDirectory(new Map([[wrong.name, wrong]]));
+  manager.fileHandle = original;
+  manager.fileName = original.name;
+  await manager.rememberProjectFolder(oldFolder);
+  window.showDirectoryPicker = async () => wrongFolder;
+  await assert.rejects(manager.ensureRunStorageAccess({ promptForDirectory: true }),
+    error => error.code === 'WRONG_PROJECT_DIRECTORY');
+  assert.equal(manager.fileHandle, original);
+  assert.equal(manager.getRunStorageDirectoryHandle(), oldFolder);
+});
+
+test('Cancelling folder change keeps an existing connected project folder', async () => {
+  const { window, manager } = setup();
+  const model = makeHandle();
+  const folder = makeDirectory(new Map([[model.name, model]]));
+  manager.fileHandle = model;
+  manager.fileName = model.name;
+  await manager.rememberProjectFolder(folder);
+  const cancelled = new Error('User cancelled');
+  cancelled.name = 'AbortError';
+  window.showDirectoryPicker = async () => { throw cancelled; };
+  await assert.rejects(manager.ensureRunStorageAccess({ promptForDirectory: true }),
+    error => error.name === 'AbortError');
+  assert.equal(manager.getRunStorageDirectoryHandle(), folder);
 });
 
 test('Cancel Open Model preserves the previously open model', async () => {

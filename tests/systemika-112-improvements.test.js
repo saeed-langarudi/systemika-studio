@@ -70,7 +70,7 @@ test('web/desktop build emits canonical WebApp-root release metadata from the ce
   assert.match(build, /JSON\.stringify\(\{ version, buildId, downloadUrl: UPDATE_DOWNLOAD_URL \}/);
   assert.match(read('.htaccess'), /svg\|png/);
   const manifest = JSON.parse(read('update.json'));
-  assert.equal(manifest.version, '1.2.0');
+  assert.equal(manifest.version, '1.3.0');
 });
 
 test('Calibration Save as Default gives visible saved state and becomes dirty on slider edits', () => {

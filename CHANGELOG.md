@@ -1,3 +1,55 @@
+## Systemika Studio 1.3.0 — Ghost and Lookup corrections (RC5, 2026-10-11)
+
+- Make Ghost symbols, including Lookup Ghosts, selectable across their SVG groups; retain selection via lifted Stock/Auxiliary label overlays.
+- Find Ghosts (Ctrl/Cmd+G) now works consistently from Lookup Ghosts as well as Stock, Flow, Auxiliary, and Constant Ghosts.
+- Exclude Ghost aliases from variable-name uniqueness checks: the original Lookup is editable even when Ghosts duplicate its name. Real model variables still cannot share names.
+- Direct Lookup Ghost editing opens the original Lookup, and Ghosts reflect edits and renamed sources.
+- Identify Flow and Constant Ghosts correctly in the top-left information bar.
+- Add all-type regression tests and a Ghost acceptance checklist. No `.ssd` or simulation-engine format changes.
+
+- View menu refinement: renamed Reset Zoom to Zoom 100% (Ctrl/Cmd+0) and placed it between Zoom Out and Zoom to Fit.
+## Systemika Studio 1.3.0 — plot tooltip, version display, and zoom refinements (RC3, 2026-10-10)
+
+- Plot value tooltips shift inside the plot near the right border instead of being clipped by the frame.
+- The menu bar displays the active model filename alongside the current Systemika Studio version.
+- View → Zoom to Fit (Ctrl/Cmd+9) fits visible model entities within the canvas viewport, rather than fitting the oversized empty drawing canvas.
+- View → Reset Zoom (Ctrl/Cmd+0) restores 100% zoom. Clear Outputs remains available through its existing toolbar button; Ctrl+0 is no longer assigned to Clear Outputs.
+- Browser-reserved shortcuts (notably Chrome's Ctrl+9 for the last tab) may override the webapp; the View menu command always remains available.
+- Added focused regression tests for zoom framing, tooltip edge placement, model version display, and shortcut labels. No model or run file format changes.
+
+## Systemika Studio 1.3.0 — Junction usability correction
+
+- Restore saved Bézier geometry before new junction rendering to prevent old models being redrawn with default handles.
+- Keep original endpoint curve handles active for junction-routed links.
+- Display all junctions when drawing a Link; Shift+L starts a branch when a Link is selected.
+- Show hollow circles for junctions with attached branches even when deselected.
+- Correct Link and keyboard help text.
+
+## Systemika Studio 1.3.0 — Junction-based link routing and forking (2026-10-10)
+
+- Added a junction count (+/−) to Link Properties. New hollow junction handles initially overlap at the middle of a link; select the link to reveal and drag them, deselect to hide them.
+- Junctions serve as draggable routing points and as possible origins of new branches. Every branch remains a conventional variable-to-variable causal Link and inherits the trunk's original source variable; junctions are graphical metadata only.
+- Junction geometry, branch references, and copy/paste coordinate and parent-ID remapping persist in `.ssd`. Deleting a parent trunk leaves the independent branch links intact, and removing in-use junctions is prevented. Existing links without junctions retain their saved geometry.
+- Straighten Link now keeps junctions and attached branches while aligning junctions on the straight link path.
+- **M** selects Move Valve and **N** selects Straighten Link. Mouse is now **Esc** rather than M; toolbar tooltips and shortcut help have been updated.
+- Added geometry/shortcut regression tests; see `docs/LINK_JUNCTIONS_1.3.0.md` for workflow and acceptance checks.
+- A headless Chromium canvas-interaction smoke test passed, but full website-hosted Chrome/Edge and desktop acceptance testing remains necessary before student distribution.
+
+## 1.2.1 — Selection-aware Equations panel (2026-10-10)
+
+- The Equations panel displays the whole model when no equation-bearing variable is selected.
+- Selecting one or more Stocks, Flows, Auxiliaries, Constants, or Lookups on the canvas displays only those variables' equations. Selecting a ghost displays its source variable; non-equation objects do not restrict the list.
+- Clearing the selection restores the whole-model listing; changes update live while Equations is open without resetting the selected equation form or sorting controls.
+- Equations TXT, CSV, and LaTeX exports match the currently displayed selection.
+- No changes to model equations, simulation engine, run files, or persistence.
+
+## Systemika Studio 1.2.0 — Run Manager and desktop portable-export correction (RC6, 2026-10-09)
+
+- **Change Model Folder** now opens the Chrome/Edge directory picker even when the model already has a valid Runs connection. A valid folder can contain the original model or an identical saved copy; the selected copy becomes the current save target. A mismatched folder is rejected without losing the existing connection, and canceling leaves it unchanged.
+- The Manage Runs dialog displays **Connect Model Folder** before authorization and **Change Model Folder** afterward. Its success, cancellation, and error messages remain visible instead of being cleared by a run-list refresh. The folder-change button is not shown in the desktop app, where the Runs location is derived from the saved model path.
+- Fixed **Export Model with Runs** in Electron: the renderer now passes the saved model path to the native ZIP export handler. Browser export remains unchanged. No run files or `.ssd` data are merged or relocated.
+- Added regression tests for switching, rejecting, and canceling browser folder changes and for the desktop and browser portable-export arguments.
+
 ## Systemika Studio 1.2.0 — Table SVG export (2026-10-09)
 
 - Added **Export SVG** to Table Output headers, alongside the existing **Export CSV**, using the same header button style as plots.
@@ -994,3 +1046,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Keyboard and selection refinement
 Enter now applies the Time Unit dialog and opens the equation/properties editor for one selected model variable when used on the canvas. M selects the Mouse tool. Undo/Redo and Mouse tooltips show their shortcuts. Attached Flow endpoint anchors use staged selection: a first click in a Stock selects the Stock; select the Flow first (for example via its valve) before selecting an attached endpoint for detaching or repositioning.
+
+### 1.3.0 RC6 — Lookup Ghost link recovery
+- Prevent an outgoing Link from overwriting a Lookup Ghost's original source ID with `Time`.
+- Recover uniquely identifiable legacy Ghost associations while preserving unresolvable Ghost and Link records.
+- Resolve Ghost aliases to original valued variables in linked-primitive autocomplete.
+- Add regression tests and recovery documentation.
+
+### 1.3.0 RC7 — Plot Range dialog keyboard confirmation
+- Pressing Enter in the plot variable Range dialog now applies its scale settings and closes it, just like clicking Apply.
+- Invalid minimum/maximum limits keep the dialog open and display the existing validation warning.
+- Automatic range, Cancel, and other plot settings are unchanged.

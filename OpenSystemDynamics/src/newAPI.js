@@ -151,12 +151,13 @@ function propogateGhosts(cell) {
 	Returns false if taken, and true if free
 
 */
-function isNameFree(newName, exepctionId) {
-	let prims = primitives();
-	for(let prim of prims) {
-		let name = getName(prim);
-		let id = prim.id;
-		if (newName === name && exepctionId !== id) {
+function isNameFree(newName, exceptionId) {
+	// Ghosts are visual aliases: they deliberately carry the same name as their
+	// source and must not reserve a second model-variable name. Otherwise a
+	// Lookup (or any other model entity) becomes uneditable after ghosting.
+	for (const prim of primitives()) {
+		if (!prim || getType(prim) === "Ghost") continue;
+		if (String(getName(prim)) === String(newName) && String(prim.id) !== String(exceptionId)) {
 			return false;
 		}
 	}
@@ -225,6 +226,9 @@ function getLinkedPrimitives(primitive) {
 	let seen = new Set();
 
 	function add(item) {
+		// Link endpoints may be graphical Ghosts. Equation autocomplete must
+		// reference the original valued entity, not the Ghost alias.
+		item = orig(item);
 		if (!item) return;
 		let itemId = getID(item);
 		if (itemId == null || seen.has(String(itemId))) return;

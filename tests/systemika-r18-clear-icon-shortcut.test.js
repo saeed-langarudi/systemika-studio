@@ -7,14 +7,15 @@ const root = path.resolve(__dirname, '..');
 const indexHtml = fs.readFileSync(path.join(root, 'OpenSystemDynamics/src/index.html'), 'utf8');
 const editorJs = fs.readFileSync(path.join(root, 'OpenSystemDynamics/src/editor.js'), 'utf8');
 
-test('Clear Outputs uses the supplied eraser asset and exact tooltip', () => {
-  assert.match(indexHtml, /id="btn_clear"[^>]*data-title="Clear Outputs \(Ctrl\+0\)"[^>]*aria-label="Clear Outputs"/);
+test('Clear Outputs preserves the eraser asset and no longer reserves Ctrl+0', () => {
+  assert.match(indexHtml, /id="btn_clear"[^>]*data-title="Clear Outputs"[^>]*aria-label="Clear Outputs"/);
   assert.match(indexHtml, /id="btn_clear"[\s\S]*?<img src="graphics\/eraser\.svg"/);
   assert.ok(fs.existsSync(path.join(root, 'OpenSystemDynamics/src/graphics/eraser.svg')));
 });
 
-test('Ctrl+0 triggers Clear Outputs and Reset Zoom no longer advertises that shortcut', () => {
-  assert.match(editorJs, /if \(event\.key === "0"\) \{[\s\S]*?ClearTool\.enterTool\(\);[\s\S]*?return;/);
-  assert.doesNotMatch(indexHtml, /id="btn_zoom_reset"[^>]*>[\s\S]*?Ctrl 0[\s\S]*?<\/button>/);
-  assert.match(indexHtml, /id="btn_zoom_reset">Reset Zoom<\/button>/);
+test('Ctrl+0 resets zoom, and Ctrl+9 fits the diagram', () => {
+  assert.match(editorJs, /if \(event\.key === "0"\) \{[\s\S]*?Zoom\.zoomReset\(\);[\s\S]*?return;/);
+  assert.match(editorJs, /if \(event\.key === "9"\) \{[\s\S]*?Zoom\.zoomToFit\(\);[\s\S]*?return;/);
+  assert.match(indexHtml, /id="btn_zoom_reset">Zoom 100% <span class="shortcut">Ctrl 0<\/span><\/button>/);
+  assert.match(indexHtml, /id="btn_zoom_fit">Zoom to Fit <span class="shortcut">Ctrl 9<\/span><\/button>/);
 });

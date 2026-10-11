@@ -317,14 +317,15 @@
   }
 
   async function locateRunsFolder() {
-    if (!await ensureSavedModel()) return false;
+    // Invoke the directory picker directly from the button's user gesture.
+    // In particular, do not wait on IndexedDB or an existing-folder check:
+    // doing so can consume Chromium's transient user activation.
+    if (typeof fileManager === 'undefined' || !fileManager.fileName) {
+      if (!await ensureSavedModel()) return false;
+    }
     const api = getRunsAPI();
     if (!api || typeof api.ensureAccess !== 'function') return true; // Desktop uses the model path.
-    // Keep an existing valid project directory. Do not clear it just because
-    // a user clicked the recovery action; otherwise every click forces a picker.
     const manager = typeof fileManager !== 'undefined' ? fileManager : null;
-    const existing = manager && manager.getRunStorageDirectoryHandle && manager.getRunStorageDirectoryHandle();
-    if (existing && manager.directoryContainsCurrentModel && await manager.directoryContainsCurrentModel(existing)) return true;
     if (!manager || typeof manager.ensureRunStorageAccess !== 'function') return false;
     try {
       await manager.ensureRunStorageAccess({ promptForDirectory: true });
@@ -345,14 +346,14 @@
     const api = getRunsAPI();
     if (!api) throw new Error('Persistent run storage is unavailable.');
     if (typeof api.exportPortable === 'function') {
-      await api.exportPortable();
-      return;
+      // Electron requires the actual saved model path. Browser storage ignores
+      // this extra argument and uses its own selected file handle.
+      return await api.exportPortable(fileManager.fileName);
     }
     if (typeof root.getElectronAPI === 'function') {
       const electron = root.getElectronAPI();
       if (electron && electron.runs && electron.runs.exportPortable) {
-        await electron.runs.exportPortable(fileManager.fileName);
-        return;
+        return await electron.runs.exportPortable(fileManager.fileName);
       }
     }
     throw new Error('Portable export is not available in this environment.');

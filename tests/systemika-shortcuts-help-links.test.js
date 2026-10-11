@@ -67,11 +67,11 @@ test('Time Unit Enter uses the common Apply path and canvas Enter opens a select
 });
 
 test('Mouse, Undo, and Redo toolbar tooltips expose keyboard shortcuts', () => {
-  assert.match(html, /id="btn_mouse"[^>]*data-title="Mouse \(M\)"/);
+  assert.match(html, /id="btn_mouse"[^>]*data-title="Mouse \(Esc\)"/);
   assert.match(html, /id="btn_undo"[^>]*data-title="Undo \(Ctrl\+Z\)"/);
   assert.match(html, /id="btn_redo"[^>]*data-title="Redo \(Ctrl\+Y\)"/);
-  assert.match(editor, /if \(key === "m"\)[\s\S]{0,120}ToolBox\.setTool\("mouse"\)/);
-  assert.match(help, /\| Mouse tool \| M \|/);
+  assert.match(editor, /if \(event\.key === "Escape"\)[\s\S]{0,120}ToolBox\.setTool\("mouse"\)/);
+  assert.match(help, /\| Mouse tool \| Esc \|/);
 });
 
 test('attached flow endpoints require their flow to be selected before the endpoint can steal a stock click', () => {

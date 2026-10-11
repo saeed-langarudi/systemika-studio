@@ -243,6 +243,11 @@ class BaseFileManager {
     if (name) name = String(name).split(/[\\/]/).pop();
     display.textContent = name || "Untitled model";
     display.title = name || "Untitled model";
+    const versionLabel = document.getElementById("systemika-version-label");
+    if (versionLabel && typeof systemika !== "undefined" && systemika.version) {
+      versionLabel.textContent = `v${systemika.version}`;
+      versionLabel.title = `Systemika Studio ${systemika.version}`;
+    }
   }
   updateTitle() {
     this.updateModelNameDisplay();
@@ -678,9 +683,24 @@ class WebFileManagerModern extends BaseFileManager {
     let recoveredHandle = null;
     if (this.fileHandle) {
       if (!await this.directoryContainsCurrentModel(directoryHandle)) {
-        const error = new Error(`The selected folder does not contain the currently open model (${this.fileHandle.name}). Select that model's containing folder.`);
-        error.code = "WRONG_PROJECT_DIRECTORY";
-        throw error;
+        // The user may deliberately switch to another folder containing a
+        // copy of the same model. A filename match alone is insufficient:
+        // check the actual saved bytes before switching the working file.
+        try {
+          const candidate = await directoryHandle.getFileHandle(this.fileHandle.name, { create: false });
+          const [previousFile, candidateFile] = await Promise.all([
+            this.fileHandle.getFile(), candidate.getFile(),
+          ]);
+          if (await this.fingerprintContents(await previousFile.text()) ===
+              await this.fingerprintContents(await candidateFile.text())) {
+            recoveredHandle = candidate;
+          }
+        } catch (_) { /* Missing or inaccessible model; reject below. */ }
+        if (!recoveredHandle) {
+          const error = new Error(`The selected folder must contain the same saved model (${this.fileHandle.name}). Select its containing folder, not the Runs subfolder. Other models cannot share this connection.`);
+          error.code = "WRONG_PROJECT_DIRECTORY";
+          throw error;
+        }
       }
     } else {
       try {
@@ -694,6 +714,12 @@ class WebFileManagerModern extends BaseFileManager {
         error.code = "WRONG_PROJECT_DIRECTORY";
         throw error;
       }
+      await this.setFileHandle(recoveredHandle);
+    }
+
+    // A successfully matched copy becomes the working model's save target;
+    // do not leave a valid run folder paired with a different model file.
+    if (this.fileHandle && recoveredHandle && this.fileHandle !== recoveredHandle) {
       await this.setFileHandle(recoveredHandle);
     }
 

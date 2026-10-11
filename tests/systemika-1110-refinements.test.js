@@ -20,8 +20,8 @@ function fileMenuMarkup() {
   return index.slice(start, end);
 }
 
-test('1.2.0 shows the current model name in the model window', () => {
-  assert.equal(pkg.version, '1.2.0');
+test('1.3.0 shows the current model name in the model window', () => {
+  assert.equal(pkg.version, '1.3.0');
   assert.match(index, /id="current-model-name" class="current-model-name"/);
   assert.match(css, /\.current-model-name\s*\{/);
   assert.match(environment, /updateModelNameDisplay\(\)/);

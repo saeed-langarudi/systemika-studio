@@ -596,7 +596,10 @@ class InfoBar {
 
 				// Make first letter uppercase
 				// let Type = type.charAt(0).toUpperCase() + type.slice(1);
-				let Type = type_basename[type];
+				// Flow and Constant Ghosts use the ordinary circular VariableVisual
+				// for rendering. The InfoBar must report the source's *real* entity
+				// type rather than misidentifying both as Auxiliaries.
+				let Type = selected.is_ghost ? systemikaTypeName(primitive) : type_basename[type];
 				switch (type) {
 					case "numberbox":
 						let targetName = `${getName(findID(selected.primitive.getAttribute("Target")))}`
@@ -623,6 +626,11 @@ class InfoBar {
 			$(this.infoDefinitionElement).find(".CodeMirror").removeClass("cm-comment")
 			this.cmInfoDef.setValue(`${selected_array.length} objects selected`);
 			this.infoDE.html("");
+		}
+		// Keep the Equations view synchronized with canvas selection without
+		// replacing its form/sort controls on every ordinary InfoBar update.
+		if (typeof window !== "undefined" && window.SystemikaOutputDock) {
+			window.SystemikaOutputDock.refreshEquationsForSelection();
 		}
 	}
 }
@@ -1313,11 +1321,29 @@ class OnePointer extends BaseObject {
 
 		this.update();
 
-		for (let key in this.element_array) {
-			let element = this.element_array[key];
-			$(element).on("mousedown", (event) => {
+		if (this.is_ghost) {
+			// A Ghost is a single selectable model alias, including its symbol and
+			// overlaid icon. Delegating selection from the entire SVG group avoids
+			// gaps in the hit area of Lookup/Converter hexagons and ensures the
+			// same selection and Find Ghosts behavior for every Ghost type.
+			this.group.setAttribute("pointer-events", "all");
+			$(this.group).on("mousedown", (event) => {
 				primitive_mousedown(this.id, event);
 			});
+			// Stock/Auxiliary Ghost names are moved to a separate overlay layer,
+			// outside the group. Keep those names selectable as well.
+			if (this.name_overlay_group && this.name_element) {
+				$(this.name_element).on("mousedown", (event) => {
+					primitive_mousedown(this.id, event);
+				});
+			}
+		} else {
+			for (let key in this.element_array) {
+				let element = this.element_array[key];
+				$(element).on("mousedown", (event) => {
+					primitive_mousedown(this.id, event);
+				});
+			}
 		}
 		$(this.group).dblclick((event) => {
 			if (!$(event.target).hasClass("name_element")) {
@@ -1919,6 +1945,11 @@ class ConverterVisual extends BasePrimitive {
 		return [xEdge, yEdge];
 	}
 	attachEvent() {
+		// A Lookup Ghost uses Source to identify its original Lookup, NOT the
+		// input of a numerical Lookup. A causal Link starting from a Ghost calls
+		// attachEvent() on its source. Updating Source here would overwrite its
+		// original's id with "Time" and permanently break saved Ghosts.
+		if (this.is_ghost || getType(this.primitive) === "Ghost") return;
 		// A Lookup's input is defined only by its single incoming Link. Outgoing
 		// Links must never change the Lookup source. When the incoming Link is
 		// removed, the Lookup falls back to Time.
@@ -3526,6 +3557,7 @@ const SystemikaOutputDock = {
 			equationList.dialogContent = view;
 			view.innerHTML = equationList.renderPanelHtml();
 			equationList.bindPanelEvents();
+			this._equationsSelectionKey = equationList.selectionKey();
 		} else view.innerHTML = `<div style="padding:12px;">Model equations will appear here.</div>`;
 		this.refreshSelector();
 	},
@@ -3687,6 +3719,17 @@ const SystemikaOutputDock = {
 
 	refreshEquationsIfVisible() {
 		if (this.activeType === "equations" && !this._hidden) this.showEquations(false);
+	},
+
+	refreshEquationsForSelection() {
+		if (this.activeType !== "equations" || this._hidden ||
+			typeof equationList === "undefined" || !equationList) return;
+		let key = equationList.selectionKey();
+		if (key === this._equationsSelectionKey) return;
+		this._equationsSelectionKey = key;
+		// Only redraw the preview; leave equation form, sort controls and
+		// their focus untouched as the user changes the canvas selection.
+		equationList.updatePreview();
 	}
 };
 if (typeof window !== "undefined") window.SystemikaOutputDock = SystemikaOutputDock;
@@ -4210,6 +4253,31 @@ function plotBottomLegendOptions(show = true) {
 	return options;
 }
 
+// jqPlot always positions a north-east highlighter tooltip to the right of
+// the point. Near the right border, the tooltip can be obscured by the plot
+// frame or clipped by its scrolling panel. Shift it left, within the chart.
+function keepSystemikaPlotTooltipVisible(chartDiv) {
+    if (!chartDiv || chartDiv.dataset.systemikaTooltipClamp === "true") return;
+    chartDiv.dataset.systemikaTooltipClamp = "true";
+    chartDiv.addEventListener("mousemove", () => {
+        const tooltip = chartDiv.querySelector(".jqplot-highlighter-tooltip");
+        if (!tooltip || tooltip.style.display === "none") return;
+        const x = parseFloat(tooltip.style.left);
+        const width = tooltip.offsetWidth;
+        const chartWidth = chartDiv.clientWidth;
+        if (!Number.isFinite(x) || !width || !chartWidth) return;
+        const margin = 5;
+        if (x + width > chartWidth - margin) {
+            // Prefer the opposite side of the highlighted point; always
+            // clamp within the plot for exceptionally wide value labels.
+            const alternate = x - width - 12;
+            tooltip.style.left = `${Math.max(margin, Math.min(alternate, chartWidth - width - margin))}px`;
+        } else if (x < margin) {
+            tooltip.style.left = `${margin}px`;
+        }
+    });
+}
+
 let systemikaDetachedPlotStageCounter = 0;
 function renderSystemikaJqPlot(chartDiv, series, options) {
 	if (!chartDiv || !chartDiv.id) throw new Error("No Systemika plot target specified");
@@ -4221,7 +4289,9 @@ function renderSystemikaJqPlot(chartDiv, series, options) {
 	// detached chart. Event handlers are attached to those same DOM nodes and
 	// therefore remain interactive after adoption.
 	if (!chartDiv.ownerDocument || chartDiv.ownerDocument === document) {
-		return $.jqplot(chartDiv.id, series, options);
+		const plot = $.jqplot(chartDiv.id, series, options);
+		keepSystemikaPlotTooltipVisible(chartDiv);
+		return plot;
 	}
 
 	let stage = document.createElement("div");
@@ -4240,6 +4310,7 @@ function renderSystemikaJqPlot(chartDiv, series, options) {
 		while (stage.firstChild) chartDiv.appendChild(stage.firstChild);
 		chartDiv.classList.add("jqplot-target");
 		chartDiv.style.position = "relative";
+		keepSystemikaPlotTooltipVisible(chartDiv);
 		if (plot) {
 			plot.target = $(chartDiv);
 			plot.targetId = `#${chartDiv.id}`;
@@ -6686,6 +6757,41 @@ function setInformationLinksVisible(visible) {
 	updateInformationLinksMenuButton();
 }
 
+// Junction geometry is presentation metadata only. Causal graph edges always
+// connect source and destination model variables, never junctions.
+// Unlike a normal Bézier handle, a junction is always shown as a hollow circle,
+// including while selected or hovered. The larger invisible hit target makes
+// overlapping junctions easier to separate without enlarging the visible mark.
+class LinkJunctionAnchor extends AnchorPoint {
+	getImage() {
+		return [
+			SVG.circle(0, 0, 10, "none", "transparent", "junction-hit", {"pointer-events": "all"}),
+			SVG.circle(0, 0, 5, this.color, "white", "element", {"pointer-events": "all"}),
+			SVG.circle(0, 0, 7, this.color, "none", "highlight", {"pointer-events": "none"})
+		];
+	}
+}
+function getLinkJunctionMetadata(primitive) {
+	if (!primitive) return [];
+	return SystemikaLinkJunctions.parse(primitive.getAttribute("SystemikaJunctions"));
+}
+function findLinkJunction(parentId, junctionId) {
+	let visual = connection_array[String(parentId)];
+	if (!visual || visual.type !== "link") return null;
+	return (visual.junctionAnchors || []).find(anchor => String(anchor.junctionId) === String(junctionId)) || null;
+}
+function getLinkBranchOrigin(primitive) {
+	if (!primitive) return null;
+	let parentId = primitive.getAttribute("SystemikaJunctionParent");
+	let junctionId = primitive.getAttribute("SystemikaJunctionId");
+	if (!parentId || !junctionId || String(parentId) === String(getID(primitive))) return null;
+	let parent = connection_array[String(parentId)];
+	let anchor = findLinkJunction(parentId, junctionId);
+	if (!parent || !anchor || !parent.getStartAttach || !parent.getStartAttach()) return null;
+	// Guard against stale/corrupt references and source changes.
+	if (!primitive.source || String(primitive.source.id) !== String(parent.getStartAttach().id)) return null;
+	return anchor.getPos();
+}
 class LinkVisual extends BaseConnection {
 	constructor(id, type, pos0, pos1) {
 		super(id, type, pos0, pos1);
@@ -6696,6 +6802,7 @@ class LinkVisual extends BaseConnection {
 	}
 
 	createInitialAnchors(pos0, pos1) {
+		this.junctionAnchors = [];
 		// Used to keep a local coordinate system between start- and endAnchor
 		// startLocal = [0,0], endLocal = [1,0]
 		this.b1Local = [0.3, 0.0];
@@ -6709,9 +6816,103 @@ class LinkVisual extends BaseConnection {
 	}
 
 	getAnchors() {
-		return [this.start_anchor, this.b1_anchor, this.b2_anchor, this.end_anchor];
+		return [this.start_anchor, this.b1_anchor, this.b2_anchor, ...this.junctionAnchors, this.end_anchor];
 	}
 
+	loadJunctions() {
+		for (let anchor of this.junctionAnchors) {
+			anchor.clearImage();
+			delete object_array[anchor.id];
+		}
+		this.junctionAnchors = [];
+		for (let item of getLinkJunctionMetadata(this.primitive)) {
+			let anchor = new LinkJunctionAnchor(`${this.id}.junction_${item.id}`, "dummy_anchor", [item.x, item.y], "junction");
+			anchor.junctionId = item.id;
+			anchor.setColor(this.color || "black");
+			anchor.setVisible(false);
+			this.junctionAnchors.push(anchor);
+		}
+		// syncVisual restores the saved Bézier handles after loading junctions.
+		// Do not render yet: doing so can overwrite legacy curved geometry.
+	}
+	persistJunctions() {
+		this.primitive.setAttribute("SystemikaJunctions", SystemikaLinkJunctions.serialize(
+			this.junctionAnchors.map(anchor => ({ id: anchor.junctionId, x: anchor.getPos()[0], y: anchor.getPos()[1] }))
+		));
+	}
+	getJunctionCount() { return this.junctionAnchors.length; }
+	// In-use fork nodes stay visible; all junctions are available while drawing
+	// Links, including those on trunks which are not currently selected.
+	refreshJunctionVisibility() {
+		let drawing = typeof currentTool !== "undefined" && currentTool === LinkTool;
+		let visibleLink = !this.isInformationLink() || informationLinksVisible;
+		for (let anchor of this.junctionAnchors) {
+			let branched = Object.values(connection_array).some(link => link !== this && link.type === "link" && link.primitive &&
+				link.primitive.getAttribute("SystemikaJunctionParent") === String(this.id) &&
+				link.primitive.getAttribute("SystemikaJunctionId") === String(anchor.junctionId));
+			anchor.setVisible(visibleLink && (this.selected || drawing || branched));
+		}
+	}
+	setJunctionCount(requestedCount) {
+		let count = Math.max(0, Math.min(40, Math.floor(Number(requestedCount) || 0)));
+		if (count === this.junctionAnchors.length) return true;
+		if (count < this.junctionAnchors.length) {
+			let removed = this.junctionAnchors.slice(count);
+			let inUse = removed.some(anchor => Object.values(connection_array).some(link => link.type === "link" &&
+				link !== this && link.primitive.getAttribute("SystemikaJunctionParent") === String(this.id) &&
+				link.primitive.getAttribute("SystemikaJunctionId") === String(anchor.junctionId)));
+			if (inUse) return false;
+			for (let anchor of removed) {
+				anchor.clearImage();
+				delete object_array[anchor.id];
+			}
+			this.junctionAnchors.length = count;
+		}
+		let used = new Set(this.junctionAnchors.map(anchor => String(anchor.junctionId)));
+		let nextId = 1;
+		while (this.junctionAnchors.length < count) {
+			while (used.has(String(nextId))) nextId++;
+			let id = String(nextId++);
+			used.add(id);
+			let midway = SystemikaLinkJunctions.midpoint(
+				this.start_anchor.getPos(), this.b1_anchor.getPos(), this.b2_anchor.getPos(), this.end_anchor.getPos()
+			);
+			let anchor = new LinkJunctionAnchor(`${this.id}.junction_${id}`, "dummy_anchor", midway, "junction");
+			anchor.junctionId = id;
+			anchor.setColor(this.color || "black");
+			anchor.setVisible(false);
+			this.junctionAnchors.push(anchor);
+		}
+		this.persistJunctions();
+		this.update();
+		if (this.selected) this.select();
+		else this.refreshJunctionVisibility();
+		return true;
+	}
+	setJunctionPosition(anchor, position) {
+		if (!this.junctionAnchors.includes(anchor)) return;
+		anchor.setPos(position);
+		this.persistJunctions();
+		this.update();
+	}
+	updateJunctionBranches() {
+		for (let link of Object.values(connection_array)) {
+			if (link !== this && link.type === "link" && link.primitive &&
+				link.primitive.getAttribute("SystemikaJunctionParent") === String(this.id)) link.update();
+		}
+	}
+	renderJunctionCurve() {
+		if (!this.curve || !this.click_area || !this.junctionAnchors.length) return;
+		let waypoints = [this.start_anchor.getPos(), ...this.junctionAnchors.map(a => a.getPos()), this.end_anchor.getPos()];
+		let path = SystemikaLinkJunctions.path(waypoints, this.b1_anchor.getPos(), this.b2_anchor.getPos());
+		this.curve.setAttribute("d", path);
+		// An open spline with a transparent fill implicitly closes across the
+		// diagram and steals clicks inside that polygon. Limit hit testing to
+		// the 10px stroke around the actual link instead.
+		this.click_area.setAttribute("d", path);
+		this.click_area.setAttribute("fill", "none");
+		this.click_area.setAttribute("pointer-events", "stroke");
+	}
 	worldToLocal(worldPos) {
 		// localPos(worldPos) = inv(S)*inv(R)*inv(T)*worldPos
 		let origoWorld = this.start_anchor.getPos();
@@ -6756,6 +6957,7 @@ class LinkVisual extends BaseConnection {
 		for (let element of this.showOnlyOnSelect) {
 			element.setAttribute("visibility", "hidden");
 		}
+		this.refreshJunctionVisibility();
 		refreshSelectionStacking();
 	}
 	select(selectChildren = true) {
@@ -6772,17 +6974,18 @@ class LinkVisual extends BaseConnection {
 		}
 
 		if (selectChildren) {
-			// This for loop is partly redundant and should be integrated in later code
 			for (let anchor of this.getAnchors()) {
 				anchor.select();
 				anchor.setVisible(true);
 			}
 		}
 
-		// Show beizer lines
+		// Endpoint Bézier handles remain active with junctions so both mount
+		// positions and the incoming/outgoing link directions are adjustable.
 		for (let element of this.showOnlyOnSelect) {
 			element.setAttribute("visibility", "visible");
 		}
+		this.refreshJunctionVisibility();
 		refreshSelectionStacking();
 	}
 	updateClickArea() {
@@ -6795,6 +6998,7 @@ class LinkVisual extends BaseConnection {
 		this.click_area.x4 = this.curve.x4;
 		this.click_area.y4 = this.curve.y4;
 		this.click_area.update();
+		this.renderJunctionCurve();
 	}
 
 	isAcceptableStartAttach(attachVisual) {
@@ -6851,7 +7055,8 @@ class LinkVisual extends BaseConnection {
 	}
 
 	clean() {
-		// remove end_attach to make sure end_attach value error is updated
+		// Orphaned branches remain real causal links; they simply fall back to
+		// drawing from their original source variable when the trunk is removed.
 		this.setEndAttach(null);
 		super.clean();
 	}
@@ -6871,6 +7076,7 @@ class LinkVisual extends BaseConnection {
 		this.end_anchor.setColor(color);
 		this.b1_anchor.setColor(color);
 		this.b2_anchor.setColor(color);
+		for (let anchor of this.junctionAnchors) anchor.setColor(color);
 		this.b1_line.setAttribute("stroke", color);
 		this.b2_line.setAttribute("stroke", color);
 	}
@@ -6976,10 +7182,19 @@ class LinkVisual extends BaseConnection {
 		if (!obj1 || !obj2) {
 			return;
 		}
-		this.start_anchor.setPos(obj1.getLinkMountPos(obj2.getPos()));
+		this.start_anchor.setPos(getLinkBranchOrigin(this.primitive) || obj1.getLinkMountPos(obj2.getPos()));
 		this.end_anchor.setPos(obj2.getLinkMountPos(obj1.getPos()));
 		this.resetBezier1();
 		this.resetBezier2();
+		// Straightening must retain junction IDs and their branches, while
+		// positioning the junctions on the direct line between endpoints.
+		let [x1, y1] = this.start_anchor.getPos();
+		let [x2, y2] = this.end_anchor.getPos();
+		this.junctionAnchors.forEach((anchor, index) => {
+			let fraction = (index + 1) / (this.junctionAnchors.length + 1);
+			anchor.setPos([x1 + fraction * (x2 - x1), y1 + fraction * (y2 - y1)]);
+		});
+		if (this.junctionAnchors.length) this.persistJunctions();
 		this.update();
 	}
 	resetBezier1() {
@@ -7052,6 +7267,7 @@ class LinkVisual extends BaseConnection {
 		this.curve.x4 = this.endX;
 		this.curve.y4 = this.endY;
 		this.curve.update();
+		this.updateClickArea();
 		this.updatePolarityLabel();
 	}
 	update() {
@@ -7064,7 +7280,7 @@ class LinkVisual extends BaseConnection {
 		if (this.getStartAttach() != null && this.start_anchor != null) {
 			if (this.getStartAttach().getPos) {
 				let oldPos = this.start_anchor.getPos();
-				let newPos = this.getStartAttach().getLinkMountPos(this.b1_anchor.getPos());
+				let newPos = getLinkBranchOrigin(this.primitive) || this.getStartAttach().getLinkMountPos(this.b1_anchor.getPos());
 				// If start point have moved reset b1
 				if (oldPos[0] != newPos[0] || oldPos[1] != newPos[1]) {
 					this.start_anchor.setPos(newPos);
@@ -7085,6 +7301,7 @@ class LinkVisual extends BaseConnection {
 		// update anchors
 		this.getAnchors().map(anchor => anchor.updatePosition());
 		this.updateGraphics();
+		if (this.junctionAnchors.length) this.updateJunctionBranches();
 		this.updateInformationLinkPresentation();
 	}
 	keepRelativeHandlePositions() {
@@ -7791,6 +8008,22 @@ class TwoPointerTool extends BaseTool {
 		// Example: this.current_connection = new FlowVisual(this.primitive.id,this.getType(),[x,y]);
 	}
 	static leftMouseDown(x, y) {
+		let junctionSource = null;
+		if (this === LinkTool) {
+			// All junctions are available when the Link tool is active;
+			// selection is not required. Hidden information links stay excluded.
+			for (let link of Object.values(connection_array)) {
+				if (link.type !== "link" || !link.getStartAttach() ||
+					(link.isInformationLink() && !informationLinksVisible)) continue;
+				for (let anchor of link.junctionAnchors || []) {
+					if (distance(anchor.getPos(), [x, y]) <= 9) {
+						junctionSource = { link, anchor, source: link.getStartAttach() };
+						break;
+					}
+				}
+				if (junctionSource) break;
+			}
+		}
 		unselect_all();
 		this.advanceBeforeIds = RunResults.isAdvanceActive() ? advanceStructureIds() : null;
 
@@ -7803,8 +8036,14 @@ class TwoPointerTool extends BaseTool {
 
 		// subscribes to stored model-position changes so they can be saved
 		this.primitive.subscribePosition(this.current_connection.positionUpdateHandler);
-		if (start_element != null && this.current_connection.getStartAttach) {
-			this.current_connection.setStartAttach(get_parent(start_element));
+		if (this.current_connection.getStartAttach) {
+			if (junctionSource && this.current_connection.setStartAttach(junctionSource.source) !== false) {
+				this.primitive.setAttribute("SystemikaJunctionParent", String(junctionSource.link.id));
+				this.primitive.setAttribute("SystemikaJunctionId", String(junctionSource.anchor.junctionId));
+				this.current_connection.start_anchor.setPos(junctionSource.anchor.getPos());
+			} else if (start_element != null) {
+				this.current_connection.setStartAttach(get_parent(start_element));
+			}
 		}
 		this.current_connection.setName(primitive_name);
 
@@ -8316,6 +8555,10 @@ class LinkTool extends TwoPointerTool {
 			let parent = connection_array[get_parent_id(node_id)];
 			parent.setHandle2Pos([x, y]);
 			parent.update();
+		} else if (anchor_type.startsWith("junction_")) {
+			let parent = connection_array[get_parent_id(node_id)];
+			let anchor = object_array[node_id];
+			if (parent && anchor) parent.setJunctionPosition(anchor, [x, y]);
 		}
 	}
 	static mouseRelativeMoveSingleAnchor(diff_x, diff_y, shiftKey, move_node_id) {
@@ -8348,6 +8591,9 @@ class LinkTool extends TwoPointerTool {
 		mouse.lastClickedPrimitive = null;
 		if (this.rightClickMode === false) {
 			ToolBox.setTool("mouse");
+		}
+		for (let connection of Object.values(connection_array)) {
+			if (connection.type === "link" && connection.refreshJunctionVisibility) connection.refreshJunctionVisibility();
 		}
 	}
 	static getType() {
@@ -8499,6 +8745,16 @@ class RectSelector {
 function tool_deletePrimitive(id) {
 	let primitive = findID(id);
 
+	// Deleting a graphical trunk must not delete its independent causal
+	// branches. They become ordinary direct links to the same source variable.
+	if (primitive && getType(primitive) === "Link") {
+		for (let child of primitives("Link")) {
+			if (String(child.getAttribute("SystemikaJunctionParent")) === String(id)) {
+				child.value.removeAttribute("SystemikaJunctionParent");
+				child.value.removeAttribute("SystemikaJunctionId");
+			}
+		}
+	}
 	removePrimitive(primitive);
 
 	// Delete ghosts
@@ -8924,6 +9180,33 @@ class Zoom {
 		else this.setLevel(1);
 	}
 
+	// Fit model entities (not the much larger fixed canvas) into the workspace.
+	// Include every primitive/output with a valid bounding box, not only the
+	// selected subset, so this always acts as a whole-model overview.
+	static zoomToFit() {
+		const view = this.view;
+		if (!view || !view.clientWidth || !view.clientHeight) return;
+		const objects = typeof get_root_objects === "function" ? Object.values(get_root_objects()) : [];
+		const bounds = objects.map((object) => {
+			try { return typeof object.getBoundRect === "function" ? object.getBoundRect() : null; }
+			catch (_) { return null; }
+		}).filter((rect) => rect && [rect.minX, rect.maxX, rect.minY, rect.maxY].every(Number.isFinite)
+			&& rect.minX <= rect.maxX && rect.minY <= rect.maxY);
+		if (!bounds.length) { this.zoomReset(); return; }
+		const minX = Math.max(0, Math.min(...bounds.map(b => b.minX)) - 70);
+		const minY = Math.max(0, Math.min(...bounds.map(b => b.minY)) - 70);
+		const maxX = Math.min(CANVAS_WIDTH, Math.max(...bounds.map(b => b.maxX)) + 70);
+		const maxY = Math.min(CANVAS_HEIGHT, Math.max(...bounds.map(b => b.maxY)) + 70);
+		const width = Math.max(1, maxX - minX);
+		const height = Math.max(1, maxY - minY);
+		const level = Math.min(this.MAX, Math.max(this.minLevel(),
+			Math.min((view.clientWidth - 32) / width, (view.clientHeight - 32) / height)));
+		this.level = level;
+		this.apply();
+		view.scrollLeft = ((minX + maxX) / 2) * level - view.clientWidth / 2;
+		view.scrollTop = ((minY + maxY) / 2) * level - view.clientHeight / 2;
+	}
+
 	// Zoom around a screen point (used by Ctrl+wheel).
 	static setLevelAt(newLevel, clientX, clientY) {
 		let view = this.view;
@@ -9203,6 +9486,10 @@ class ToolBox {
 			currentTool.leaveTool();
 			currentTool = this.tools[toolName];
       currentTool.enterTool(whichMouseButton);
+      // Show potential branch origins as soon as the Link tool is active.
+      for (let connection of Object.values(connection_array)) {
+        if (connection.type === "link" && connection.refreshJunctionVisibility) connection.refreshJunctionVisibility();
+      }
       if ([
         "stock",
   			"converter",
@@ -9242,6 +9529,13 @@ function translateCopiedConnectorGeometry(primitive, delta) {
 		// connector endpoints move with setCenterPosition(), but these attributes
 		// otherwise stay at the source location, which changes the copied curve's
 		// shape and can make the handles appear randomly placed.
+		let rawJunctions = primitive.getAttribute("SystemikaJunctions");
+		if (rawJunctions) {
+			let junctions = SystemikaLinkJunctions.parse(rawJunctions);
+			if (junctions.length) primitive.value.setAttribute("SystemikaJunctions", SystemikaLinkJunctions.serialize(
+				junctions.map(item => ({id: item.id, x: item.x + dx, y: item.y + dy}))
+			));
+		}
 		for (let [xAttr, yAttr] of [["b1x", "b1y"], ["b2x", "b2y"]]) {
 			let rawX = primitive.getAttribute(xAttr);
 			let rawY = primitive.getAttribute(yAttr);
@@ -9529,6 +9823,14 @@ class Clipboard {
 		}
 	}
 	static remapIdAttributes(primitive, idMap) {
+ 		let oldJunctionParent = primitive.getAttribute("SystemikaJunctionParent");
+		if (oldJunctionParent) {
+			if (idMap.has(String(oldJunctionParent))) primitive.value.setAttribute("SystemikaJunctionParent", String(idMap.get(String(oldJunctionParent)).id));
+			else {
+				primitive.value.removeAttribute("SystemikaJunctionParent");
+				primitive.value.removeAttribute("SystemikaJunctionId");
+			}
+		}
 		for (let attribute of ["Source", "Target"]) {
 			let oldValue = primitive.getAttribute(attribute);
 			if (oldValue != null && idMap.has(String(oldValue))) {
@@ -9795,7 +10097,12 @@ $(window).load(function () {
 			}
 			if (event.key === "0") {
 				event.preventDefault();
-				ClearTool.enterTool();
+				Zoom.zoomReset();
+				return;
+			}
+			if (event.key === "9") {
+				event.preventDefault();
+				Zoom.zoomToFit();
 				return;
 			}
 			if (event.key == "1" || event.key.toLowerCase() == "r") {
@@ -9876,7 +10183,7 @@ $(window).load(function () {
 						}
 					}
 				}
-				if (key === "m") {
+				if (event.key === "Escape") {
 					event.preventDefault();
 					ToolBox.setTool("mouse");
 					return;
@@ -9896,14 +10203,16 @@ $(window).load(function () {
 					t: "table",
 					x: "xyplot",
 					h: "histoplot",
-					r: "rotatename"
+					r: "rotatename",
+					m: "movevalve",
+					n: "straightenlink"
 				};
 				if (key === "q") {
 					event.preventDefault();
 					DefinitionQuestionMarks.toggle();
 				} else if (key === "l") {
 					let selectedRoots = Object.values(get_selected_root_objects()).filter(Boolean);
-					if (selectedRoots.length === 1 && selectedRoots[0].type === "link") {
+					if (!event.shiftKey && selectedRoots.length === 1 && selectedRoots[0].type === "link") {
 						event.preventDefault();
 						selectedRoots[0].doubleClick();
 					} else {
@@ -10125,6 +10434,9 @@ $(window).load(function () {
 	});
 	$("#btn_zoom_out").click(function () {
 		Zoom.zoomOut();
+	});
+	$("#btn_zoom_fit").click(function () {
+		Zoom.zoomToFit();
 	});
 	$("#btn_zoom_reset").click(function () {
 		Zoom.zoomReset();
@@ -10513,6 +10825,13 @@ function syncVisual(tprimitive) {
 		case "Ghost":
 			{
 				let source_primitive = findID(tprimitive.getAttribute("Source"));
+				if (!source_primitive || !source_primitive.value ||
+					!["Stock", "Flow", "Variable", "Converter"].includes(source_primitive.value.nodeName)) {
+					// An orphaned Ghost must not crash model loading or be deleted.
+					// Its original XML node remains intact for a later repair.
+					console.warn("Systemika: unresolved Ghost", tprimitive.id, tprimitive.getAttribute("name"));
+					return;
+				}
 				let source_type = source_primitive.value.nodeName;
 				//~ do_global_log("id is "+tprimitive.id);
 				let position = getCenterPosition(tprimitive);
@@ -10591,6 +10910,14 @@ function syncVisual(tprimitive) {
 			break;
 		case "Link":
 			{
+				// If an original model entity is absent, leave its saved Link
+				// untouched rather than reattaching it to null during rendering.
+				// This is especially important for unrecoverable legacy Ghosts.
+				if ((tprimitive.source && !get_object(tprimitive.source.id)) ||
+					(tprimitive.target && !get_object(tprimitive.target.id))) {
+					console.warn("Systemika: retaining an unrenderable Link", tprimitive.id);
+					return;
+				}
 				let source_pos = getSourcePosition(tprimitive);
 				let target_pos = getTargetPosition(tprimitive);
 
@@ -10620,6 +10947,8 @@ function syncVisual(tprimitive) {
 					// bezierPoints does not exist. Create them
 					connection.resetBezierPoints();
 				}
+				// Preserve the original Bézier handles before junction routing begins.
+				connection.loadJunctions();
 				for (let i = 0; i < 8; i++) {
 					// the anchor and the handle are co-dependent
 					// This means that moving the handle moves the anchor which moves the handle ... etc.
@@ -10650,9 +10979,16 @@ function syncAllVisuals() {
 		}
 	}
 	// Invalid half-connected Links are never part of a valid Systemika model.
-	// Remove any such legacy/corrupted records after loading or Undo restore so
-	// they cannot poison selection, Delete, or subsequent history operations.
+	// Do not remove Links whose endpoints still exist in the stored graph but
+	// cannot be drawn because an orphaned Ghost is missing its original.
 	cleanUnconnectedLinks();
+	let unresolvedGhosts = primitives("Ghost").filter(ghost => {
+		let source = findID(ghost.getAttribute("Source"));
+		return !source || !source.value || source.value.nodeName === "Ghost";
+	});
+	if (unresolvedGhosts.length && typeof xAlert === "function") {
+		xAlert(`${unresolvedGhosts.length} Ghost alias(es) could not be reconnected automatically. Their saved records and links have been preserved, not deleted. The rest of the model can be used. Restore the missing original variables or open an earlier model copy to recover these aliases.`);
+	}
 	update_all_objects();
 	unselect_all();
 	if (window.SystemikaOutputDock && document.getElementById("systemika-output-panel")) SystemikaOutputDock.onModelSynced();
@@ -12141,16 +12477,22 @@ class SystemikaRunsManagerDialog extends jqDialog {
 		this.nameInput.on("keydown keyup keypress", event => event.stopPropagation());
         $(this.dialogContent).find('.systemika-runs-recover').on('click', async () => {
             try {
-                this.status('Select the folder containing the open .ssd model. Do not select or create the Runs subfolder.');
-                if (await SystemikaRunManager.locateRunsFolder()) await this.reload();
-                else this.status('Folder selection cancelled. The model remains usable.');
+                this.status('Choose the folder containing a copy of the open .ssd model. Systemika finds the Runs subfolder automatically.');
+                if (await SystemikaRunManager.locateRunsFolder()) {
+                    await this.reload();
+                    const folder = typeof fileManager !== 'undefined' && fileManager.getRunStorageDirectoryHandle
+                        ? fileManager.getRunStorageDirectoryHandle() : null;
+                    // reload() clears the status. Set the outcome *afterwards* so
+                    // the user has time to read it instead of seeing a flash.
+                    this.status(folder ? `Model folder connected: ${folder.name}. Saved runs refreshed. Model saves use the .ssd file in this folder.` : 'Model folder connected.');
+                } else this.status('Folder selection cancelled. The previous connection is unchanged.');
             } catch (error) { this.status(error.message || String(error), true); }
         });
         $(this.dialogContent).find('.systemika-runs-export').on('click', async () => {
             try {
                 this.status('Preparing portable model archive…');
-                await SystemikaRunManager.exportPortableModel();
-                this.status('Export completed or download started.');
+                const result = await SystemikaRunManager.exportPortableModel();
+                this.status(result === null ? 'Export cancelled.' : 'Model and runs export completed or download started.');
             } catch (error) { this.status(error.message || String(error), true); }
         });
 	}
@@ -12178,6 +12520,13 @@ class SystemikaRunsManagerDialog extends jqDialog {
 	}
 	async reload() {
 		let list = $(this.dialogContent).find(".systemika-runs-manager-list");
+		const folderPickerAvailable = typeof fileManager !== 'undefined' && fileManager.supportsProjectRunStorage
+			&& fileManager.supportsProjectRunStorage();
+		const connectedFolder = typeof fileManager !== 'undefined' && fileManager.getRunStorageDirectoryHandle
+			? fileManager.getRunStorageDirectoryHandle() : null;
+		$(this.dialogContent).find('.systemika-runs-recover')
+			.toggle(Boolean(folderPickerAvailable))
+			.text(connectedFolder ? 'Change Model Folder' : 'Connect Model Folder');
 		this.status("Loading runs…");
 		try {
             // In the webapp a file picker supplies a file handle, not access to
@@ -12658,24 +13007,31 @@ class PlotVariableSelectorComponent extends PrimitiveSelectorComponent {
 		let sync = () => host.find(".systemika-range-fields input").prop("disabled", host.find(".range-auto").prop("checked"));
 		host.find(".range-auto").change(sync); sync();
 		let close = () => { try { host.dialog("destroy"); } catch (_error) {} host.remove(); };
+		let applyRange = () => {
+			let auto = host.find(".range-auto").prop("checked");
+			let min = Number(host.find(".range-min").val());
+			let max = Number(host.find(".range-max").val());
+			if (!auto && (!Number.isFinite(min) || !Number.isFinite(max) || !(max > min))) {
+				host.find(".systemika-range-warning").text("Maximum must be greater than minimum.");
+				return;
+			}
+			this.ranges[key] = auto ? { auto: true, min: 0, max: 1 } : { auto: false, min, max };
+			this.updateSelectedList();
+			this.parent.requestLiveApply(0);
+			close();
+		};
+		// Enter in either range field (or the Automatic checkbox) acts like Apply.
+		// Keep invalid values in the dialog so the existing warning can be read.
+		host.on("keydown.systemikaRangeSubmit", "input", event => {
+			if ((event.key === "Enter" || event.which === 13) && !event.isComposing) {
+				event.preventDefault();
+				event.stopPropagation();
+				applyRange();
+			}
+		});
 		host.dialog({
 			title: `Range — ${primitive ? getName(primitive) : key}`, modal: true, width: 330, resizable: false,
-			buttons: {
-				Apply: () => {
-					let auto = host.find(".range-auto").prop("checked");
-					let min = Number(host.find(".range-min").val());
-					let max = Number(host.find(".range-max").val());
-					if (!auto && (!Number.isFinite(min) || !Number.isFinite(max) || !(max > min))) {
-						host.find(".systemika-range-warning").text("Maximum must be greater than minimum.");
-						return;
-					}
-					this.ranges[key] = auto ? { auto: true, min: 0, max: 1 } : { auto: false, min, max };
-					this.updateSelectedList();
-					this.parent.requestLiveApply(0);
-					close();
-				},
-				Cancel: close
-			},
+			buttons: { Apply: applyRange, Cancel: close },
 			close
 		});
 	}
@@ -15146,9 +15502,25 @@ class LinkPropertiesDialog extends jqDialog {
 					<option value="-">Negative (−)</option>
 				</select>
 				<p style="margin: 0.9rem 0 0; max-width: 320px;">Polarity is a causal annotation. It does not change the simulation equations.</p>
+				<div style="margin-top: 1rem; border-top: 1px solid #ddd; padding-top: 0.8rem;">
+					<label for="link-junction-count"><b>Number of junctions:</b></label>
+					<div style="display:flex; gap:0.4rem; align-items:center; margin-top:0.4rem;">
+						<button type="button" class="link-junction-minus" aria-label="Remove junction">−</button>
+						<input id="link-junction-count" class="link-junction-count" type="number" min="0" max="40" step="1" value="0" style="width:4rem; text-align:center;" />
+						<button type="button" class="link-junction-plus" aria-label="Add junction">+</button>
+					</div>
+					<p style="margin:0.5rem 0 0; max-width:320px;">Junctions begin at the link midpoint. Drag their hollow circles to route the link; the two square curve handles control where the link meets its variables. Press L with no Link selected to show all junctions and draw a branch, or Shift+L while a Link is selected. Junctions with branches remain visible.</p>
+				</div>
 			</div>
 		`);
 		this.polarityField = $(this.dialogContent).find(".polarity-field").get(0);
+		this.junctionCountField = $(this.dialogContent).find(".link-junction-count").get(0);
+		$(this.dialogContent).find(".link-junction-minus").on("click", () => {
+			this.junctionCountField.value = Math.max(0, Number(this.junctionCountField.value || 0) - 1);
+		});
+		$(this.dialogContent).find(".link-junction-plus").on("click", () => {
+			this.junctionCountField.value = Math.min(40, Number(this.junctionCountField.value || 0) + 1);
+		});
 		this.bindEnterApplyEvents();
 	}
 	open(id) {
@@ -15161,6 +15533,7 @@ class LinkPropertiesDialog extends jqDialog {
 		if (!this.primitive) return;
 		let polarity = this.primitive.getAttribute("Polarity") || "";
 		this.polarityField.value = polarity === "+" || polarity === "-" ? polarity : "";
+		this.junctionCountField.value = getLinkJunctionMetadata(this.primitive).length;
 	}
 	afterShow() {
 		this.polarityField.focus();
@@ -15169,8 +15542,17 @@ class LinkPropertiesDialog extends jqDialog {
 		if (!this.primitive) return false;
 		let polarity = this.polarityField.value;
 		if (!["", "+", "-"].includes(polarity)) return false;
-		this.primitive.setAttribute("Polarity", polarity);
 		let visual = get_object(getID(this.primitive));
+		let count = Number(this.junctionCountField.value);
+		if (!Number.isInteger(count) || count < 0 || count > 40) {
+			xAlert("The junction count must be a whole number from 0 to 40.");
+			return false;
+		}
+		if (visual && !visual.setJunctionCount(count)) {
+			xAlert("A junction with an attached branch cannot be removed. Remove the branch first.");
+			return false;
+		}
+		this.primitive.setAttribute("Polarity", polarity);
 		if (visual && typeof visual.update === "function") visual.update();
 	}
 }
@@ -15341,6 +15723,12 @@ class ConverterDialog extends jqDialog {
 		if (jqDialog.blockingDialogOpen) {
 			// We can't open a new dialog while one is already open
 			return;
+		}
+		// A Lookup Ghost is an alias, not a second Lookup. Always edit the
+		// original entity even when a caller passes the Ghost's id directly.
+		let requestedPrimitive = findID(id);
+		if (requestedPrimitive && getType(requestedPrimitive) === "Ghost") {
+			id = requestedPrimitive.getAttribute("Source");
 		}
 		this.primitive = findID(id);
 		if (this.primitive == null) {
@@ -15781,17 +16169,19 @@ class KeyboardShortcutsDialog extends CloseDialog {
 		<tr><td>Save / Save As</td><td>${modifierKey}+S / ${modifierKey}+Shift+S</td></tr>
 		<tr><td>Undo / Redo</td><td>${modifierKey}+Z / ${modifierKey}+Y</td></tr>
 		<tr><td>Open equation/properties for selected model variable</td><td>Enter</td></tr>
-		<tr><td>Mouse tool</td><td>M</td></tr>
+		<tr><td>Mouse tool</td><td>Esc</td></tr>
+		<tr><td>Move Valve / Straighten Link</td><td>M / N</td></tr>
 		<tr><td>Cut / Copy / Paste</td><td>${modifierKey}+X / ${modifierKey}+C / ${modifierKey}+V<br/><small>Copy/Cut of one selected Figure also copies its image to the system clipboard.</small></td></tr>
 		<tr><td>Select all</td><td>${modifierKey}+A</td></tr>
 		<tr><td>Find variable</td><td>${modifierKey}+F</td></tr>
 			<tr><td>Find next Ghost / return to original variable</td><td>${modifierKey}+G</td></tr>
 		<tr><td>Delete selection</td><td>Delete or Backspace</td></tr>
 		<tr><td>Zoom in / out</td><td>${modifierKey}++ / ${modifierKey}+-</td></tr>
+		<tr><td>Zoom 100% / Zoom to Fit</td><td>${modifierKey}+9 / ${modifierKey}+0</td></tr>
 		<tr><td>Return canvas to origin</td><td>${modifierKey}+Home</td></tr>
 		<tr><td>Scroll canvas left / right</td><td>Shift+Page Up / Shift+Page Down</td></tr>
 		<tr><td>Move selection</td><td>Arrow keys (Shift+Arrow for larger steps)</td></tr>
-		<tr><td>Clear outputs</td><td>${modifierKey}+0</td></tr>
+		<tr><td>Clear outputs</td><td>Toolbar button</td></tr>
 		<tr><td>Run / Pause</td><td>${modifierKey}+1 or ${modifierKey}+R</td></tr>
 		<tr><td>Run / Pause from Run Name</td><td>Enter, ${modifierKey}+1, or ${modifierKey}+R</td></tr>
 		<tr><td>Advance / Advance to End</td><td>${modifierKey}+2 / ${modifierKey}+3</td></tr>
@@ -15800,6 +16190,7 @@ class KeyboardShortcutsDialog extends CloseDialog {
 		<tr><td>Stock / Flow / Auxiliary / Constant</td><td>S / F / A / C</td></tr>
 		<tr><td>Link</td><td>L</td></tr>
 		<tr><td>Link Properties (one Link selected)</td><td>L</td></tr>
+		<tr><td>Begin a branched Link while another Link is selected</td><td>Shift+L</td></tr>
 		<tr><td>Lookup / Ghost</td><td>K / G</td></tr>
 		<tr><td>Hide / unhide definition question marks</td><td>Q</td></tr>
 		<tr><td>Rotate entity name</td><td>R</td></tr>
@@ -16984,9 +17375,28 @@ class EquationListDialog extends jqDialog {
 		</div>`);
 	}
 
+	selectedEntityIds() {
+		// Canvas selection may contain links, annotations, handles or ghosts.
+		// Only actual equation-bearing entities determine the filter.
+		const ids = new Set();
+		for (const visual of Object.values(get_selected_root_objects())) {
+			if (!visual || !visual.primitive) continue;
+			let primitive = visual.primitive;
+			if (visual.is_ghost) primitive = findID(primitive.getAttribute("Source"));
+			if (primitive && ["Stock", "Flow", "Variable", "Converter"].includes(getType(primitive))) {
+				ids.add(String(getID(primitive)));
+			}
+		}
+		return ids;
+	}
+	selectionKey() {
+		return Array.from(this.selectedEntityIds()).sort().join("|");
+	}
 	collectEntities() {
+		const selectedIds = this.selectedEntityIds();
+		const include = primitive => !selectedIds.size || selectedIds.has(String(getID(primitive)));
 		const flows = primitives("Flow");
-		const stocks = primitives("Stock").map(stock => ({
+		const stocks = primitives("Stock").filter(include).map(stock => ({
 			type: "stock",
 			name: getName(stock),
 			expression: getValue(stock),
@@ -16995,14 +17405,14 @@ class EquationListDialog extends jqDialog {
 			inflows: flows.filter(flow => flow.target && String(flow.target.id) === String(getID(stock))).map(getName),
 			outflows: flows.filter(flow => flow.source && String(flow.source.id) === String(getID(stock))).map(getName)
 		}));
-		const flowRows = flows.map(flow => ({
+		const flowRows = flows.filter(include).map(flow => ({
 			type: "flow", name: getName(flow), expression: getValue(flow), units: getUnits(flow), comment: flow.getAttribute("Note") || ""
 		}));
-		const variableRows = primitives("Variable").map(variable => ({
+		const variableRows = primitives("Variable").filter(include).map(variable => ({
 			type: variable.getAttribute("isConstant") === "true" ? "constant" : "auxiliary",
 			name: getName(variable), expression: getValue(variable), units: getUnits(variable), comment: variable.getAttribute("Note") || ""
 		}));
-		const lookupRows = primitives("Converter").map(lookup => {
+		const lookupRows = primitives("Converter").filter(include).map(lookup => {
 			let input = getConverterInput(lookup);
 			return {
 				type: "lookup", name: getName(lookup), expression: getValue(lookup), units: getUnits(lookup), comment: lookup.getAttribute("Note") || "",
@@ -17034,7 +17444,7 @@ class EquationListDialog extends jqDialog {
 			<p><b>Equation form:</b> ${htmlEscape(this.equationFormLabel())}<br/>
 			<b>Sorted by:</b> ${htmlEscape(this.sortModeLabel())}</p>
 			${formNote}${orderNote}
-			<div class="equation-entity-count">Total of ${rows.length} model entities</div>
+			<div class="equation-entity-count">${this.selectedEntityIds().size ? `Selected: ${rows.length} model entit${rows.length === 1 ? "y" : "ies"}` : `Total of ${rows.length} model entities`}</div>
 			<table class="modern-table zebra equation-document-table">
 				<tr><th>#</th><th>Type</th><th>Name</th><th>Equation</th><th>Initial Condition</th><th>Units</th><th>Comment</th></tr>
 				${rows.map(row => `<tr>

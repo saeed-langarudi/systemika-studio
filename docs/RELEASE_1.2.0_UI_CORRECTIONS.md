@@ -30,3 +30,19 @@ Because a standard file input does not provide a persistent file handle, newly o
 7. Save and reopen an edited model; check that normal `.ssd` and `.sysrun` files remain separate. Test SVG exports to ensure RC4 functionality remains intact.
 
 A live interactive Chrome/Edge test is still required; the test environment cannot reliably launch a local Chromium session. If Chrome still closes, capture OS, Chrome version, whether it happens on opening the picker or selecting a file, and whether it happens with a tiny newly created model. `chrome://crashes` may contain a browser crash report (depending on browser configuration).
+
+## RC6: Change Model Folder and desktop portable export
+
+The webapp's **Connect Model Folder** control changes to **Change Model Folder** once connected. Clicking it *always* opens the directory picker, including when a folder is already connected. Select the directory containing the saved `.ssd` model (or a byte-identical saved copy of it); do not select the `Runs` subfolder. If the selected directory contains a verified model copy, that copy becomes Systemika's model save target. The old folder is not deleted or modified. Canceling or selecting a mismatched folder preserves the existing connection and keeps the message visible.
+
+The desktop app already derives its Runs location from the full path of the saved model, so it does not show a nonfunctional Connect/Change Model Folder action. For desktop portable ZIP export, the renderer now supplies the saved model path to Electron's export handler. The ZIP includes the original `.ssd` and separate `.sysrun` and `.sysrun.metadata.json` files, with no change to the normal shared Runs layout.
+
+### Manual RC6 acceptance checks
+
+1. In Chrome/Edge, open a model and connect its folder. Reopen Manage Runs and confirm the button is labeled **Change Model Folder**.
+2. Click **Change Model Folder**. Verify the picker opens again. Cancel it and confirm the original runs remain accessible and the cancellation message stays on screen.
+3. Select a different folder containing an identical saved `.ssd` copy, with its own `Runs` subfolder. Confirm the run list now reflects that folder and subsequent model saves target the model copy there.
+4. Select a folder containing a different model with the same name. Confirm the connection is rejected without replacing the previous folder.
+5. In the Windows/Linux/macOS desktop build made from this source, open a saved `.ssd` with runs and select **Export Model with Runs**. Confirm the ZIP save dialog appears and the downloaded ZIP includes the `.ssd` and separate `Runs/*.sysrun` files.
+
+Browser permission behavior and the Electron ZIP save dialog still require manual verification on their target platforms. No desktop installer is included in the source/webapp archives.

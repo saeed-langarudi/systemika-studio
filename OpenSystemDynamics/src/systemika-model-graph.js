@@ -184,12 +184,32 @@ function systemikaNormalizeLoadedModel() {
             String(other.getAttribute("name") || "").trim().toLowerCase() === cleanName.toLowerCase());
         if (!collision) item.value.setAttribute("name", cleanName);
     }
-    // Ghost display names are derived from their source entity and should never
-    // preserve a stale bracketed spelling after the source is normalized.
+    // Ghost display names are derived from their source entity.
+    // Ghost Source identifies its original model variable. Older Systemika
+    // builds accidentally wrote "Time" there when a Link was drawn FROM a
+    // Lookup Ghost; the old loader then deleted the Ghost and aborted loading.
+    // Recover only if its saved name uniquely identifies an original variable.
+    // Never infer a relationship when multiple candidates exist, and never
+    // replace a valid explicit source association.
     for (const ghost of primitives("Ghost")) {
         const sourceId = ghost && ghost.getAttribute("Source");
-        const source = sourceId != null && typeof findID === "function" ? findID(sourceId) : null;
-        if (source && source.getAttribute("name")) ghost.value.setAttribute("name", source.getAttribute("name"));
+        let source = sourceId != null && typeof findID === "function" ? findID(sourceId) : null;
+        if (!source || !source.value || !namedTypes.has(source.value.nodeName)) {
+            const ghostName = String(ghost.getAttribute("name") || "").trim().toLowerCase();
+            const matches = ghostName ? namedItems.filter(item =>
+                String(item.getAttribute("name") || "").trim().toLowerCase() === ghostName) : [];
+            if (matches.length === 1) {
+                source = matches[0];
+                ghost.value.setAttribute("Source", String(source.id));
+                console.info("Systemika: restored Ghost source association for", ghostName);
+            } else {
+                // Leave the original XML data intact. A later repair can still
+                // recover this alias if its source is restored or identified.
+                console.warn("Systemika: unresolved Ghost source for", ghost.getAttribute("name"));
+                continue;
+            }
+        }
+        if (source.getAttribute("name")) ghost.value.setAttribute("name", source.getAttribute("name"));
     }
 
     // Insight Maker / older Systemika files may carry OnlyPositive="true"

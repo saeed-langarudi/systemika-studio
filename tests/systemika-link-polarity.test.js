@@ -12,8 +12,8 @@ test('Link entity stores an explicit optional polarity annotation', () => {
 });
 
 test('double-clicking a Link opens the Link Properties dialog', () => {
-  assert.match(editor, /class LinkVisual extends BaseConnection[\s\S]{0,9000}\$\(this\.group\)\.dblclick\(\(event\) => \{[\s\S]{0,220}this\.doubleClick\(\)/);
-  assert.match(editor, /class LinkVisual extends BaseConnection[\s\S]{0,9000}doubleClick\(\) \{[\s\S]{0,160}linkPropertiesDialog\.open\(this\.id\)/);
+  assert.match(editor, /class LinkVisual extends BaseConnection[\s\S]{0,19000}\$\(this\.group\)\.dblclick\(\(event\) => \{[\s\S]{0,220}this\.doubleClick\(\)/);
+  assert.match(editor, /class LinkVisual extends BaseConnection[\s\S]{0,19000}doubleClick\(\) \{[\s\S]{0,160}linkPropertiesDialog\.open\(this\.id\)/);
 });
 
 test('Link Properties allows unspecified positive or negative polarity and persists it', () => {

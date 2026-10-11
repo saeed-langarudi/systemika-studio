@@ -55,6 +55,7 @@ test('single-run histogram keeps the reliable one-series rendering path', () => 
 test('copy/paste translates Link handles and Flow bend points with the copied structure', () => {
   const snippet = sourceBetween(editor, 'function translateCopiedConnectorGeometry', 'class Clipboard');
   const context = {
+    SystemikaLinkJunctions: require('../OpenSystemDynamics/src/systemika-link-junctions.js'),
     getType: primitive => primitive.type,
   };
   vm.createContext(context);
