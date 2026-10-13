@@ -154,6 +154,9 @@ const mouse = {
 	lastCanvasX: NaN,
 	lastCanvasY: NaN,
 	emptyClickDown: false,
+	// UI-only clicks must not serialize an unchanged model on mouse-up.
+	modelDragOccurred: false,
+	modelChangeDuringMouseTool: false,
 	// NOTE: values for event.which should be used
 	// event.button will give incorrect results
 	left: 1,
@@ -209,7 +212,28 @@ function updateFindGhostsButtonState() {
 	if (button) button.disabled = getSelectedGhostNavigationContext() == null;
 }
 
+// Selection changes can touch hundreds of elements. Update global selection
+// affordances only once per batch, not once for every selected/cleared handle.
+let selectionUpdateDepth = 0;
+let selectionRefreshPending = false;
+function batchSelectionUpdates(callback) {
+	selectionUpdateDepth++;
+	try {
+		return callback();
+	} finally {
+		selectionUpdateDepth--;
+		if (!selectionUpdateDepth && selectionRefreshPending) {
+			selectionRefreshPending = false;
+			refreshSelectionStacking();
+		}
+	}
+}
+
 function refreshSelectionStacking() {
+	if (selectionUpdateDepth) {
+		selectionRefreshPending = true;
+		return;
+	}
 	if (typeof SVG !== "undefined" && SVG.svgElement && typeof get_selected_root_objects === "function") {
 		let selected = Object.values(get_selected_root_objects() || {}).filter(Boolean);
 		SVG.svgElement.classList.toggle("selection-on-top", selected.length > 0);
@@ -4371,6 +4395,11 @@ function graphExportDimensions(visual) {
 const GRAPH_EXPORT_RASTER_SCALE = 3;
 const GRAPH_EXPORT_EDGE_PADDING = 10;
 const GRAPH_EXPORT_LEGEND_GAP = 11;
+// SVG export reserves its own axis-label band. The on-screen jqPlot grid
+// padding is not reliable for SVG typography, particularly with legends.
+const GRAPH_EXPORT_X_TICK_OFFSET = 18;
+const GRAPH_EXPORT_X_LABEL_OFFSET = 44;
+const GRAPH_EXPORT_X_LEGEND_GAP = 16;
 
 function graphLegendMetrics(plot, availableWidth = 1000) {
 	if (!plot || !plot.legend || !plot.legend.show || !Array.isArray(plot.series)) return null;
@@ -4398,7 +4427,7 @@ function graphAxisTicksSvg(axis, orientation, grid, width, height) {
 		if (orientation === "x") {
 			if (pos < grid.left - 1 || pos > grid.right + 1) continue;
 			chunks.push(`<line x1="${pos}" y1="${grid.top}" x2="${pos}" y2="${grid.bottom}" stroke="#e6e6e6" stroke-width="1"/>`);
-			chunks.push(`<text x="${pos}" y="${Math.min(height - 3, grid.bottom + 16)}" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#222">${graphXmlEscape(label)}</text>`);
+			chunks.push(`<text x="${pos}" y="${grid.bottom + GRAPH_EXPORT_X_TICK_OFFSET}" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#222">${graphXmlEscape(label)}</text>`);
 		} else if (orientation === "y") {
 			if (pos < grid.top - 1 || pos > grid.bottom + 1) continue;
 			chunks.push(`<line x1="${grid.left}" y1="${pos}" x2="${grid.right}" y2="${pos}" stroke="#e6e6e6" stroke-width="1"/>`);
@@ -4655,6 +4684,7 @@ function graphHistogramNotesSvg(visual, width, height) {
 	return chunks.join("");
 }
 
+let systemikaGraphSvgClipSequence = 0;
 function buildGraphSvgPayload(visual) {
 	if (!visual || !visual.chartDiv || !visual.plot) throw new Error("The graph is not currently rendered.");
 	let plot = visual.plot;
@@ -4669,15 +4699,25 @@ function buildGraphSvgPayload(visual) {
 		bottom: height - graphFinite(padding.bottom, 38)
 	};
 	let legend = graphLegendMetrics(plot, width);
+	let xAxis = plot.axes && plot.axes.xaxis;
+	let xLabel = graphPlainText(xAxis && xAxis.label);
+	let hasXTicks = !!(xAxis && xAxis.show !== false && Array.isArray(xAxis._ticks) &&
+		xAxis._ticks.some(tick => tick && tick.show !== false && tick.showLabel !== false));
+	// Tick numbers, title and legend need separate vertical bands. The jqPlot
+	// canvas height does not guarantee enough room for these in a standalone SVG.
+	let tickBaseline = grid.bottom + GRAPH_EXPORT_X_TICK_OFFSET;
+	let xLabelY = grid.bottom + GRAPH_EXPORT_X_LABEL_OFFSET;
+	let axisBottom = xLabel ? xLabelY + 5 : (hasXTicks ? tickBaseline + 5 : grid.bottom);
 	let exportWidth = width + GRAPH_EXPORT_EDGE_PADDING;
 	if (legend) exportWidth = Math.max(exportWidth, legend.width + (GRAPH_EXPORT_EDGE_PADDING * 2));
-	// jqPlot's outside-bottom legend already reserves vertical grid padding. Reuse
-	// that space in exports rather than adding a second empty legend band.
+	// Reuse the existing legend space if it is large enough; otherwise extend
+	// the SVG rather than squeezing the X-axis title against its tick labels.
 	let legendTop = legend
-		? Math.max(grid.bottom + 30, height - legend.height - GRAPH_EXPORT_EDGE_PADDING)
+		? Math.max(axisBottom + GRAPH_EXPORT_X_LEGEND_GAP, height - legend.height - GRAPH_EXPORT_EDGE_PADDING)
 		: null;
 	let exportHeight = Math.max(
 		height + GRAPH_EXPORT_EDGE_PADDING,
+		axisBottom + GRAPH_EXPORT_EDGE_PADDING,
 		legend ? legendTop + legend.height + GRAPH_EXPORT_EDGE_PADDING : 0
 	);
 	let chunks = [`<svg xmlns="http://www.w3.org/2000/svg" width="${exportWidth}" height="${exportHeight}" viewBox="0 0 ${exportWidth} ${exportHeight}">`];
@@ -4691,15 +4731,25 @@ function buildGraphSvgPayload(visual) {
 		chunks.push(graphAxisTicksSvg(plot.axes && plot.axes.yaxis, "y", grid, width, height));
 		chunks.push(graphAxisTicksSvg(plot.axes && plot.axes.y2axis, "y2", grid, width, height));
 	}
-	chunks.push(`<rect x="${grid.left}" y="${grid.top}" width="${Math.max(0, grid.right - grid.left)}" height="${Math.max(0, grid.bottom - grid.top)}" fill="none" stroke="#b8b8b8" stroke-width="1"/>`);
+	// jqPlot clips its canvas to the grid. The standalone vector exporter must
+	// apply the same clipping, otherwise curves with manually limited X/Y
+	// ranges (including fills, markers and run-number labels) escape the frame.
+	// Use an SVG clipPath rather than discarding off-range points: that preserves
+	// the exact intersections at the grid edge, including stepped curves.
+	const plotClipId = `systemika-plot-clip-${++systemikaGraphSvgClipSequence}`;
+	const plotWidth = Math.max(0, grid.right - grid.left);
+	const plotHeight = Math.max(0, grid.bottom - grid.top);
+	chunks.push(`<defs><clipPath id="${plotClipId}" clipPathUnits="userSpaceOnUse"><rect x="${grid.left}" y="${grid.top}" width="${plotWidth}" height="${plotHeight}"/></clipPath></defs>`);
+	chunks.push(`<g class="systemika-export-plot-data" clip-path="url(#${plotClipId})">`);
 	chunks.push(graphSeriesSvg(plot));
 	chunks.push(graphComparePointLabelsSvg(visual));
 	chunks.push(graphXyNumbersSvg(visual));
+	chunks.push(`</g>`);
+	// Draw the border over the clipped plot so it remains clearly visible.
+	chunks.push(`<rect x="${grid.left}" y="${grid.top}" width="${plotWidth}" height="${plotHeight}" fill="none" stroke="#b8b8b8" stroke-width="1"/>`);
 	let title = graphPlainText(plot.title && plot.title.text);
 	if (title) chunks.push(`<text x="${(grid.left + grid.right) / 2}" y="17" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#111">${graphXmlEscape(title)}</text>`);
-	let xLabel = graphPlainText(plot.axes && plot.axes.xaxis && plot.axes.xaxis.label);
-	// Give the X-axis title a clear gap below tick labels in exported figures.
-	let xLabelY = legend ? Math.min(legendTop - 8, grid.bottom + 34) : Math.min(height - 4, grid.bottom + 34);
+	// The export title baseline never shifts upward to make room for a legend.
 	if (xLabel) chunks.push(`<text x="${(grid.left + grid.right) / 2}" y="${xLabelY}" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#111">${graphXmlEscape(xLabel)}</text>`);
 	let yLabel = (visual instanceof ComparePlotVisual && isPlotMultiscaleEnabled(visual.primitive)) ? "" : graphPlainText(plot.axes && plot.axes.yaxis && plot.axes.yaxis.label);
 	if (yLabel) chunks.push(`<text x="13" y="${(grid.top + grid.bottom) / 2}" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#111" transform="rotate(-90 13 ${(grid.top + grid.bottom) / 2})">${graphXmlEscape(yLabel)}</text>`);
@@ -7856,6 +7906,8 @@ class MouseTool extends BaseTool {
 	static leftMouseDown(x, y) {
 		mouse.downX = x;
 		mouse.downY = y;
+		mouse.modelDragOccurred = false;
+		mouse.modelChangeDuringMouseTool = false;
 		do_global_log("mouse.clickedOnObject " + mouse.clickedOnObject);
 		if (!mouse.clickedOnObject) {
 			mouse.emptyClickDown = true;
@@ -7866,6 +7918,11 @@ class MouseTool extends BaseTool {
 		// Only one anchor is selected AND that that anchor has attaching capabilities
 		if (selected_anchor && connection_array[selected_anchor.parent_id].getStartAttach) {
 			let parent = connection_array[selected_anchor.parent_id];
+			// Detaching a Flow endpoint on mouse-down changes the model even
+			// without a subsequent drag; retain an Undo snapshot for this case.
+			if (parent.getStartAttach() || parent.getEndAttach()) {
+				mouse.modelChangeDuringMouseTool = true;
+			}
 			// Detach anchor
 			switch (object_array[selected_anchor.child_id].getAnchorType()) {
 				case "start":
@@ -7890,6 +7947,7 @@ class MouseTool extends BaseTool {
 			RectSelector.move(mouse.downX, mouse.downY);
 			return;
 		}
+		if (diff_x !== 0 || diff_y !== 0) mouse.modelDragOccurred = true;
 		// We only come here if some object is being dragged
 		// Otherwise we will trigger mouse.emptyClickDown
 		let only_selected_anchor = get_only_selected_anchor_id();
@@ -7943,6 +8001,9 @@ class MouseTool extends BaseTool {
 		let selected_anchor = get_only_selected_anchor_id();
 
 		if (selected_anchor && connection_array[selected_anchor.parent_id].getStartAttach) {
+			// The endpoint release/attachment can change model geometry without
+			// any mousemove event (e.g. snapping a Flow endpoint to a Stock).
+			mouse.modelChangeDuringMouseTool = true;
 			let parent = connection_array[selected_anchor.parent_id];
 			let tool = ToolBox.tools[parent.getType()];
 			tool.mouseUpSingleAnchor(x, y, false, selected_anchor.child_id);
@@ -8678,20 +8739,22 @@ class CoordRect {
 }
 
 class RectSelector {
-	/** @type {CoordRect} coordRect */
+	/** @type {CoordRect} */
 	static coordRect;
+	// IDs deliberately selected by the current rectangle (including parents of
+	// selected anchors). Keeping this set avoids clearing/reselecting the entire
+	// model on every mousemove, which was quadratic in large diagrams.
+	static activeIds = new Set();
 	static init() {
 		RectSelector.coordRect = new CoordRect();
 		RectSelector.coordRect.element = SVG.append(SVG.svgElement, SVG.rect(-30, -30, 60, 60, "black", "none", "rect-selector"));
 		RectSelector.coordRect.element.setAttribute("stroke-dasharray", "4 4");
 		RectSelector.coordRect.setVisible(false);
 	}
-	/**
-	 * @param {number} x
-	 * @param {number} y
-	*/
+	/** @param {number} x @param {number} y */
 	static start(x, y) {
-		unselect_all();
+		batchSelectionUpdates(() => unselect_all());
+		RectSelector.activeIds = new Set();
 		RectSelector.coordRect.setVisible(true);
 		RectSelector.coordRect.x1 = x;
 		RectSelector.coordRect.y1 = y;
@@ -8699,39 +8762,60 @@ class RectSelector {
 		RectSelector.coordRect.y2 = y;
 		RectSelector.coordRect.update();
 	}
-	/**
-	 * @param {number} x
-	 * @param {number} y
-	*/
+	/** @param {number} x @param {number} y */
 	static move(x, y) {
 		RectSelector.coordRect.x2 = x;
 		RectSelector.coordRect.y2 = y;
 		RectSelector.coordRect.update();
-		unselect_all();
-		let select_array = RectSelector.getObjectsWithin();
-		for (let key in select_array) {
-			let parent = get_parent(select_array[key]);
-			parent.select(false); // We also select the parent but not all of its anchors
-			select_array[key].select();
+		const within = RectSelector.getObjectsWithin();
+		const wanted = new Set();
+		for (const id of Object.keys(within)) {
+			wanted.add(id);
+			wanted.add(get_parent_id(id));
 		}
+		const previous = RectSelector.activeIds;
+		if (wanted.size === previous.size && [...wanted].every(id => previous.has(id))) return;
+
+		batchSelectionUpdates(() => {
+			// Release child handles before parents, so parent visuals can correctly
+			// assess whether any selected child handles remain.
+			for (const id of previous) {
+				if (id.includes(".") && !wanted.has(id)) get_object(id)?.unselect();
+			}
+			for (const id of previous) {
+				if (!id.includes(".") && !wanted.has(id)) get_object(id)?.unselect();
+			}
+			// Select parents once, even if many of their anchors fall in the box.
+			for (const id of wanted) {
+				if (!id.includes(".") && !previous.has(id)) get_object(id)?.select(false);
+			}
+			for (const id of wanted) {
+				if (id.includes(".") && !previous.has(id)) get_object(id)?.select();
+			}
+		});
+		RectSelector.activeIds = wanted;
 	}
 	static stop() {
 		RectSelector.coordRect.setVisible(false);
-		let select_array = RectSelector.getObjectsWithin();
-		for (let key in select_array) {
-			select_array[key].select();
-		}
+		// Preserve the pre-existing completed-selection behavior: a root object
+		// inside the rectangle becomes fully selected, including its handles.
+		const within = RectSelector.getObjectsWithin();
+		batchSelectionUpdates(() => {
+			for (const id of Object.keys(within)) {
+				const object = within[id];
+				if (object && !id.includes(".")) object.select();
+			}
+		});
+		RectSelector.activeIds = new Set();
 	}
 	static getObjectsWithin() {
-		let return_array = {};
-		for (let key in object_array) {
-			if (RectSelector.isWithin(key)) {
-				return_array[key] = object_array[key];
-			}
+		const result = {};
+		for (const key in object_array) {
+			if (RectSelector.isWithin(key)) result[key] = object_array[key];
 		}
-		return return_array;
+		return result;
 	}
-	/** @param {string} nodeId  */
+	/** @param {string} nodeId */
 	static isWithin(nodeId) {
 		return (
 			object_array[nodeId].pos[0] >= this.coordRect.xmin() &&
@@ -8875,6 +8959,7 @@ function primitive_mousedown(node_id, event, new_primitive) {
 	mouse.lastClickedPrimitive = get_object(node_id);
 	// If we left click directly on the anchors we dont want anything but them selected
 	if (event.which === mouse.left) {
+		return batchSelectionUpdates(() => {
 		if (mouse.lastClickedPrimitive.type == "dummy_anchor") {
 			let elementId = get_parent_id(mouse.lastClickedPrimitive.id);
 			let parentConnection = connection_array[elementId];
@@ -8917,6 +9002,7 @@ function primitive_mousedown(node_id, event, new_primitive) {
 		}
 		mouse.clickedOnObject = true
 		refreshSelectionStacking();
+		});
 	}
 }
 
@@ -9018,28 +9104,45 @@ function unselect_all_other_anchors(parent_id, child_id_to_select) {
 	}
 }
 
-function unselect_all() {
-	for (let key in object_array) {
-		object_array[key].unselect();
-	}
-	for (let key in connection_array) {
-		connection_array[key].unselect();
-	}
-	refreshSelectionStacking();
+// Normal clicks should touch only selected visuals, not every object in a
+// large model.  However, a new TwoPointer/Link visual can have visible and
+// selected anchor *children* while its parent has selected=false.  Clearing
+// those children alone leaves the parent SVG's handles visible.  Track the
+// affected parents and finish their cleanup after clearing their children.
+//
+// Model loading is different from a click: constructors may leave graphical
+// handles visible regardless of their selection flags.  forceVisualReset
+// reconciles the actual SVG visibility after reconstruction, once per load.
+function clearSelectionVisuals(dont_unselect_id = null, forceVisualReset = false) {
+	return batchSelectionUpdates(() => {
+		const affectedParents = new Set();
+		for (let key in object_array) {
+			let visual = object_array[key];
+			if (key === dont_unselect_id) continue;
+			if (visual.isSelected()) {
+				if (key.includes(".")) affectedParents.add(get_parent_id(key));
+				visual.unselect();
+			} else if (forceVisualReset) {
+				visual.unselect();
+			}
+		}
+		for (let key in connection_array) {
+			if (key === dont_unselect_id) continue;
+			let visual = connection_array[key];
+			if (forceVisualReset || visual.isSelected() || affectedParents.has(key)) {
+				visual.unselect();
+			}
+		}
+		refreshSelectionStacking();
+	});
+}
+
+function unselect_all(forceVisualReset = false) {
+	return clearSelectionVisuals(null, forceVisualReset);
 }
 
 function unselect_all_but(dont_unselect_id) {
-	for (let key in object_array) {
-		if (key != dont_unselect_id) {
-			object_array[key].unselect();
-		}
-	}
-	for (let key in connection_array) {
-		if (key != dont_unselect_id) {
-			connection_array[key].unselect();
-		}
-	}
-	refreshSelectionStacking();
+	return clearSelectionVisuals(dont_unselect_id);
 }
 
 function rotate_name(node_id) {
@@ -9365,11 +9468,16 @@ function mouseUpHandler(event) {
 
 		// A click/selection rectangle on empty canvas is UI state only.  It must not
 		// create a model undo snapshot or trigger the Unsaved Changes indicator.
-		let wasBlankCanvasInteraction = currentTool === MouseTool && mouse.emptyClickDown;
+		let wasMouseTool = currentTool === MouseTool;
 		currentTool.leftMouseUp(x, y, event.shiftKey);
 		mouse.isLeftDown = false;
 		InfoBar.update();
-		if (!wasBlankCanvasInteraction) History.storeUndoState();
+		// Selection is presentation state, not a model edit. Rebuilding an XML
+		// snapshot on every click is expensive in moderately sized models.
+		// Other tools and actual MouseTool moves/endpoint changes still get Undo.
+		if (!wasMouseTool || mouse.modelDragOccurred || mouse.modelChangeDuringMouseTool) {
+			History.storeUndoState();
+		}
 	} else if (event.which == mouse.middle) {
 		event.preventDefault()
 		MousePan.end()
@@ -10990,7 +11098,9 @@ function syncAllVisuals() {
 		xAlert(`${unresolvedGhosts.length} Ghost alias(es) could not be reconnected automatically. Their saved records and links have been preserved, not deleted. The rest of the model can be used. Restore the missing original variables or open an earlier model copy to recover these aliases.`);
 	}
 	update_all_objects();
-	unselect_all();
+	// Loading recreates SVG handles with constructor-time visibility independent
+	// of selected flags.  Normalize them once before the user can interact.
+	unselect_all(true);
 	if (window.SystemikaOutputDock && document.getElementById("systemika-output-panel")) SystemikaOutputDock.onModelSynced();
 }
 

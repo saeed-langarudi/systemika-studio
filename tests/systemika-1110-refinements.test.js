@@ -20,8 +20,8 @@ function fileMenuMarkup() {
   return index.slice(start, end);
 }
 
-test('1.3.0 shows the current model name in the model window', () => {
-  assert.equal(pkg.version, '1.3.0');
+test('1.3.1 shows the current model name in the model window', () => {
+  assert.equal(pkg.version, '1.3.1');
   assert.match(index, /id="current-model-name" class="current-model-name"/);
   assert.match(css, /\.current-model-name\s*\{/);
   assert.match(environment, /updateModelNameDisplay\(\)/);
@@ -106,7 +106,7 @@ test('multiscale gutter stays outside the plot and SVG restores horizontal grid 
   assert.match(editor, /host\.style\.width = `\$\{Math\.max\(46, gridLeft - gutterLeft - gutterRightGap\)\}px`/);
   assert.match(editor, /function graphMultiScaleGridSvg\(visual, grid\)/);
   assert.match(editor, /graphMultiScaleGridSvg\(visual, grid\)/);
-  assert.match(editor, /grid\.bottom \+ 34/);
+  assert.match(editor, /grid\.bottom \+ GRAPH_EXPORT_X_LABEL_OFFSET/);
 });
 
 test('Manage Runs opens independently of project-directory authorization and offers explicit recovery', () => {

@@ -1,3 +1,30 @@
+## Systemika Studio 1.3.1 — Selection-state loading correction (RC5, 2026-10-13)
+
+- Restore a one-time, complete SVG selection-state reset after every model load or undo reconstruction. In RC4, a connection could report `selected=false` while its constructor-created control anchors and Bézier handles remained visible; fast deselection incorrectly skipped the parent and left most links appearing selected.
+- Clear both selected child anchors and the corresponding parent connection on blank-canvas clicks, including when the parent itself reports `selected=false`.
+- Preserve incremental selection updates and the click-only Undo optimization introduced in RC3/RC4; no `.ssd`, simulation, run, or plot format changes.
+- Add regression tests covering inconsistent parent/anchor states, model-load normalization, and repeated blank-canvas clicks. See `docs/SELECTION_STATE_RESET_1.3.1.md`.
+
+## Systemika Studio 1.3.1 — Individual entity selection performance correction (RC4, 2026-10-13)
+
+- Avoid clearing/repainting every object when clicking a single model variable, link, Ghost, or handle; modify only the prior selection and batch selection UI updates.
+- Do not serialize the entire model into Undo history for selection-only clicks. Preserve Undo snapshots for geometry changes, endpoint attachment/detachment, and model-editing tools.
+- Keep all existing model, run, simulation, and plot formats unchanged. Add selection, Shift-click, anchor, and Undo regression tests. See `docs/CLICK_SELECTION_PERFORMANCE_1.3.1.md`.
+
+## Systemika Studio 1.3.1 — SVG X-axis spacing correction (RC2, 2026-10-13)
+
+- Prevent SVG exports from overlapping X-axis tick numbers with the X-axis title, particularly for multi-run plots with a legend.
+- Reserve independent spacing for tick numbers, axis title, and legend; grow the SVG canvas when required instead of compressing the labels.
+- Retain the earlier 1.3.1 plot-boundary clipping correction, separate plot/run data, and unchanged live-chart layout.
+- Add regression tests for multi-run legends, short chart panels, and plots without legends or X titles. See `docs/SVG_X_AXIS_LAYOUT_1.3.1.md`.
+
+## Systemika Studio 1.3.1 — SVG plot clipping correction (2026-10-12)
+
+- Fix SVG graph exports when manually limited Y or X axis ranges cause a curve to extend beyond the plot area. Data curves, fills, markers, and curve/point annotations are now clipped to the plotting rectangle, matching the live chart.
+- Preserve complete path geometry and intersection points at the plot border; do not remove or alter out-of-range simulation data.
+- Keep axes, grid labels, plot border, title, and legend outside the clipping group. No model file or simulation engine changes.
+- Add executable regression tests for limited axes, steps, fills, markers, annotation clipping, and legends. See `docs/SVG_PLOT_CLIPPING_1.3.1.md`.
+
 ## Systemika Studio 1.3.0 — Ghost and Lookup corrections (RC5, 2026-10-11)
 
 - Make Ghost symbols, including Lookup Ghosts, selectable across their SVG groups; retain selection via lifted Stock/Auxiliary label overlays.
@@ -1057,3 +1084,8 @@ Enter now applies the Time Unit dialog and opens the equation/properties editor 
 - Pressing Enter in the plot variable Range dialog now applies its scale settings and closes it, just like clicking Apply.
 - Invalid minimum/maximum limits keep the dialog open and display the existing validation warning.
 - Automatic range, Cancel, and other plot settings are unchanged.
+
+### 1.3.1 RC3 — Selection responsiveness
+- Reduce large-model marquee-selection work by incrementally updating only objects entering or leaving the rectangle.
+- Batch global selection UI refreshes rather than repeating them for every primitive and link handle.
+- Preserve selected link handles and existing model/simulation storage behavior.

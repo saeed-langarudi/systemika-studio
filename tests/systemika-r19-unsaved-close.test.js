@@ -121,7 +121,7 @@ test('A clean loaded model is canonicalized so harmless UI activity does not mar
   assert.equal(History.undoStates.length, 1);
 });
 
-test('Blank-canvas mouse interaction does not store an undo state', () => {
-  assert.match(editor, /let wasBlankCanvasInteraction = currentTool === MouseTool && mouse\.emptyClickDown;/);
-  assert.match(editor, /if \(!wasBlankCanvasInteraction\) History\.storeUndoState\(\);/);
+test('Selection-only and blank-canvas mouse interactions do not serialize undo snapshots', () => {
+  assert.match(editor, /let wasMouseTool = currentTool === MouseTool;/);
+  assert.match(editor, /if \(!wasMouseTool \|\| mouse\.modelDragOccurred \|\| mouse\.modelChangeDuringMouseTool\)/);
 });
